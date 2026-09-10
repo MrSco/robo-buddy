@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Robo Buddy Settings</title>
+    <link rel="stylesheet" href="/src/settings.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Robo Buddy</h1>
+
+      <section>
+        <h2>Character</h2>
+        <div class="row">
+          <select id="character"></select>
+          <button id="import" type="button">Import model…</button>
+        </div>
+        <p class="hint" id="packs-hint">GLB, VRM, animated WebP, GIF or PNG. Imported packs go in your characters folder.</p>
+        <label class="slider">
+          <span>Size <output id="size-out">100%</output></span>
+          <input id="size" type="range" min="0.5" max="2.5" step="0.05" />
+        </label>
+      </section>
+
+      <section>
+        <h2>Reactions</h2>
+        <label class="check"><input id="paused" type="checkbox" /> Pause all reactions</label>
+        <label class="check"><input id="mouse" type="checkbox" /> Watch the mouse</label>
+        <label class="check"><input id="physics" type="checkbox" /> Gravity and throwing</label>
+        <label class="check"><input id="music" type="checkbox" /> Dance to music</label>
+        <label class="slider indent">
+          <span>Music sensitivity <output id="sens-out"></output></span>
+          <input id="sensitivity" type="range" min="0" max="1" step="0.01" />
+        </label>
+        <label class="check indent"><input id="tempo" type="checkbox" /> Only dance when a steady tempo is detected (filters game audio)</label>
+      </section>
+
+      <section>
+        <h2>Window</h2>
+        <label class="field">
+          <span>Clicking</span>
+          <select id="clickthrough">
+            <option value="pixel">Precise: only the drawn pixels are clickable</option>
+            <option value="window">Whole window is clickable</option>
+            <option value="locked">Locked: never clickable (move via this window)</option>
+          </select>
+        </label>
+        <label class="check"><input id="autostart" type="checkbox" /> Start with Windows</label>
+      </section>
+
+      <p class="status" id="status"></p>
+    </main>
+    <script type="module" src="/src/settings.ts"></script>
+  </body>
+</html>

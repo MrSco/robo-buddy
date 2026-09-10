@@ -1,0 +1,13 @@
+{
+  "name": "Rocco (VRM)",
+  "author": "rocco",
+  "version": 1,
+  "renderer": "3d",
+  "model": "rocco.vrm",
+  "states": { "idle": { "clip": "idle", "loop": true } },
+  "reactions": {
+    "music": { "enabled": true, "threshold": 0.15 },
+    "mouse": { "enabled": true, "lookAtCursor": true },
+    "physics": { "gravity": true, "throwable": true, "walk": false }
+  }
+}

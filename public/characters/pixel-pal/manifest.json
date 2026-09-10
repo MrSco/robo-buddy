@@ -1,0 +1,17 @@
+{
+  "name": "Pixel Pal",
+  "author": "robo-buddy",
+  "version": 1,
+  "renderer": "2d",
+  "model": "idle.webp",
+  "states": {
+    "idle": { "clip": "idle.webp", "loop": true },
+    "dance": { "clip": "dance.webp", "loop": true, "beatsPerLoop": 2 },
+    "poked": { "clip": "poked.webp", "loop": false, "then": "idle" }
+  },
+  "reactions": {
+    "music": { "enabled": true, "threshold": 0.15 },
+    "mouse": { "enabled": true, "lookAtCursor": true },
+    "physics": { "gravity": true, "throwable": true, "walk": false }
+  }
+}

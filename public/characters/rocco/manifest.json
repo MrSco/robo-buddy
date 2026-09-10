@@ -1,0 +1,37 @@
+{
+  "name": "Rocco",
+  "author": "rocco",
+  "version": 1,
+  "renderer": "3d",
+  "model": "rocco.glb",
+  "lookAtBone": "mixamorig:Head",
+  "states": {
+    "idle": {
+      "clip": "idle",
+      "loop": true
+    },
+    "poked": {
+      "clip": "wave",
+      "loop": false,
+      "then": "idle"
+    }
+  },
+  "reactions": {
+    "music": {
+      "enabled": true,
+      "threshold": 0.15
+    },
+    "mouse": {
+      "enabled": true,
+      "lookAtCursor": true
+    },
+    "physics": {
+      "gravity": true,
+      "throwable": true,
+      "walk": false
+    }
+  },
+  "clips": {
+    "wave": "clips/wave.glb"
+  }
+}
