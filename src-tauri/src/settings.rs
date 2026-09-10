@@ -26,6 +26,10 @@ pub struct Settings {
     pub autostart: bool,
     /// Freeze all reactions (music, mouse, physics) without quitting.
     pub paused: bool,
+    /// Minutes of inactivity before the buddy falls asleep; 0 = never.
+    pub sleep_after_min: f64,
+    pub sounds_enabled: bool,
+    pub bubbles_enabled: bool,
 }
 
 impl Default for Settings {
@@ -41,6 +45,9 @@ impl Default for Settings {
             click_through: "pixel".into(),
             autostart: false,
             paused: false,
+            sleep_after_min: 5.0,
+            sounds_enabled: true,
+            bubbles_enabled: true,
         }
     }
 }

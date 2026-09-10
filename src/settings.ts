@@ -20,6 +20,9 @@ const els = {
   tempo: $<HTMLInputElement>("tempo"),
   clickthrough: $<HTMLSelectElement>("clickthrough"),
   autostart: $<HTMLInputElement>("autostart"),
+  sounds: $<HTMLInputElement>("sounds"),
+  bubbles: $<HTMLInputElement>("bubbles"),
+  sleep: $<HTMLSelectElement>("sleep"),
   status: $<HTMLParagraphElement>("status"),
 };
 
@@ -56,6 +59,12 @@ function render() {
   els.tempo.checked = settings.requireTempo;
   els.clickthrough.value = settings.clickThrough;
   els.autostart.checked = settings.autostart;
+  els.sounds.checked = settings.soundsEnabled;
+  els.bubbles.checked = settings.bubblesEnabled;
+  // Snap to the nearest offered option (the stored value may be anything).
+  const opts = Array.from(els.sleep.options).map((o) => Number(o.value));
+  const nearest = opts.reduce((a, b) => (Math.abs(b - settings.sleepAfterMin) < Math.abs(a - settings.sleepAfterMin) ? b : a));
+  els.sleep.value = String(nearest);
   applying = false;
 }
 
@@ -94,6 +103,9 @@ async function main() {
   });
   els.sensitivity.addEventListener("change", () => commit({ musicThreshold: thresholdFromSlider(Number(els.sensitivity.value)) }));
   els.tempo.addEventListener("change", () => commit({ requireTempo: els.tempo.checked }));
+  els.sounds.addEventListener("change", () => commit({ soundsEnabled: els.sounds.checked }));
+  els.bubbles.addEventListener("change", () => commit({ bubblesEnabled: els.bubbles.checked }));
+  els.sleep.addEventListener("change", () => commit({ sleepAfterMin: Number(els.sleep.value) }));
   els.clickthrough.addEventListener("change", () => commit({ clickThrough: els.clickthrough.value as ClickThroughMode }));
   els.autostart.addEventListener("change", async () => {
     try {

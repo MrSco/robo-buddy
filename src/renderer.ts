@@ -10,6 +10,8 @@ export interface FrameInput {
   state: StateName;
   /** 0..1 blend for the dance layer. */
   danceAmount: number;
+  /** 0..1 blend for the sleep pose. */
+  sleepAmount: number;
   music: Music | null;
   /** Head look target in radians. */
   yaw: number;

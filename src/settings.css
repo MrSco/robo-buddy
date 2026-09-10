@@ -114,3 +114,16 @@ output {
   min-height: 16px;
   margin: 4px 2px 0;
 }
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.field.inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 0;
+}
+.field.inline select {
+  flex: 1;
+}

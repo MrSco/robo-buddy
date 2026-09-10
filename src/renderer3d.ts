@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { loadCharacter, type Character } from "./character";
 import { applyDance } from "./dance";
 import type { Manifest, PackRef } from "./packs";
-import { applyFlail, applyIdle, applyLookAt } from "./pose";
+import { applyFlail, applyIdle, applyLookAt, applySleep } from "./pose";
 import type { FrameInput, Renderer, StateName } from "./renderer";
 
 /** three.js renderer for GLB / VRM characters: clips via the mixer, procedural layers on top. */
@@ -146,7 +146,9 @@ export class Renderer3D implements Renderer {
     this.lean += (targetLean - this.lean) * Math.min(1, input.dt * 12);
     root.rotation.z = this.lean;
 
-    applyLookAt(c, input.yaw, input.pitch + pokePitch + nod, roll);
+    const awake = 1 - input.sleepAmount;
+    applyLookAt(c, input.yaw * awake, (input.pitch + pokePitch + nod) * awake, roll * awake);
+    if (!this.hasClip("sleep")) applySleep(c, input.t, input.sleepAmount);
     c.update(input.dt);
     this.renderer.render(this.scene, this.camera);
     this.renders++;

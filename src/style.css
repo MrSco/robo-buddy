@@ -23,3 +23,39 @@ html, body {
 #stage2d:active {
   cursor: grabbing;
 }
+
+.bubble {
+  position: absolute;
+  max-width: 200px;
+  padding: 6px 10px;
+  background: #fff;
+  color: #1a1a1a;
+  border-radius: 12px;
+  font: 600 13px/1.25 "Segoe UI", system-ui, sans-serif;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  white-space: nowrap;
+  --tail: 20px;
+}
+.bubble::after {
+  content: "";
+  position: absolute;
+  left: calc(var(--tail) - 6px);
+  bottom: -7px;
+  border: 6px solid transparent;
+  border-top-color: #fff;
+  border-bottom: 0;
+}
+.bubble.pop {
+  animation: pop 0.18s ease-out;
+}
+@keyframes pop {
+  from {
+    transform: translateY(6px) scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}

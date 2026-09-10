@@ -22,6 +22,10 @@ export interface Manifest {
     string,
     { clip: string; loop?: boolean; beatsPerLoop?: number; playbackRate?: number; then?: string; sheet?: string; frames?: number; fps?: number }
   >;
+  /** Optional speech-bubble lines per event; one is picked at random. */
+  lines?: Partial<Record<"greet" | "poked" | "sleep" | "wake" | "land" | "dance", string[]>>;
+  /** Optional sound files per event, relative to the pack. */
+  sounds?: Partial<Record<"poked" | "land" | "wake" | "greet", string>>;
   reactions: {
     music?: { enabled: boolean; threshold?: number };
     mouse?: { enabled: boolean; lookAtCursor?: boolean; pokeState?: string };

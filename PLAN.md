@@ -167,9 +167,13 @@ Any missing state falls back to `idle`.
 - Lesson: keep one WebGL renderer per canvas for the app lifetime; `forceContextLoss` leaves the canvas unusable for the next renderer.
 - Not tested here: the autostart toggle (writes a Run registry entry) and the file-picker import; both use stock Tauri plugins.
 
-**M4 — Polish and ship**
-- Autostart plugin, idle-to-sleep, sounds, speech bubbles, optional walk along screen bottom.
-- NSIS installer plus portable exe. Updater plugin. Signed builds later.
+**M4 — Polish and ship** — in progress, Sep 10 2026
+- Done: idle-to-sleep (`sleepAfterMin`, hover/poke/drag/music wake him), speech bubbles (`src/bubble.ts`, per-pack `lines`),
+  sounds (`src/sound.ts`, per-pack `sounds`; Pixel Pal ships boing/thud), sounds/bubbles/sleep controls in settings, autostart (M3).
+- Done: release build via `pnpm tauri build` (NSIS + MSI under `src-tauri/target/release/bundle`).
+- Deferred: updater plugin (needs a signing key pair and a hosted latest.json), code signing, walk along the screen bottom,
+  memory trimming of the WebView2 helper processes.
+- Lesson: procedural rotations about world X need the sign checked visually; look-at uses negative pitch for "up".
 
 ## 5. Known Windows gotchas
 - Transparent windows need `decorations: false` and `shadow: false` or you get a grey frame.

@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { Music } from "./audio";
+import { Bubble } from "./bubble";
+import { Sounds } from "./sound";
 import { cursor, IN_TAURI, startInput } from "./input";
 import { listPacks, resolvePack, validateManifest, type Manifest, type PackRef } from "./packs";
 import { WindowPhysics } from "./physics";
@@ -56,6 +58,18 @@ let pokePending = false;
 let settingsEvents = 0;
 let bootStamp = Date.now() % 100000;
 
+// Sleep / activity
+let lastActivity = 0;
+let asleep = false;
+let sleepAmount = 0;
+let nextSnore = 0;
+let dancedThisSession = false;
+
+const bubble = new Bubble();
+const sounds = new Sounds();
+let headX = BASE_W / 2;
+let headY = BASE_H * 0.2;
+
 const headWorld = new THREE.Vector3();
 
 // ---------- boot ----------
@@ -67,10 +81,19 @@ async function boot() {
   p.onPoke = () => {
     sincePoke = 0;
     pokePending = true;
+    activity();
+    if (!settings.paused) {
+      speak("poked");
+      sounds.play("poked");
+    }
   };
   p.onLand = (speed) => {
     sinceLand = 0;
     landStrength = Math.min(1, speed / 2500);
+    if (landStrength > 0.4) {
+      speak("land");
+      sounds.play("land");
+    }
   };
   await p.init();
   if (IN_TAURI) {
@@ -136,6 +159,10 @@ async function loadPack(id: string) {
     }
     currentState = "idle";
     danceAmount = 0;
+    sounds.load(ref, m);
+    activity();
+    speak("greet", 3);
+    sounds.play("greet");
   } catch (err) {
     console.error(`failed to load pack "${id}"`, err);
     if (id !== "rocco") {
@@ -169,13 +196,31 @@ function applySettings(s: Settings) {
     if (physics.opts.gravity && physics.mode === "rest") physics.mode = "falling";
   }
   if (music) music.threshold = s.musicThreshold;
+  sounds.enabled = s.soundsEnabled;
+  if (!s.bubblesEnabled) bubble.hide();
   ignoringCursor = null; // force the click-through mode to be re-applied
+}
+
+function speak(event: NonNullable<Manifest["lines"]> extends Partial<Record<infer K, string[]>> ? K : never, seconds = 2.5) {
+  if (!settings.bubblesEnabled || !manifest) return;
+  bubble.say(manifest.lines?.[event], seconds, clock.elapsedTime);
+}
+
+/** Any interaction: resets the sleep timer and wakes him up. */
+function activity() {
+  lastActivity = clock.elapsedTime;
+  if (asleep) {
+    asleep = false;
+    speak("wake");
+    sounds.play("wake");
+  }
 }
 
 // ---------- input ----------
 function onGrab(e: PointerEvent) {
   if (e.button !== 0 || !physics || settings.clickThrough === "locked") return;
   physics.grab();
+  activity();
 }
 stage3d.addEventListener("pointerdown", onGrab);
 stage2d.addEventListener("pointerdown", onGrab);
@@ -195,20 +240,23 @@ function cursorInCanvas(): { x: number; y: number } | null {
   return { x, y };
 }
 
+function updateHead() {
+  // Where the head is on screen, for either renderer: drives look-at and the speech bubble.
+  headX = cssW / 2;
+  headY = cssH * 0.2;
+  const head = renderer === renderer3d ? renderer3d?.debugCharacter?.bone("head") : undefined;
+  if (head && renderer3d) {
+    head.getWorldPosition(headWorld).project(renderer3d.camera);
+    headX = ((headWorld.x + 1) / 2) * cssW;
+    headY = ((1 - headWorld.y) / 2) * cssH;
+  }
+}
+
 function updateLook(dt: number) {
   const mouse = settings.mouseEnabled && !settings.paused && (manifest?.reactions.mouse?.lookAtCursor ?? true);
   let targetYaw = 0;
   let targetPitch = 0;
   if (mouse && physics && cursor.valid) {
-    // Reference point: where the head is on screen, for either renderer.
-    let headX = cssW / 2;
-    let headY = cssH * 0.2;
-    const head = renderer3d?.debugCharacter?.bone("head");
-    if (head && renderer3d) {
-      head.getWorldPosition(headWorld).project(renderer3d.camera);
-      headX = ((headWorld.x + 1) / 2) * cssW;
-      headY = ((1 - headWorld.y) / 2) * cssH;
-    }
     const dx = (cursor.x - physics.x) / scaleFactor - headX;
     const dy = (cursor.y - physics.y) / scaleFactor - headY;
     if (Math.hypot(dx, dy) < cssH * 1.5) {
@@ -242,6 +290,7 @@ function resolveState(t: number): StateName {
   if (physics?.mode === "held") return "dragged";
   if (physics?.airborne) return "fall";
   if (pokeUntil > t) return "poked";
+  if (asleep) return "sleep";
   if (danceAmount > 0.5) return "dance";
   return "idle";
 }
@@ -258,7 +307,7 @@ function debugTitle(t: number) {
   const probe = renderer3d ? renderer3d.debugProbe() : "2d";
   const title =
     `Robo Buddy | ${p.mode} y=${p.y.toFixed(0)} air=${p.airborne} yaw=${yaw.toFixed(2)} cur=${cursor.x},${cursor.y},${cursor.buttons}` +
-    ` | pack=${pack?.id} state=${currentState} ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
+    ` | pack=${pack?.id} state=${currentState} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
     (m ? ` | lvl=${m.level.toFixed(2)} bpm=${m.bpm.toFixed(0)} dance=${m.dancing} amt=${danceAmount.toFixed(2)} beats=${m.beats.toFixed(1)}` : "");
   getCurrentWindow().setTitle(title).catch(() => {});
 }
@@ -279,7 +328,27 @@ function frame() {
   }
   sincePoke += dt;
   sinceLand += dt;
+  updateHead();
   updateLook(dt);
+
+  // Activity: hovering over him, dragging, music, pokes. Silence for long enough = sleep.
+  if (music?.dancing || physics?.mode === "held" || cursorInCanvas()) activity();
+  if (music) {
+    if (danceAmount > 0.5 && !dancedThisSession) {
+      dancedThisSession = true;
+      speak("dance");
+    } else if (danceAmount < 0.1) dancedThisSession = false;
+  }
+  const sleepAfter = settings.sleepAfterMin * 60;
+  if (!asleep && sleepAfter > 0 && !paused && t - lastActivity > sleepAfter) {
+    asleep = true;
+    nextSnore = t + 1;
+  }
+  if (asleep && t > nextSnore) {
+    speak("sleep", 2.2);
+    nextSnore = t + 6 + Math.random() * 4;
+  }
+  sleepAmount += ((asleep ? 1 : 0) - sleepAmount) * (1 - Math.exp(-dt * (asleep ? 0.8 : 3)));
 
   // A poke starts the pack's poked clip (if any) for its duration, else a short procedural hop.
   if (pokePending) {
@@ -294,6 +363,7 @@ function frame() {
       dt,
       state: currentState,
       danceAmount,
+      sleepAmount,
       music,
       yaw,
       pitch,
@@ -306,6 +376,7 @@ function frame() {
     renderer.frame(input);
   }
   if (!paused || physics?.mode === "held" || physics?.airborne) physics?.step(dt);
+  bubble.update(t, headX, headY, cssW);
   updateClickThrough();
   debugTitle(t);
 }

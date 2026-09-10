@@ -90,3 +90,21 @@ export function applyLookAt(c: Character, yaw: number, pitch: number, roll = 0) 
   rotateWorld(head, WORLD_X, -pitch * 0.6);
   rotateWorld(head, WORLD_Z, roll);
 }
+
+/**
+ * Asleep on the feet: slumped chest, head dropped forward, slow deep breathing.
+ * `amount` blends it over the idle pose so falling asleep and waking are gradual.
+ */
+export function applySleep(c: Character, t: number, amount: number) {
+  if (amount <= 0.001) return;
+  const breathe = Math.sin(t * 0.9) * 0.03 * amount;
+  const chest = c.bone("chest") ?? c.bone("spine");
+  c.root.updateMatrixWorld(true);
+  rotateWorld(chest, WORLD_X, 0.18 * amount + breathe);
+  rotateWorld(c.bone("neck"), WORLD_X, 0.25 * amount);
+  rotateWorld(c.bone("head"), WORLD_X, 0.45 * amount);
+  rotateWorld(c.bone("head"), WORLD_Z, 0.12 * amount);
+  // Arms hang a little looser.
+  rotateWorld(c.bone("leftUpperArm"), WORLD_Z, -0.12 * amount);
+  rotateWorld(c.bone("rightUpperArm"), WORLD_Z, 0.12 * amount);
+}

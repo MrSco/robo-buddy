@@ -33,5 +33,32 @@
   },
   "clips": {
     "wave": "clips/wave.glb"
+  },
+  "lines": {
+    "greet": [
+      "Yo.",
+      "What's up.",
+      "Back at it."
+    ],
+    "poked": [
+      "Hey!",
+      "What?",
+      "Easy.",
+      "Don't do that."
+    ],
+    "sleep": [
+      "zzz"
+    ],
+    "wake": [
+      "Huh? Oh. Hey."
+    ],
+    "land": [
+      "Ow.",
+      "Careful!"
+    ],
+    "dance": [
+      "Let's go!",
+      "This slaps."
+    ]
   }
 }

@@ -15,6 +15,10 @@ export interface Settings {
   clickThrough: ClickThroughMode;
   autostart: boolean;
   paused: boolean;
+  /** Minutes of inactivity before sleeping; 0 = never. */
+  sleepAfterMin: number;
+  soundsEnabled: boolean;
+  bubblesEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -28,6 +32,9 @@ export const DEFAULT_SETTINGS: Settings = {
   clickThrough: "pixel",
   autostart: false,
   paused: false,
+  sleepAfterMin: 5,
+  soundsEnabled: true,
+  bubblesEnabled: true,
 };
 
 export async function getSettings(): Promise<Settings> {

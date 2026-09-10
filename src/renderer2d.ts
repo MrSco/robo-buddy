@@ -128,6 +128,8 @@ export class Renderer2D implements Renderer {
       const wanted = (clip.beatsPerLoop * 60) / input.music.bpm;
       rate = clip.total / wanted;
     }
+    // Asleep without a sleep clip: the idle loop crawls.
+    if (input.sleepAmount > 0 && cur.state !== "sleep" && !this.clips.has("sleep")) rate *= 1 - 0.7 * input.sleepAmount;
     cur.time += input.dt * rate;
     if (clip.loop) cur.time %= clip.total;
     else cur.time = Math.min(cur.time, clip.total - 1e-4);
@@ -177,7 +179,7 @@ export class Renderer2D implements Renderer {
     const cx = W / 2;
     const feetY = H * 0.97 + bob * H;
     ctx.translate(cx, feetY);
-    ctx.rotate(this.lean);
+    ctx.rotate(this.lean + 0.1 * input.sleepAmount);
     ctx.scale(squashX * this.facing, squashY);
     ctx.drawImage(img, -dw / 2, -dh, dw, dh);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
