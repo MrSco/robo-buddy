@@ -376,7 +376,10 @@ function frame() {
     renderer.frame(input);
   }
   if (!paused || physics?.mode === "held" || physics?.airborne) physics?.step(dt);
-  bubble.update(t, headX, headY, cssW);
+  if (renderer) {
+    const a = renderer.bubbleAnchor();
+    bubble.update(t, a.x, a.y, cssW);
+  }
   updateClickThrough();
   debugTitle(t);
 }

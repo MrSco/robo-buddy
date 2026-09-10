@@ -34,7 +34,7 @@ export class Bubble {
     this.hideAt = 0;
   }
 
-  /** Reposition each frame; (x, y) is the head's CSS pixel position in the window. */
+  /** Reposition each frame; (x, y) is the top of the head in CSS pixels. */
   update(now: number, headX: number, headY: number, stageW: number) {
     if (this.el.hidden) return;
     if (now >= this.hideAt) {
@@ -44,7 +44,7 @@ export class Bubble {
     const w = this.el.offsetWidth;
     const left = Math.max(4, Math.min(stageW - w - 4, headX - w / 2));
     this.el.style.left = `${left}px`;
-    this.el.style.top = `${Math.max(4, headY - this.el.offsetHeight - 14)}px`;
+    this.el.style.top = `${Math.max(2, headY - this.el.offsetHeight - 12)}px`;
     // Tail points at the head.
     this.el.style.setProperty("--tail", `${Math.max(12, Math.min(w - 12, headX - left))}px`);
   }

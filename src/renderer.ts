@@ -34,6 +34,8 @@ export interface Renderer {
   frame(input: FrameInput): void;
   /** Alpha (0..255) of the last drawn frame at CSS pixel coordinates. */
   alphaAt(x: number, y: number): number;
+  /** Top of the character's head in CSS pixels; speech bubbles sit above this point. */
+  bubbleAnchor(): { x: number; y: number };
   /** True when the pack provides a clip for the state, so procedural fallbacks can step aside. */
   hasClip(state: StateName): boolean;
   /** Length of the state's clip in seconds, for one-shot states like "poked". */

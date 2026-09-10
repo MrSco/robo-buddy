@@ -28,6 +28,7 @@ export class Renderer2D implements Renderer {
   private dpr = Math.min(window.devicePixelRatio, 2);
   private lean = 0;
   private facing = 1;
+  private crownY = 0.15;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -173,16 +174,21 @@ export class Renderer2D implements Renderer {
     if (Math.abs(input.yaw) > 0.25) this.facing = input.yaw > 0 ? 1 : -1;
 
     // Fit the image to the stage, anchored at the bottom centre.
-    const scale = Math.min(W / img.width, H / img.height) * 0.92;
+    const scale = Math.min(W / img.width, H / img.height) * 0.8;
     const dw = img.width * scale;
     const dh = img.height * scale;
     const cx = W / 2;
     const feetY = H * 0.97 + bob * H;
+    this.crownY = (feetY - dh * squashY) / H;
     ctx.translate(cx, feetY);
     ctx.rotate(this.lean + 0.1 * input.sleepAmount);
     ctx.scale(squashX * this.facing, squashY);
     ctx.drawImage(img, -dw / 2, -dh, dw, dh);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  bubbleAnchor() {
+    return { x: this.canvas.width / this.dpr / 2, y: (this.crownY * this.canvas.height) / this.dpr };
   }
 
   alphaAt(x: number, y: number): number {

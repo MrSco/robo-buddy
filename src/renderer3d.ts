@@ -22,6 +22,9 @@ export class Renderer3D implements Renderer {
   private state: StateName | null = null;
   private lean = 0;
   private pixel = new Uint8Array(4);
+  private cssW = 320;
+  private cssH = 440;
+  private crown = new THREE.Vector3();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -69,13 +72,18 @@ export class Renderer3D implements Renderer {
     const box = new THREE.Box3().setFromObject(c.root);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-    const height = size.y * 1.12;
+    // Frame 1.3x the model height, with the model pushed toward the bottom so the feet
+    // keep a small margin and the top quarter stays free for speech bubbles.
+    const height = size.y * 1.3;
     const dist = height / 2 / Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
-    this.camera.position.set(center.x, center.y + size.y * 0.02, center.z + dist);
-    this.camera.lookAt(center.x, center.y, center.z);
+    const targetY = center.y + size.y * 0.09;
+    this.camera.position.set(center.x, targetY, center.z + dist);
+    this.camera.lookAt(center.x, targetY, center.z);
   }
 
   resize(w: number, h: number) {
+    this.cssW = w;
+    this.cssH = h;
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
@@ -159,6 +167,17 @@ export class Renderer3D implements Renderer {
     const px = new Uint8Array(4);
     this.gl.readPixels(Math.floor(this.canvas.width / 2), Math.floor(this.canvas.height * 0.55), 1, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, px);
     return `${Array.from(px).join(",")} err=${this.gl.getError()} lost=${this.gl.isContextLost()} inst=${this.id} renders=${this.renders} same=${this.gl === this.renderer.getContext()}`;
+  }
+
+  bubbleAnchor() {
+    const c = this.character;
+    const head = c?.bone("head");
+    if (!c || !head) return { x: this.cssW / 2, y: this.cssH * 0.15 };
+    // The head bone sits at the base of the skull; the crown is roughly 13% of the height above it.
+    head.getWorldPosition(this.crown);
+    this.crown.y += c.height * 0.13;
+    this.crown.project(this.camera);
+    return { x: ((this.crown.x + 1) / 2) * this.cssW, y: ((1 - this.crown.y) / 2) * this.cssH };
   }
 
   alphaAt(x: number, y: number): number {
