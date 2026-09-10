@@ -73,6 +73,17 @@ pub fn load(app: &AppHandle) -> Settings {
         .unwrap_or_default()
 }
 
+/// Load before the app exists. Windows from the config are created before `setup` runs and
+/// the buddy asks for its settings immediately, so the store must be managed on the Builder.
+/// Mirrors Tauri's app_config_dir on Windows: %APPDATA%\<identifier>.
+pub fn load_early(identifier: &str) -> Settings {
+    std::env::var_os("APPDATA")
+        .map(|base| PathBuf::from(base).join(identifier).join("settings.json"))
+        .and_then(|p| fs::read_to_string(p).ok())
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
+}
+
 fn save(app: &AppHandle, s: &Settings) {
     if let Some(p) = settings_path(app) {
         if let Ok(json) = serde_json::to_string_pretty(s) {

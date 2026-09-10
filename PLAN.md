@@ -180,6 +180,7 @@ Any missing state falls back to `idle`.
   memory trimming of the WebView2 helper processes, interacting with other windows (sit on title bars, push windows) -> M5.
 - Done: "Bring buddy here" (tray + settings button) teleports him to the floor of the monitor under the cursor. Wandering keeps him on his current monitor, so on a multi-monitor desk he can be out of sight.
 - Done: uncaught errors are mirrored into the hidden window title in every build (read with GetWindowText) since release builds have no devtools.
+- Lesson (the invisible-buddy bug): Tauri v2 creates config windows before `setup`, and the release frontend loads fast enough to call `get_settings` before `app.manage` ran. Anything a window needs on load must be managed on the Builder. Debug builds hid it because the Vite dev server is slower.
 - Note: when the screen saver or secure desktop is active, GetCursorPos fails and WebView2 stops painting; the app shows cur=0,0 and an all-zero probe. Not a bug.
 - More dances: only one in the free library. See `docs/dances.md` for the Mixamo route and the Fortnite-emote lookalike list.
 - Lesson: a scheduler that picks an activity must also push its own next-event time, or it re-rolls every frame.

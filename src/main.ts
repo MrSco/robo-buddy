@@ -331,7 +331,9 @@ function walkRate(speedPx: number): number {
 // ---------- loop ----------
 let lastTitle = 0;
 function debugTitle(t: number) {
-  if (!import.meta.env.DEV || !IN_TAURI || !physics || t - lastTitle < 0.1) return;
+  // The title is never visible (no decorations, no taskbar entry), so it doubles as a
+  // status line in every build; release builds have no other way to be inspected.
+  if (!IN_TAURI || !physics || t - lastTitle < (import.meta.env.DEV ? 0.1 : 0.5)) return;
   lastTitle = t;
   const p = physics;
   const m = music;

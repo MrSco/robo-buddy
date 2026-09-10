@@ -25,7 +25,11 @@ fn open_settings(app: tauri::AppHandle) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let context = tauri::generate_context!();
+    let initial = settings::load_early(&context.config().identifier);
     tauri::Builder::default()
+        // Managed before any window exists: the buddy window calls get_settings on load.
+        .manage(settings::SettingsState(std::sync::Mutex::new(initial.clone())))
         .plugin(
             tauri_plugin_window_state::Builder::default()
                 // Only remember where windows sit; size and visibility are ours to control.
@@ -37,10 +41,7 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .setup(|app| {
-            let initial = settings::load(app.handle());
-            app.manage(settings::SettingsState(std::sync::Mutex::new(initial.clone())));
-
+        .setup(move |app| {
             let bring_item = MenuItem::with_id(app, "bring", "Bring buddy here", true, None::<&str>)?;
             let settings_item = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
             let pause_item = CheckMenuItem::with_id(app, "pause", "Pause reactions", true, initial.paused, None::<&str>)?;
@@ -96,6 +97,6 @@ pub fn run() {
             packs::import_pack,
             open_settings,
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running Robo Buddy");
 }
