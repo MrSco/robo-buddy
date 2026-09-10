@@ -83,6 +83,35 @@ pub fn start_cursor_thread(app: AppHandle) {
     });
 }
 
+/// Work areas of every monitor, so the frontend can pick one synchronously while dragging.
+#[tauri::command]
+pub fn work_areas() -> Vec<WorkArea> {
+    #[cfg(windows)]
+    {
+        use windows::core::BOOL;
+        use windows::Win32::Foundation::{LPARAM, RECT};
+        use windows::Win32::Graphics::Gdi::{EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO};
+        unsafe extern "system" fn cb(hmon: HMONITOR, _hdc: HDC, _rc: *mut RECT, lp: LPARAM) -> BOOL {
+            let out = &mut *(lp.0 as *mut Vec<WorkArea>);
+            let mut info = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+            if GetMonitorInfoW(hmon, &mut info).as_bool() {
+                let r = info.rcWork;
+                out.push(WorkArea { left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+            }
+            BOOL(1)
+        }
+        let mut out: Vec<WorkArea> = Vec::new();
+        // SAFETY: the callback only touches the Vec we pass through lparam for the duration of the call.
+        unsafe {
+            let _ = EnumDisplayMonitors(None, None, Some(cb), LPARAM(&mut out as *mut _ as isize));
+        }
+        if !out.is_empty() {
+            return out;
+        }
+    }
+    vec![work_area(0, 0)]
+}
+
 /// Ask the buddy to come to the monitor the cursor is on (tray menu and settings button).
 #[tauri::command]
 pub fn bring_here(app: AppHandle) {

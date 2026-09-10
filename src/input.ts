@@ -56,3 +56,8 @@ export async function getWorkArea(x: number, y: number): Promise<WorkArea> {
   if (!IN_TAURI) return { left: 0, top: 0, right: screen.width, bottom: screen.height };
   return invoke<WorkArea>("work_area", { x, y });
 }
+
+export async function getWorkAreas(): Promise<WorkArea[]> {
+  if (!IN_TAURI) return [{ left: 0, top: 0, right: screen.width, bottom: screen.height }];
+  return invoke<WorkArea[]>("work_areas");
+}

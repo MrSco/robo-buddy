@@ -182,6 +182,11 @@ Any missing state falls back to `idle`.
 - Done: uncaught errors are mirrored into the hidden window title in every build (read with GetWindowText) since release builds have no devtools.
 - Lesson (the invisible-buddy bug): Tauri v2 creates config windows before `setup`, and the release frontend loads fast enough to call `get_settings` before `app.manage` ran. Anything a window needs on load must be managed on the Builder. Debug builds hid it because the Vite dev server is slower.
 - Note: when the screen saver or secure desktop is active, GetCursorPos fails and WebView2 stops painting; the app shows cur=0,0 and an all-zero probe. Not a bug.
+- Done: 19 Mixamo dances plus hanging/falling/landing and 8 idles, fetched through the user's logged-in Chrome, converted by `scripts/fbx_to_glb.py` (Blender headless) and baked with `--map=mixamo`. Source FBX kept in `assets/mixamo/`.
+- Done: click-vs-hold (a press becomes a grab after 6 px or 220 ms; a quick release is a poke), held plays Hanging Idle, airborne plays Falling Idle.
+- Done: clip transitions never drop total mixer weight below one (no more T-pose flashes); a state without a clip keeps the last clip as its base.
+- Done: drag across monitors picks the destination monitor's work area synchronously (all work areas cached).
+- Done: settings gallery with posed thumbnails, a live animated preview, per-pack idle-set checkboxes.
 - More dances: only one in the free library. See `docs/dances.md` for the Mixamo route and the Fortnite-emote lookalike list.
 - Lesson: a scheduler that picks an activity must also push its own next-event time, or it re-rolls every frame.
 - Lesson: clips that key only some bones flicker during crossfades (unkeyed bones blend toward the rest pose). Hips translation must be kept for crouches and kneels or the feet leave the floor.

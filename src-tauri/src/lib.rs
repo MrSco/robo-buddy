@@ -89,6 +89,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             input::work_area,
+            input::work_areas,
             input::bring_here,
             settings::get_settings,
             settings::set_settings,

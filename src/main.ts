@@ -88,14 +88,7 @@ async function boot() {
 
   const p = new WindowPhysics({ gravity: false, throwable: false });
   p.onPoke = () => {
-    sincePoke = 0;
-    pokePending = true;
-    activity();
-    behavior.interrupt(clock.elapsedTime);
-    if (!settings.paused) {
-      speak("poked");
-      sounds.play("poked");
-    }
+    // Grabs only start after the hold threshold, so a release here is a drop, not a poke.
   };
   p.onLand = (speed) => {
     sinceLand = 0;
@@ -219,6 +212,8 @@ function applySettings(s: Settings) {
   if (music) music.threshold = s.musicThreshold;
   sounds.enabled = s.soundsEnabled;
   behavior.opts = { wander: s.wanderEnabled, danceMode: s.danceMode };
+  const set = pack ? s.idleSets?.[pack.id] : undefined;
+  behavior.enabled = set ? new Set(set) : null;
   if (!s.bubblesEnabled) bubble.hide();
   ignoringCursor = null; // force the click-through mode to be re-applied
 }
@@ -239,11 +234,38 @@ function activity() {
 }
 
 // ---------- input ----------
+// A press is not a grab until the cursor moves or is held; a quick release is a poke.
+// This keeps the current animation running through a plain click instead of snapping to "held".
+let press: { t: number; x: number; y: number } | null = null;
+const GRAB_MOVE = 6;
+const GRAB_HOLD = 0.22;
+
 function onGrab(e: PointerEvent) {
   if (e.button !== 0 || !physics || settings.clickThrough === "locked") return;
-  physics.grab();
+  press = { t: clock.elapsedTime, x: cursor.x, y: cursor.y };
   activity();
-  behavior.interrupt(clock.elapsedTime);
+}
+
+function updatePress(t: number) {
+  if (!press || !physics) return;
+  const moved = Math.hypot(cursor.x - press.x, cursor.y - press.y);
+  const released = !(cursor.buttons & 1);
+  if (released) {
+    press = null;
+    sincePoke = 0;
+    pokePending = true;
+    behavior.interrupt(t);
+    if (!settings.paused) {
+      speak("poked");
+      sounds.play("poked");
+    }
+    return;
+  }
+  if (moved > GRAB_MOVE || t - press.t > GRAB_HOLD) {
+    press = null;
+    physics.grab();
+    behavior.interrupt(t);
+  }
 }
 stage3d.addEventListener("pointerdown", onGrab);
 stage2d.addEventListener("pointerdown", onGrab);
@@ -310,8 +332,8 @@ function updateClickThrough() {
 
 /** Pick the behaviour state for this frame, plus the clip that goes with it. */
 function resolveState(t: number, act: ReturnType<Behavior["update"]>): { state: StateName; clip: ClipChoice | null } {
-  if (physics?.mode === "held") return { state: "dragged", clip: null };
-  if (physics?.airborne) return { state: "fall", clip: null };
+  if (physics?.mode === "held") return { state: "dragged", clip: behavior.stateClip("dragged") };
+  if (physics?.airborne) return { state: "fall", clip: behavior.stateClip("fall") };
   if (pokeUntil > t) return { state: "poked", clip: pokeClip };
   if (asleep) return { state: "sleep", clip: null };
   if (danceAmount > 0.5) return { state: "dance", clip: danceClip };
@@ -363,6 +385,7 @@ function frame() {
   }
   sincePoke += dt;
   sinceLand += dt;
+  updatePress(t);
   updateHead();
   updateLook(dt);
 

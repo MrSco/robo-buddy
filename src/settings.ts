@@ -2,7 +2,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { listPacks, type Manifest, type PackRef } from "./packs";
-import { previewFor } from "./preview";
+import { LivePreview, thumbnailFor } from "./preview";
+import { Behavior } from "./behavior";
 import { getSettings, onSettingsChanged, setSettings, type ClickThroughMode, type Settings } from "./settings-store";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -27,8 +28,9 @@ const els = {
   sleep: $<HTMLSelectElement>("sleep"),
   dance: $<HTMLSelectElement>("dance"),
   wander: $<HTMLInputElement>("wander"),
-  preview: $<HTMLImageElement>("preview"),
-  previewEmpty: $<HTMLSpanElement>("preview-empty"),
+  live: $<HTMLCanvasElement>("live"),
+  gallery: $<HTMLDivElement>("gallery"),
+  idleset: $<HTMLDivElement>("idleset"),
   status: $<HTMLParagraphElement>("status"),
 };
 
@@ -36,6 +38,92 @@ let settings: Settings;
 let applying = false;
 let packs: PackRef[] = [];
 const manifests = new Map<string, Manifest>();
+let live: LivePreview | null = null;
+/** Pack currently shown in the live preview (may differ from the active character). */
+let previewing: string | null = null;
+
+function getLive() {
+  if (!live) live = new LivePreview(els.live);
+  return live;
+}
+
+async function previewPack(id: string) {
+  const pack = packs.find((p) => p.id === id);
+  if (!pack) return;
+  previewing = id;
+  for (const b of els.gallery.querySelectorAll("button")) b.classList.toggle("previewing", b.dataset.id === id);
+  const m = await manifestFor(pack);
+  try {
+    await getLive().show(pack, m);
+  } catch (err) {
+    status(`Preview failed: ${err}`);
+  }
+}
+
+async function renderGallery() {
+  els.gallery.innerHTML = "";
+  for (const p of packs) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.dataset.id = p.id;
+    b.title = p.name;
+    b.classList.toggle("selected", p.id === settings.character);
+    const label = document.createElement("span");
+    label.textContent = p.name;
+    b.appendChild(label);
+    b.addEventListener("click", () => {
+      // First click previews, a click on the previewed pack makes it the buddy.
+      if (previewing === p.id && settings.character !== p.id) {
+        void commit({ character: p.id });
+        for (const x of els.gallery.querySelectorAll("button")) x.classList.toggle("selected", x.dataset.id === p.id);
+        void updatePackDetails();
+      } else void previewPack(p.id);
+    });
+    els.gallery.appendChild(b);
+  }
+  // Thumbnails load one at a time through the shared preview context.
+  for (const p of packs) {
+    try {
+      const m = await manifestFor(p);
+      const src = await thumbnailFor(p, m, getLive());
+      const b = els.gallery.querySelector<HTMLButtonElement>(`button[data-id="${CSS.escape(p.id)}"]`);
+      if (b) b.style.backgroundImage = `url(${src})`;
+    } catch {
+      // leave the placeholder
+    }
+  }
+  // Thumbnails borrowed the live canvas; show the active pack in it now.
+  await previewPack(settings.character);
+}
+
+function renderIdleSet(m: Manifest) {
+  els.idleset.innerHTML = "";
+  const enabled = new Set(settings.idleSets?.[settings.character] ?? []);
+  const hasSet = !!settings.idleSets?.[settings.character];
+  const entries: Array<{ key: string; label: string }> = [
+    ...(m.idleVariants ?? []).map((v) => ({ key: v, label: `idle: ${v}` })),
+    ...(m.fidgets ?? []).map((f) => ({ key: Behavior.fidgetKey(f), label: `fidget: ${Behavior.fidgetKey(f).replace(/\+/g, " → ")}` })),
+  ];
+  if (!entries.length) {
+    els.idleset.textContent = "This character has no idle variations.";
+    return;
+  }
+  for (const e of entries) {
+    const label = document.createElement("label");
+    label.className = "check";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = hasSet ? enabled.has(e.key) : true;
+    input.addEventListener("change", () => {
+      const current = new Set(settings.idleSets?.[settings.character] ?? entries.map((x) => x.key));
+      if (input.checked) current.add(e.key);
+      else current.delete(e.key);
+      void commit({ idleSets: { ...settings.idleSets, [settings.character]: [...current] } });
+    });
+    label.append(input, document.createTextNode(" " + e.label));
+    els.idleset.appendChild(label);
+  }
+}
 
 async function manifestFor(pack: PackRef): Promise<Manifest> {
   let m = manifests.get(pack.id);
@@ -51,28 +139,17 @@ async function updatePackDetails() {
   if (!pack) return;
   const m = await manifestFor(pack);
   // Dance choices for this pack.
-  const dances = ["random", ...(m.dances ?? []).filter((d) => d !== "procedural"), "procedural"];
+  const names = (m.dances ?? []).map((d) => (typeof d === "string" ? d : d.clip)).filter((d) => d !== "procedural");
+  const dances = ["random", ...names, "procedural"];
   els.dance.innerHTML = "";
   for (const d of dances) {
     const opt = document.createElement("option");
     opt.value = d;
-    opt.textContent = d === "random" ? "Random each time" : d === "procedural" ? "Built-in groove" : d;
+    opt.textContent = d === "random" ? "Random each time" : d === "procedural" ? "Built-in groove" : d.replace(/_/g, " ");
     els.dance.appendChild(opt);
   }
   els.dance.value = dances.includes(settings.danceMode) ? settings.danceMode : "random";
-  // Thumbnail.
-  els.preview.hidden = true;
-  els.previewEmpty.hidden = false;
-  els.previewEmpty.textContent = "…";
-  try {
-    const src = await previewFor(pack, m);
-    if ((packs.find((p) => p.id === settings.character) ?? packs[0]) !== pack) return;
-    els.preview.src = src;
-    els.preview.hidden = false;
-    els.previewEmpty.hidden = true;
-  } catch {
-    els.previewEmpty.textContent = "no preview";
-  }
+  renderIdleSet(m);
 }
 
 // Sensitivity slider maps 0..1 to threshold 0.5..0.03 (higher slider = more sensitive).
@@ -89,6 +166,7 @@ async function refreshPacks() {
     els.character.appendChild(opt);
   }
   els.character.value = settings.character;
+  void renderGallery();
 }
 
 function render() {

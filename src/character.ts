@@ -196,7 +196,6 @@ export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<
       const action = actionFor(name);
       if (!action) return;
       const fade = opts.fade ?? 0.25;
-      if (current && current !== action) current.fadeOut(fade);
       action.reset();
       action.enabled = true;
       action.setLoop(opts.loop ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
@@ -207,7 +206,16 @@ export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<
         scale = action.getClip().duration / wanted;
       }
       action.timeScale = scale;
-      action.fadeIn(fade).play();
+      // Weights must always sum to one, or the mixer blends toward the rest T-pose.
+      // Crossfade only when another action is actually carrying weight; otherwise start at full weight.
+      const prevWeight = current && current !== action ? current.getEffectiveWeight() : 0;
+      if (current && current !== action && prevWeight > 0.01) {
+        current.fadeOut(fade);
+        action.fadeIn(fade).play();
+      } else {
+        action.setEffectiveWeight(1);
+        action.play();
+      }
       current = action;
       animatedBones.clear();
       for (const track of action.getClip().tracks) {

@@ -2,6 +2,7 @@
 //! broadcast to every window as a `settings-changed` event whenever they change.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -34,6 +35,8 @@ pub struct Settings {
     pub wander_enabled: bool,
     /// "random", "procedural", or a dance clip name from the pack.
     pub dance_mode: String,
+    /// Per pack id: the idle variants / fidgets left enabled. Missing = all.
+    pub idle_sets: HashMap<String, Vec<String>>,
 }
 
 impl Default for Settings {
@@ -54,6 +57,7 @@ impl Default for Settings {
             bubbles_enabled: true,
             wander_enabled: true,
             dance_mode: "random".into(),
+            idle_sets: HashMap::new(),
         }
     }
 }

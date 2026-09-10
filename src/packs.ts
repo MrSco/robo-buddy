@@ -39,8 +39,8 @@ export interface Manifest {
   idleVariants?: string[];
   /** One-shot clips (or sequences) played now and then while idle. */
   fidgets?: Array<string | string[]>;
-  /** Dance clip names the user can choose from; "procedural" is the built-in groove. */
-  dances?: string[];
+  /** Dance clips the user can choose from; "procedural" is the built-in groove. */
+  dances?: Array<string | { clip: string; beatsPerLoop?: number; label?: string }>;
   /** Optional speech-bubble lines per event; one is picked at random. */
   lines?: Partial<Record<"greet" | "poked" | "sleep" | "wake" | "land" | "dance", string[]>>;
   /** Optional sound files per event, relative to the pack. */

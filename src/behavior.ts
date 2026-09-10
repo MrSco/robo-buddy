@@ -46,6 +46,12 @@ export class Behavior {
   private fidgetQueue: string[] = [];
   private danceChoice: string | null = null;
   opts: BehaviorOptions = { wander: true, danceMode: "random" };
+  /** Enabled idle variants / fidget keys, or null for all. Fidget sequences are keyed by their joined names. */
+  enabled: Set<string> | null = null;
+
+  static fidgetKey(f: string | string[]): string {
+    return Array.isArray(f) ? f.join("+") : f;
+  }
 
   setPack(manifest: Manifest, durations: (name: string) => number, t: number) {
     this.manifest = manifest;
@@ -69,7 +75,7 @@ export class Behavior {
   /** Called when a dance session starts: pick which dance to do this time. */
   chooseDance(): ClipChoice | null {
     const m = this.manifest;
-    const list = (m?.dances ?? []).filter((d) => d === "procedural" || this.durations(d) > 0);
+    const list = (m?.dances ?? []).map((d) => (typeof d === "string" ? d : d.clip)).filter((d) => d === "procedural" || this.durations(d) > 0);
     let pick: string | null = null;
     if (this.opts.danceMode === "procedural") pick = "procedural";
     else if (this.opts.danceMode !== "random" && list.includes(this.opts.danceMode)) pick = this.opts.danceMode;
@@ -77,8 +83,11 @@ export class Behavior {
     else pick = m?.states.dance ? m.states.dance.clip : "procedural";
     this.danceChoice = pick;
     if (!pick || pick === "procedural") return null;
-    const def = m?.states.dance;
-    return { name: pick, loop: true, beatsPerLoop: def?.beatsPerLoop ?? 2 };
+    const entry = (m?.dances ?? []).find((d) => typeof d !== "string" && d.clip === pick) as { clip: string; beatsPerLoop?: number } | undefined;
+    // Without a stated beat count, assume the clip was choreographed near 120 bpm (two beats per second)
+    // so it stays roughly on the music's tempo instead of racing.
+    const beats = entry?.beatsPerLoop ?? (pick === m?.states.dance?.clip ? m?.states.dance?.beatsPerLoop : undefined) ?? Math.max(1, Math.round(this.durations(pick) * 2));
+    return { name: pick, loop: true, beatsPerLoop: beats };
   }
 
   get currentDance() {
@@ -127,8 +136,9 @@ export class Behavior {
     if (s.t < this.nextEvent) return this.activity;
 
     // Time for something new.
-    const variants = (m.idleVariants ?? []).filter((v) => this.durations(v) > 0);
-    const fidgets = (m.fidgets ?? []).filter((f) => (Array.isArray(f) ? f : [f]).every((c) => this.durations(c) > 0));
+    const on = (key: string) => !this.enabled || this.enabled.has(key);
+    const variants = (m.idleVariants ?? []).filter((v) => this.durations(v) > 0 && on(v));
+    const fidgets = (m.fidgets ?? []).filter((f) => (Array.isArray(f) ? f : [f]).every((c) => this.durations(c) > 0) && on(Behavior.fidgetKey(f)));
     const walk = m.states.walk;
     const canWalk = this.opts.wander && !!walk && this.durations(walk.clip) > 0 && s.right - s.left - s.w > MIN_WANDER * 2;
     const options: Array<() => void> = [];

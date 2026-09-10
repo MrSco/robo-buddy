@@ -23,6 +23,8 @@ export interface Settings {
   wanderEnabled: boolean;
   /** "random", "procedural", or a dance clip name from the pack. */
   danceMode: string;
+  /** Per pack id: idle variants / fidgets the user left enabled. Missing = all. */
+  idleSets: Record<string, string[]>;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -41,6 +43,7 @@ export const DEFAULT_SETTINGS: Settings = {
   bubblesEnabled: true,
   wanderEnabled: true,
   danceMode: "random",
+  idleSets: {},
 };
 
 export async function getSettings(): Promise<Settings> {

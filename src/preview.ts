@@ -1,73 +1,131 @@
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
+import { loadCharacter, type Character } from "./character";
 import type { Manifest, PackRef } from "./packs";
+import { applyIdle } from "./pose";
 
 /**
- * Renders a thumbnail for a character pack: a still of the model for 3D packs,
- * the first idle frame for 2D packs. Results are cached per pack id.
+ * Live animated preview of a character pack for the settings window: the model plays
+ * its idle clip in a small viewport. The same scene produces still thumbnails for the
+ * gallery, so one WebGL context serves everything.
  */
-const cache = new Map<string, Promise<string>>();
-let renderer: THREE.WebGLRenderer | null = null;
+const thumbCache = new Map<string, Promise<string>>();
 
-const W = 160;
-const H = 200;
+export class LivePreview {
+  private renderer: THREE.WebGLRenderer;
+  private scene = new THREE.Scene();
+  private camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+  private character: Character | null = null;
+  private clock = new THREE.Clock();
+  private raf = 0;
+  private token = 0;
+  private img: HTMLImageElement | null = null;
 
-function getRenderer() {
-  if (!renderer) {
-    const canvas = document.createElement("canvas");
-    canvas.width = W * 2;
-    canvas.height = H * 2;
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
-    renderer.setClearColor(0x000000, 0);
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
+  constructor(private canvas: HTMLCanvasElement) {
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
+    this.renderer.setClearColor(0x000000, 0);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.6));
+    const key = new THREE.DirectionalLight(0xffffff, 1.4);
+    key.position.set(1.5, 3, 2.5);
+    this.scene.add(key);
+    this.resize();
   }
-  return renderer;
+
+  resize() {
+    const w = this.canvas.clientWidth || 200;
+    const h = this.canvas.clientHeight || 260;
+    this.renderer.setSize(w, h, false);
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+  }
+
+  /** Show a pack. 3D packs animate; 2D packs show their first frame as an image. */
+  async show(pack: PackRef, manifest: Manifest) {
+    const token = ++this.token;
+    this.stop();
+    if (manifest.renderer !== "3d") {
+      const src = await thumbnail2d(pack, manifest);
+      if (token !== this.token) return;
+      this.showImage(src);
+      return;
+    }
+    const c = await loadCharacter(pack, manifest);
+    if (token !== this.token) {
+      c.dispose();
+      return;
+    }
+    this.character = c;
+    this.scene.add(c.root);
+    this.frame(c);
+    const idle = manifest.states.idle?.clip;
+    if (idle && c.hasClip(idle)) c.play(idle, { loop: true, fade: 0 });
+    this.hideImage();
+    this.clock.start();
+    const loop = () => {
+      if (token !== this.token) return;
+      const dt = Math.min(this.clock.getDelta(), 0.1);
+      c.beginFrame(dt);
+      applyIdle(c, this.clock.elapsedTime, 1);
+      c.update(dt);
+      this.renderer.render(this.scene, this.camera);
+      this.raf = requestAnimationFrame(loop);
+    };
+    loop();
+  }
+
+  /** Render one posed frame of a character (idle clip advanced a little) and return a PNG. */
+  renderOnce(c: Character): string {
+    this.scene.add(c.root);
+    this.frame(c);
+    c.beginFrame(0.4);
+    applyIdle(c, 0, 1);
+    c.update(0);
+    this.renderer.render(this.scene, this.camera);
+    const src = this.renderer.domElement.toDataURL("image/png");
+    this.scene.remove(c.root);
+    return src;
+  }
+
+  private frame(c: Character) {
+    c.root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(c.root);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    // The rest pose is a T-pose, so frame on height only and ignore the arm span.
+    const dist = (size.y * 1.15) / 2 / Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    this.camera.position.set(center.x, center.y + size.y * 0.02, center.z + dist);
+    this.camera.lookAt(center.x, center.y, center.z);
+  }
+
+  private showImage(src: string) {
+    if (!this.img) {
+      this.img = document.createElement("img");
+      this.img.className = "preview-2d";
+      this.canvas.insertAdjacentElement("afterend", this.img);
+    }
+    this.img.src = src;
+    this.img.hidden = false;
+    this.canvas.hidden = true;
+  }
+
+  private hideImage() {
+    if (this.img) this.img.hidden = true;
+    this.canvas.hidden = false;
+  }
+
+  stop() {
+    cancelAnimationFrame(this.raf);
+    if (this.character) {
+      this.character.dispose();
+      this.character = null;
+    }
+    this.renderer.clear();
+  }
 }
 
-async function render3d(url: string): Promise<string> {
-  const loader = new GLTFLoader();
-  loader.register((parser) => new VRMLoaderPlugin(parser));
-  const gltf = await loader.loadAsync(url);
-  const vrm = gltf.userData.vrm as VRM | undefined;
-  const root = vrm ? vrm.scene : gltf.scene;
-  if (vrm) VRMUtils.rotateVRM0(vrm);
-  root.traverse((o) => {
-    if ((o as THREE.SkinnedMesh).isSkinnedMesh) o.frustumCulled = false;
-  });
-
-  const scene = new THREE.Scene();
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.6));
-  const key = new THREE.DirectionalLight(0xffffff, 1.4);
-  key.position.set(1.5, 3, 2.5);
-  scene.add(key);
-  scene.add(root);
-
-  root.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(root);
-  const size = box.getSize(new THREE.Vector3());
-  const center = box.getCenter(new THREE.Vector3());
-  const camera = new THREE.PerspectiveCamera(30, W / H, 0.1, 100);
-  // Frame the upper body: T-posed arms are wide, so aim for the torso and head.
-  const fit = Math.max(size.y * 0.75, size.x * 0.45);
-  const dist = fit / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-  camera.position.set(center.x, center.y + size.y * 0.15, center.z + dist);
-  camera.lookAt(center.x, center.y + size.y * 0.15, center.z);
-
-  const r = getRenderer();
-  r.render(scene, camera);
-  const data = r.domElement.toDataURL("image/png");
-  root.traverse((o) => {
-    const m = o as THREE.Mesh;
-    m.geometry?.dispose();
-    const mats = Array.isArray(m.material) ? m.material : m.material ? [m.material] : [];
-    for (const mat of mats) mat.dispose();
-  });
-  return data;
-}
-
-async function render2d(url: string): Promise<string> {
-  const resp = await fetch(url);
+async function thumbnail2d(pack: PackRef, manifest: Manifest): Promise<string> {
+  const resp = await fetch(pack.base + manifest.model);
   const Decoder = (window as unknown as { ImageDecoder?: typeof ImageDecoder }).ImageDecoder;
   let bitmap: ImageBitmap;
   if (Decoder) {
@@ -81,8 +139,8 @@ async function render2d(url: string): Promise<string> {
     bitmap = await createImageBitmap(await resp.blob());
   }
   const canvas = document.createElement("canvas");
-  canvas.width = W * 2;
-  canvas.height = H * 2;
+  canvas.width = 320;
+  canvas.height = 400;
   const ctx = canvas.getContext("2d")!;
   const scale = Math.min(canvas.width / bitmap.width, canvas.height / bitmap.height) * 0.9;
   const dw = bitmap.width * scale;
@@ -92,13 +150,21 @@ async function render2d(url: string): Promise<string> {
   return canvas.toDataURL("image/png");
 }
 
-export function previewFor(pack: PackRef, manifest: Manifest): Promise<string> {
-  let p = cache.get(pack.id);
+/** Still thumbnail for the gallery, posed by the pack's idle clip so the arms are down. */
+export function thumbnailFor(pack: PackRef, manifest: Manifest, preview: LivePreview): Promise<string> {
+  let p = thumbCache.get(pack.id);
   if (!p) {
-    const url = pack.base + manifest.model;
-    p = manifest.renderer === "3d" ? render3d(url) : render2d(url);
-    p.catch(() => cache.delete(pack.id));
-    cache.set(pack.id, p);
+    p = (async () => {
+      if (manifest.renderer !== "3d") return thumbnail2d(pack, manifest);
+      const c = await loadCharacter(pack, manifest);
+      const idle = manifest.states.idle?.clip;
+      if (idle && c.hasClip(idle)) c.play(idle, { loop: true, fade: 0 });
+      const src = preview.renderOnce(c);
+      c.dispose();
+      return src;
+    })();
+    p.catch(() => thumbCache.delete(pack.id));
+    thumbCache.set(pack.id, p);
   }
   return p;
 }

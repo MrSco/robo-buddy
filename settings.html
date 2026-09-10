@@ -13,14 +13,15 @@
       <section>
         <h2>Character</h2>
         <div class="pick">
-          <div class="preview"><img id="preview" alt="" hidden /><span id="preview-empty">…</span></div>
+          <div class="preview"><canvas id="live"></canvas></div>
           <div class="pick-controls">
-            <select id="character"></select>
+            <div id="gallery" class="gallery"></div>
+            <select id="character" hidden></select>
             <div class="row">
               <button id="import" type="button">Import model…</button>
               <button id="bring" type="button">Bring buddy to this screen</button>
             </div>
-            <p class="hint" id="packs-hint">GLB, VRM, animated WebP, GIF or PNG. Imported packs go in your characters folder.</p>
+            <p class="hint" id="packs-hint">Click a character to preview it; click again to use it. GLB, VRM, animated WebP, GIF or PNG can be imported.</p>
           </div>
         </div>
         <label class="slider">
@@ -45,6 +46,10 @@
           <select id="dance"></select>
         </label>
         <label class="check"><input id="wander" type="checkbox" /> Wander around and fidget when idle</label>
+        <details class="idleset">
+          <summary>Idle moves for this character</summary>
+          <div id="idleset" class="idleset-list"></div>
+        </details>
         <div class="grid2">
           <label class="check"><input id="sounds" type="checkbox" /> Sounds</label>
           <label class="check"><input id="bubbles" type="checkbox" /> Speech bubbles</label>

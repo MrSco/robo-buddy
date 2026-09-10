@@ -113,9 +113,9 @@ export class Renderer3D implements Renderer {
         bpm: input.music?.bpm,
         playbackRate: want.playbackRate,
       });
-    } else {
-      c.stop();
     }
+    // With no clip for this state the last clip keeps running as the base pose and the
+    // procedural layers (flail, sleep, hold) go on top. Stopping it would leave a T-pose.
     this.playing = key;
     this.state = input.state;
   }

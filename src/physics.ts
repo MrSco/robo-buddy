@@ -1,5 +1,5 @@
 import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
-import { cursor, getWorkArea, IN_TAURI, onLeftRelease, type WorkArea } from "./input";
+import { cursor, getWorkArea, getWorkAreas, IN_TAURI, onLeftRelease, type WorkArea } from "./input";
 
 /**
  * Moves the OS window itself: custom drag (so we can measure velocity), throw,
@@ -33,6 +33,7 @@ export class WindowPhysics {
   private grabDx = 0;
   private grabDy = 0;
   private area: WorkArea = { left: 0, top: 0, right: 1920, bottom: 1040 };
+  private areas: WorkArea[] = [];
   private samples: Array<{ t: number; x: number; y: number }> = [];
   private lastApplied = { x: NaN, y: NaN };
   private pending = false;
@@ -52,7 +53,37 @@ export class WindowPhysics {
     this.w = size.width;
     this.h = size.height;
     this.area = await getWorkArea(this.x + this.w / 2, this.y + this.h / 2);
+    await this.refreshAreas();
     if (this.opts.gravity) this.mode = "falling";
+  }
+
+  /** Cache every monitor's work area; monitors rarely change, so re-read every 30 s. */
+  async refreshAreas() {
+    try {
+      this.areas = await getWorkAreas();
+    } catch {
+      this.areas = [];
+    }
+    setTimeout(() => void this.refreshAreas(), 30_000);
+  }
+
+  /** Synchronously pick the monitor containing a point (nearest by centre distance as a fallback). */
+  private areaAt(x: number, y: number): WorkArea {
+    if (!this.areas.length) return this.area;
+    const inside = this.areas.find((a) => x >= a.left && x < a.right && y >= a.top && y < a.bottom);
+    if (inside) return inside;
+    let best = this.areas[0];
+    let bestD = Infinity;
+    for (const a of this.areas) {
+      const cx = (a.left + a.right) / 2;
+      const cy = (a.top + a.bottom) / 2;
+      const d = (x - cx) ** 2 + (y - cy) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = a;
+      }
+    }
+    return best;
   }
 
   grab() {
@@ -83,7 +114,10 @@ export class WindowPhysics {
       }
     }
     this.mode = this.opts.gravity ? "falling" : "rest";
-    void getWorkArea(this.x + this.w / 2, this.y + this.h / 2).then((a) => (this.area = a));
+    // Pick the monitor he was released over right now; the physics would otherwise clamp
+    // him back into the old monitor's bounds while the async lookup was still in flight.
+    this.area = this.areaAt(this.x + this.w / 2, this.y + this.h / 2);
+    if (!this.areas.length) void getWorkArea(this.x + this.w / 2, this.y + this.h / 2).then((a) => (this.area = a));
   }
 
   get floor() {
@@ -124,6 +158,7 @@ export class WindowPhysics {
     if (this.mode === "held") {
       this.x = cursor.x - this.grabDx;
       this.y = cursor.y - this.grabDy;
+      this.area = this.areaAt(this.x + this.w / 2, this.y + this.h / 2);
       this.samples.push({ t: performance.now(), x: this.x, y: this.y });
       if (this.samples.length > 12) this.samples.shift();
     } else if (this.mode === "falling") {
