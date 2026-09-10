@@ -11,9 +11,23 @@
       "loop": true
     },
     "poked": {
-      "clip": "wave",
-      "loop": false,
-      "then": "idle"
+      "clip": "hit",
+      "clips": [
+        "hit",
+        "hitHead",
+        "wave"
+      ],
+      "loop": false
+    },
+    "dance": {
+      "clip": "dance",
+      "loop": true,
+      "beatsPerLoop": 2
+    },
+    "walk": {
+      "clip": "walk",
+      "loop": true,
+      "speed": 110
     }
   },
   "reactions": {
@@ -32,6 +46,24 @@
     }
   },
   "clips": {
+    "idle": "/clips/ual/Idle_Loop.glb",
+    "talk": "/clips/ual/Idle_Talking_Loop.glb",
+    "walk": "/clips/ual/Walk_Loop.glb",
+    "dance": "/clips/ual/Dance_Loop.glb",
+    "hit": "/clips/ual/Hit_Chest.glb",
+    "hitHead": "/clips/ual/Hit_Head.glb",
+    "interact": "/clips/ual/Interact.glb",
+    "fix": "/clips/ual/Fixing_Kneeling.glb",
+    "jab": "/clips/ual/Punch_Jab.glb",
+    "cross": "/clips/ual/Punch_Cross.glb",
+    "roll": "/clips/ual/Roll.glb",
+    "jumpStart": "/clips/ual/Jump_Start.glb",
+    "jumpLand": "/clips/ual/Jump_Land.glb",
+    "pickup": "/clips/ual/PickUp_Table.glb",
+    "spellEnter": "/clips/ual/Spell_Simple_Enter.glb",
+    "spellShoot": "/clips/ual/Spell_Simple_Shoot.glb",
+    "spellExit": "/clips/ual/Spell_Simple_Exit.glb",
+    "crouch": "/clips/ual/Crouch_Idle_Loop.glb",
     "wave": "clips/wave.glb"
   },
   "lines": {
@@ -60,5 +92,32 @@
       "Let's go!",
       "This slaps."
     ]
-  }
+  },
+  "idleVariants": [
+    "talk",
+    "crouch"
+  ],
+  "fidgets": [
+    "interact",
+    "fix",
+    [
+      "jab",
+      "cross"
+    ],
+    "roll",
+    [
+      "jumpStart",
+      "jumpLand"
+    ],
+    "pickup",
+    [
+      "spellEnter",
+      "spellShoot",
+      "spellExit"
+    ]
+  ],
+  "dances": [
+    "dance",
+    "procedural"
+  ]
 }

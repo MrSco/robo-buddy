@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { Music } from "./audio";
+import { Behavior, type ClipChoice } from "./behavior";
 import { Bubble } from "./bubble";
 import { Sounds } from "./sound";
 import { cursor, IN_TAURI, startInput } from "./input";
@@ -67,6 +68,13 @@ let dancedThisSession = false;
 
 const bubble = new Bubble();
 const sounds = new Sounds();
+const behavior = new Behavior();
+let pokeClip: ClipChoice | null = null;
+let lastAct = "idle";
+let lastFree = false;
+let lastClip = "-";
+let danceClip: ClipChoice | null = null;
+let facing = 0;
 let headX = BASE_W / 2;
 let headY = BASE_H * 0.2;
 
@@ -82,6 +90,7 @@ async function boot() {
     sincePoke = 0;
     pokePending = true;
     activity();
+    behavior.interrupt(clock.elapsedTime);
     if (!settings.paused) {
       speak("poked");
       sounds.play("poked");
@@ -160,6 +169,7 @@ async function loadPack(id: string) {
     currentState = "idle";
     danceAmount = 0;
     sounds.load(ref, m);
+    behavior.setPack(m, (n) => renderer?.clipDuration(n) ?? 0, clock.elapsedTime);
     activity();
     speak("greet", 3);
     sounds.play("greet");
@@ -197,6 +207,7 @@ function applySettings(s: Settings) {
   }
   if (music) music.threshold = s.musicThreshold;
   sounds.enabled = s.soundsEnabled;
+  behavior.opts = { wander: s.wanderEnabled, danceMode: s.danceMode };
   if (!s.bubblesEnabled) bubble.hide();
   ignoringCursor = null; // force the click-through mode to be re-applied
 }
@@ -221,6 +232,7 @@ function onGrab(e: PointerEvent) {
   if (e.button !== 0 || !physics || settings.clickThrough === "locked") return;
   physics.grab();
   activity();
+  behavior.interrupt(clock.elapsedTime);
 }
 stage3d.addEventListener("pointerdown", onGrab);
 stage2d.addEventListener("pointerdown", onGrab);
@@ -285,14 +297,24 @@ function updateClickThrough() {
   }
 }
 
-/** Pick the behaviour state for this frame. */
-function resolveState(t: number): StateName {
-  if (physics?.mode === "held") return "dragged";
-  if (physics?.airborne) return "fall";
-  if (pokeUntil > t) return "poked";
-  if (asleep) return "sleep";
-  if (danceAmount > 0.5) return "dance";
-  return "idle";
+/** Pick the behaviour state for this frame, plus the clip that goes with it. */
+function resolveState(t: number, act: ReturnType<Behavior["update"]>): { state: StateName; clip: ClipChoice | null } {
+  if (physics?.mode === "held") return { state: "dragged", clip: null };
+  if (physics?.airborne) return { state: "fall", clip: null };
+  if (pokeUntil > t) return { state: "poked", clip: pokeClip };
+  if (asleep) return { state: "sleep", clip: null };
+  if (danceAmount > 0.5) return { state: "dance", clip: danceClip };
+  if (act.kind === "walk") return { state: "walk", clip: act.clip ? { ...act.clip, playbackRate: walkRate(act.speed) } : null };
+  if (act.kind === "fidget") return { state: "fidget", clip: act.clip };
+  return { state: "idle", clip: act.clip ?? behavior.stateClip("idle") };
+}
+
+/** Playback rate so the walk cycle roughly matches the window's speed across the screen. */
+function walkRate(speedPx: number): number {
+  const h = renderer3d?.debugCharacter?.height ?? 1.8;
+  const pxPerMeter = (cssH * scaleFactor) / (1.3 * h);
+  const naturalMps = 1.15;
+  return Math.max(0.5, Math.min(1.6, speedPx / (pxPerMeter * naturalMps)));
 }
 
 // ---------- loop ----------
@@ -307,7 +329,7 @@ function debugTitle(t: number) {
   const probe = renderer3d ? renderer3d.debugProbe() : "2d";
   const title =
     `Robo Buddy | ${p.mode} y=${p.y.toFixed(0)} air=${p.airborne} yaw=${yaw.toFixed(2)} cur=${cursor.x},${cursor.y},${cursor.buttons}` +
-    ` | pack=${pack?.id} state=${currentState} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
+    ` | pack=${pack?.id} state=${currentState} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
     (m ? ` | lvl=${m.level.toFixed(2)} bpm=${m.bpm.toFixed(0)} dance=${m.dancing} amt=${danceAmount.toFixed(2)} beats=${m.beats.toFixed(1)}` : "");
   getCurrentWindow().setTitle(title).catch(() => {});
 }
@@ -336,6 +358,8 @@ function frame() {
   if (music) {
     if (danceAmount > 0.5 && !dancedThisSession) {
       dancedThisSession = true;
+      danceClip = behavior.chooseDance();
+      behavior.interrupt(t);
       speak("dance");
     } else if (danceAmount < 0.1) dancedThisSession = false;
   }
@@ -350,18 +374,48 @@ function frame() {
   }
   sleepAmount += ((asleep ? 1 : 0) - sleepAmount) * (1 - Math.exp(-dt * (asleep ? 0.8 : 3)));
 
-  // A poke starts the pack's poked clip (if any) for its duration, else a short procedural hop.
+  // A poke starts one of the pack's poke clips for its duration, else a short procedural hop.
   if (pokePending) {
     pokePending = false;
-    if (!paused) pokeUntil = t + (renderer?.hasClip("poked") ? renderer.clipDuration("poked") : 0.45);
+    if (!paused) {
+      pokeClip = renderer?.kind === "3d" ? behavior.stateClip("poked") : null;
+      const d = pokeClip ? renderer!.clipDuration(pokeClip.name) : renderer?.hasClip("poked") ? renderer.clipDuration("poked") : 0.45;
+      pokeUntil = t + Math.max(0.3, d);
+    }
   }
-  currentState = resolveState(t);
+
+  // Idle-time behaviour: variants, fidgets, wandering.
+  const free =
+    !paused && !asleep && !!physics && physics.mode === "rest" && !physics.airborne && danceAmount < 0.5 && pokeUntil <= t;
+  const act = behavior.update({
+    t,
+    free,
+    x: physics?.x ?? 0,
+    w: physics?.w ?? 320,
+    left: physics?.workArea.left ?? 0,
+    right: physics?.workArea.right ?? 1920,
+  });
+  const resolved = resolveState(t, act);
+  currentState = resolved.state;
+  lastAct = act.kind;
+  lastFree = free;
+  lastClip = resolved.clip?.name ?? "-";
+  let targetFacing = 0;
+  if (currentState === "walk" && act.kind === "walk" && physics) {
+    const dir = Math.sign(act.targetX - physics.x) || 1;
+    targetFacing = (dir * Math.PI) / 2;
+    const step = Math.min(Math.abs(act.targetX - physics.x), act.speed * settings.size * dt);
+    physics.nudge(dir * step);
+  }
+  facing = targetFacing;
 
   if (renderer) {
     const input: FrameInput = {
       t,
       dt,
       state: currentState,
+      clip: renderer?.kind === "3d" ? resolved.clip : null,
+      facing,
       danceAmount,
       sleepAmount,
       music,

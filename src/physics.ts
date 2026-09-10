@@ -90,6 +90,17 @@ export class WindowPhysics {
     return this.area.bottom - this.h;
   }
 
+  get workArea() {
+    return this.area;
+  }
+
+  /** Slide horizontally while resting on the floor (walking). Clamped to the work area. */
+  nudge(dx: number) {
+    if (this.mode !== "rest") return;
+    this.x = Math.max(this.area.left, Math.min(this.area.right - this.w, this.x + dx));
+    this.apply();
+  }
+
   /** True while falling or bouncing above the floor. */
   get airborne() {
     return this.mode === "falling" && this.y < this.floor - 1;

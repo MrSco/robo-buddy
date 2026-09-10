@@ -161,7 +161,9 @@ export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<
   for (const clip of gltf.animations) clips.set(clip.name, retargetClip(clip, bones));
   for (const [name, file] of Object.entries(manifest.clips ?? {})) {
     try {
-      const extra = await loader.loadAsync(pack.base + file);
+      // Absolute paths point at the app's shared clip library (/clips/...), else relative to the pack.
+      const url = file.startsWith("/") ? file : pack.base + file;
+      const extra = await loader.loadAsync(url);
       const first = extra.animations[0];
       if (first) clips.set(name, retargetClip(first, bones));
     } catch (err) {

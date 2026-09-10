@@ -1,0 +1,254 @@
+[
+  {
+    "name": "Crouch_Fwd_Loop",
+    "file": "Crouch_Fwd_Loop.glb",
+    "duration": 2.0,
+    "loop": true
+  },
+  {
+    "name": "Crouch_Idle_Loop",
+    "file": "Crouch_Idle_Loop.glb",
+    "duration": 2.933,
+    "loop": true
+  },
+  {
+    "name": "Dance_Loop",
+    "file": "Dance_Loop.glb",
+    "duration": 1.0,
+    "loop": true
+  },
+  {
+    "name": "Death01",
+    "file": "Death01.glb",
+    "duration": 2.4,
+    "loop": false
+  },
+  {
+    "name": "Driving_Loop",
+    "file": "Driving_Loop.glb",
+    "duration": 1.667,
+    "loop": true
+  },
+  {
+    "name": "Fixing_Kneeling",
+    "file": "Fixing_Kneeling.glb",
+    "duration": 5.2,
+    "loop": false
+  },
+  {
+    "name": "Hit_Chest",
+    "file": "Hit_Chest.glb",
+    "duration": 0.333,
+    "loop": false
+  },
+  {
+    "name": "Hit_Head",
+    "file": "Hit_Head.glb",
+    "duration": 0.433,
+    "loop": false
+  },
+  {
+    "name": "Idle_Loop",
+    "file": "Idle_Loop.glb",
+    "duration": 2.5,
+    "loop": true
+  },
+  {
+    "name": "Idle_Talking_Loop",
+    "file": "Idle_Talking_Loop.glb",
+    "duration": 2.933,
+    "loop": true
+  },
+  {
+    "name": "Idle_Torch_Loop",
+    "file": "Idle_Torch_Loop.glb",
+    "duration": 1.267,
+    "loop": true
+  },
+  {
+    "name": "Interact",
+    "file": "Interact.glb",
+    "duration": 2.0,
+    "loop": false
+  },
+  {
+    "name": "Jog_Fwd_Loop",
+    "file": "Jog_Fwd_Loop.glb",
+    "duration": 0.933,
+    "loop": true
+  },
+  {
+    "name": "Jump_Land",
+    "file": "Jump_Land.glb",
+    "duration": 1.267,
+    "loop": false
+  },
+  {
+    "name": "Jump_Loop",
+    "file": "Jump_Loop.glb",
+    "duration": 2.5,
+    "loop": true
+  },
+  {
+    "name": "Jump_Start",
+    "file": "Jump_Start.glb",
+    "duration": 1.333,
+    "loop": false
+  },
+  {
+    "name": "PickUp_Table",
+    "file": "PickUp_Table.glb",
+    "duration": 0.833,
+    "loop": false
+  },
+  {
+    "name": "Pistol_Aim_Down",
+    "file": "Pistol_Aim_Down.glb",
+    "duration": 0.167,
+    "loop": false
+  },
+  {
+    "name": "Pistol_Aim_Neutral",
+    "file": "Pistol_Aim_Neutral.glb",
+    "duration": 0.167,
+    "loop": false
+  },
+  {
+    "name": "Pistol_Aim_Up",
+    "file": "Pistol_Aim_Up.glb",
+    "duration": 0.167,
+    "loop": false
+  },
+  {
+    "name": "Pistol_Idle_Loop",
+    "file": "Pistol_Idle_Loop.glb",
+    "duration": 1.667,
+    "loop": true
+  },
+  {
+    "name": "Pistol_Reload",
+    "file": "Pistol_Reload.glb",
+    "duration": 1.667,
+    "loop": false
+  },
+  {
+    "name": "Pistol_Shoot",
+    "file": "Pistol_Shoot.glb",
+    "duration": 0.633,
+    "loop": false
+  },
+  {
+    "name": "Punch_Cross",
+    "file": "Punch_Cross.glb",
+    "duration": 1.0,
+    "loop": false
+  },
+  {
+    "name": "Punch_Jab",
+    "file": "Punch_Jab.glb",
+    "duration": 0.867,
+    "loop": false
+  },
+  {
+    "name": "Push_Loop",
+    "file": "Push_Loop.glb",
+    "duration": 2.667,
+    "loop": true
+  },
+  {
+    "name": "Roll",
+    "file": "Roll.glb",
+    "duration": 1.467,
+    "loop": false
+  },
+  {
+    "name": "Sitting_Enter",
+    "file": "Sitting_Enter.glb",
+    "duration": 1.3,
+    "loop": false
+  },
+  {
+    "name": "Sitting_Exit",
+    "file": "Sitting_Exit.glb",
+    "duration": 1.033,
+    "loop": false
+  },
+  {
+    "name": "Sitting_Idle_Loop",
+    "file": "Sitting_Idle_Loop.glb",
+    "duration": 1.667,
+    "loop": true
+  },
+  {
+    "name": "Sitting_Talking_Loop",
+    "file": "Sitting_Talking_Loop.glb",
+    "duration": 2.933,
+    "loop": true
+  },
+  {
+    "name": "Spell_Simple_Enter",
+    "file": "Spell_Simple_Enter.glb",
+    "duration": 0.533,
+    "loop": false
+  },
+  {
+    "name": "Spell_Simple_Exit",
+    "file": "Spell_Simple_Exit.glb",
+    "duration": 0.433,
+    "loop": false
+  },
+  {
+    "name": "Spell_Simple_Idle_Loop",
+    "file": "Spell_Simple_Idle_Loop.glb",
+    "duration": 2.1,
+    "loop": true
+  },
+  {
+    "name": "Spell_Simple_Shoot",
+    "file": "Spell_Simple_Shoot.glb",
+    "duration": 0.5,
+    "loop": false
+  },
+  {
+    "name": "Sprint_Loop",
+    "file": "Sprint_Loop.glb",
+    "duration": 0.667,
+    "loop": true
+  },
+  {
+    "name": "Swim_Fwd_Loop",
+    "file": "Swim_Fwd_Loop.glb",
+    "duration": 1.333,
+    "loop": true
+  },
+  {
+    "name": "Swim_Idle_Loop",
+    "file": "Swim_Idle_Loop.glb",
+    "duration": 3.333,
+    "loop": true
+  },
+  {
+    "name": "Sword_Attack",
+    "file": "Sword_Attack.glb",
+    "duration": 1.533,
+    "loop": false
+  },
+  {
+    "name": "Sword_Idle",
+    "file": "Sword_Idle.glb",
+    "duration": 1.667,
+    "loop": false
+  },
+  {
+    "name": "Walk_Formal_Loop",
+    "file": "Walk_Formal_Loop.glb",
+    "duration": 1.333,
+    "loop": true
+  },
+  {
+    "name": "Walk_Loop",
+    "file": "Walk_Loop.glb",
+    "duration": 1.333,
+    "loop": true
+  }
+]

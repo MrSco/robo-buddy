@@ -1,7 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { listPacks } from "./packs";
+import { listPacks, type Manifest, type PackRef } from "./packs";
+import { previewFor } from "./preview";
 import { getSettings, onSettingsChanged, setSettings, type ClickThroughMode, type Settings } from "./settings-store";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -23,18 +24,62 @@ const els = {
   sounds: $<HTMLInputElement>("sounds"),
   bubbles: $<HTMLInputElement>("bubbles"),
   sleep: $<HTMLSelectElement>("sleep"),
+  dance: $<HTMLSelectElement>("dance"),
+  wander: $<HTMLInputElement>("wander"),
+  preview: $<HTMLImageElement>("preview"),
+  previewEmpty: $<HTMLSpanElement>("preview-empty"),
   status: $<HTMLParagraphElement>("status"),
 };
 
 let settings: Settings;
 let applying = false;
+let packs: PackRef[] = [];
+const manifests = new Map<string, Manifest>();
+
+async function manifestFor(pack: PackRef): Promise<Manifest> {
+  let m = manifests.get(pack.id);
+  if (!m) {
+    m = (await (await fetch(pack.base + "manifest.json")).json()) as Manifest;
+    manifests.set(pack.id, m);
+  }
+  return m;
+}
+
+async function updatePackDetails() {
+  const pack = packs.find((p) => p.id === settings.character) ?? packs[0];
+  if (!pack) return;
+  const m = await manifestFor(pack);
+  // Dance choices for this pack.
+  const dances = ["random", ...(m.dances ?? []).filter((d) => d !== "procedural"), "procedural"];
+  els.dance.innerHTML = "";
+  for (const d of dances) {
+    const opt = document.createElement("option");
+    opt.value = d;
+    opt.textContent = d === "random" ? "Random each time" : d === "procedural" ? "Built-in groove" : d;
+    els.dance.appendChild(opt);
+  }
+  els.dance.value = dances.includes(settings.danceMode) ? settings.danceMode : "random";
+  // Thumbnail.
+  els.preview.hidden = true;
+  els.previewEmpty.hidden = false;
+  els.previewEmpty.textContent = "…";
+  try {
+    const src = await previewFor(pack, m);
+    if ((packs.find((p) => p.id === settings.character) ?? packs[0]) !== pack) return;
+    els.preview.src = src;
+    els.preview.hidden = false;
+    els.previewEmpty.hidden = true;
+  } catch {
+    els.previewEmpty.textContent = "no preview";
+  }
+}
 
 // Sensitivity slider maps 0..1 to threshold 0.5..0.03 (higher slider = more sensitive).
 const thresholdFromSlider = (v: number) => 0.5 - v * 0.47;
 const sliderFromThreshold = (t: number) => Math.min(1, Math.max(0, (0.5 - t) / 0.47));
 
 async function refreshPacks() {
-  const packs = await listPacks();
+  packs = await listPacks();
   els.character.innerHTML = "";
   for (const p of packs) {
     const opt = document.createElement("option");
@@ -65,7 +110,9 @@ function render() {
   const opts = Array.from(els.sleep.options).map((o) => Number(o.value));
   const nearest = opts.reduce((a, b) => (Math.abs(b - settings.sleepAfterMin) < Math.abs(a - settings.sleepAfterMin) ? b : a));
   els.sleep.value = String(nearest);
+  els.wander.checked = settings.wanderEnabled;
   applying = false;
+  void updatePackDetails();
 }
 
 async function commit(patch: Partial<Settings>) {
@@ -106,6 +153,8 @@ async function main() {
   els.sounds.addEventListener("change", () => commit({ soundsEnabled: els.sounds.checked }));
   els.bubbles.addEventListener("change", () => commit({ bubblesEnabled: els.bubbles.checked }));
   els.sleep.addEventListener("change", () => commit({ sleepAfterMin: Number(els.sleep.value) }));
+  els.dance.addEventListener("change", () => commit({ danceMode: els.dance.value }));
+  els.wander.addEventListener("change", () => commit({ wanderEnabled: els.wander.checked }));
   els.clickthrough.addEventListener("change", () => commit({ clickThrough: els.clickthrough.value as ClickThroughMode }));
   els.autostart.addEventListener("change", async () => {
     try {

@@ -20,6 +20,8 @@ export class Renderer3D implements Renderer {
   private character: Character | null = null;
   private canvas: HTMLCanvasElement;
   private state: StateName | null = null;
+  private playing: string | null = null;
+  private facing = 0;
   private lean = 0;
   private pixel = new Uint8Array(4);
   private cssW = 320;
@@ -94,49 +96,53 @@ export class Renderer3D implements Renderer {
     return !!def && !!this.character?.hasClip(def.clip);
   }
 
-  clipDuration(state: StateName) {
-    const def = this.character?.manifest.states[state];
-    return def ? (this.character?.clipDuration(def.clip) ?? 0) : 0;
+  clipDuration(name: string) {
+    return this.character?.clipDuration(name) ?? 0;
   }
 
-  private enterState(state: StateName, input: FrameInput) {
+  /** Switch clips whenever main.ts resolves a different one (or none) for this frame. */
+  private syncClip(input: FrameInput) {
     const c = this.character!;
-    const def = c.manifest.states[state];
-    if (def && c.hasClip(def.clip)) {
-      c.play(def.clip, {
-        loop: def.loop ?? state !== "poked",
-        beatsPerLoop: def.beatsPerLoop,
+    const want = input.clip;
+    const key = want ? want.name + "|" + input.state : null;
+    if (key === this.playing && input.state === this.state) return;
+    if (want && c.hasClip(want.name)) {
+      c.play(want.name, {
+        loop: want.loop,
+        beatsPerLoop: want.beatsPerLoop,
         bpm: input.music?.bpm,
-        playbackRate: def.playbackRate,
+        playbackRate: want.playbackRate,
       });
     } else {
       c.stop();
     }
-    this.state = state;
+    this.playing = key;
+    this.state = input.state;
   }
 
   frame(input: FrameInput) {
     const c = this.character;
     if (!c) return;
-    if (input.state !== this.state) this.enterState(input.state, input);
+    this.syncClip(input);
     c.beginFrame(input.dt);
 
     const root = c.root;
     root.position.y = 0;
+    const clipDriven = input.clip !== null;
 
     // Procedural base pose for whatever the clip does not cover.
-    if (input.airborne && !this.hasClip("fall")) applyFlail(c, input.t);
+    if (input.airborne && !clipDriven) applyFlail(c, input.t);
     else applyIdle(c, input.t, 1 - input.danceAmount * 0.7);
 
     let nod = 0;
     let roll = 0;
-    if (input.music && !this.hasClip("dance")) {
+    if (input.music && !(input.state === "dance" && clipDriven)) {
       ({ nod, roll } = applyDance(c, input.music, input.danceAmount));
     }
 
     // Poke: hop with the head thrown back, unless the pack has its own poked clip.
     let pokePitch = 0;
-    if (input.sincePoke < 0.45 && !this.hasClip("poked")) {
+    if (input.sincePoke < 0.45 && !(input.state === "poked" && clipDriven)) {
       const p = input.sincePoke / 0.45;
       root.position.y += Math.sin(Math.PI * p) * 0.06;
       pokePitch = Math.sin(Math.PI * Math.min(1, p * 1.4)) * 0.45;
@@ -153,10 +159,14 @@ export class Renderer3D implements Renderer {
     const targetLean = input.airborne ? THREE.MathUtils.clamp(-input.vx / 5000, -0.25, 0.25) : 0;
     this.lean += (targetLean - this.lean) * Math.min(1, input.dt * 12);
     root.rotation.z = this.lean;
+    // Turn to face along the floor while walking, back to the viewer otherwise.
+    this.facing += (input.facing - this.facing) * Math.min(1, input.dt * 8);
+    root.rotation.y = this.facing;
 
     const awake = 1 - input.sleepAmount;
-    applyLookAt(c, input.yaw * awake, (input.pitch + pokePitch + nod) * awake, roll * awake);
-    if (!this.hasClip("sleep")) applySleep(c, input.t, input.sleepAmount);
+    const lookScale = awake * (1 - Math.min(1, Math.abs(this.facing) / 1.2));
+    applyLookAt(c, input.yaw * lookScale, (input.pitch + pokePitch + nod) * lookScale, roll * awake);
+    if (!(input.state === "sleep" && clipDriven)) applySleep(c, input.t, input.sleepAmount);
     c.update(input.dt);
     this.renderer.render(this.scene, this.camera);
     this.renders++;

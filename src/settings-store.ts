@@ -19,6 +19,10 @@ export interface Settings {
   sleepAfterMin: number;
   soundsEnabled: boolean;
   bubblesEnabled: boolean;
+  /** Wander along the floor when idle. */
+  wanderEnabled: boolean;
+  /** "random", "procedural", or a dance clip name from the pack. */
+  danceMode: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -35,6 +39,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sleepAfterMin: 5,
   soundsEnabled: true,
   bubblesEnabled: true,
+  wanderEnabled: true,
+  danceMode: "random",
 };
 
 export async function getSettings(): Promise<Settings> {

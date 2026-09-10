@@ -107,8 +107,8 @@ export class Renderer2D implements Renderer {
     return this.clips.has(state);
   }
 
-  clipDuration(state: StateName) {
-    return this.clips.get(state)?.total ?? 0;
+  clipDuration(name: string) {
+    return this.clips.get(name)?.total ?? 0;
   }
 
   private select(state: StateName): boolean {

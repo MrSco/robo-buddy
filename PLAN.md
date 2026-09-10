@@ -171,8 +171,15 @@ Any missing state falls back to `idle`.
 - Done: idle-to-sleep (`sleepAfterMin`, hover/poke/drag/music wake him), speech bubbles (`src/bubble.ts`, per-pack `lines`),
   sounds (`src/sound.ts`, per-pack `sounds`; Pixel Pal ships boing/thud), sounds/bubbles/sleep controls in settings, autostart (M3).
 - Done: release build via `pnpm tauri build` (NSIS + MSI under `src-tauri/target/release/bundle`).
-- Deferred: updater plugin (needs a signing key pair and a hosted latest.json), code signing, walk along the screen bottom,
-  memory trimming of the WebView2 helper processes.
+- Done: Quaternius Universal Animation Library (Standard, CC0) retargeted onto the Mixamo rig by `scripts/retarget_clips.py`
+  (world-space delta method between T-poses, hips offset scaled by hip height). 42 clips in `public/clips/ual/`, source GLB in `assets/ual/`.
+- Done: idle behaviour (`src/behavior.ts`): idle variants, fidget one-shots and sequences, wandering along the taskbar with a walk clip
+  and body turn; dance choice per session (random / fixed / procedural) from the pack's `dances` list. Settings: wander toggle, dance picker.
+- Done: model thumbnails in the settings character picker (`src/preview.ts`).
+- Deferred: updater plugin (needs a signing key pair and a hosted latest.json), code signing,
+  memory trimming of the WebView2 helper processes, interacting with other windows (sit on title bars, push windows) -> M5.
+- More dances: only one in the free library. See `docs/dances.md` for the Mixamo route and the Fortnite-emote lookalike list.
+- Lesson: a scheduler that picks an activity must also push its own next-event time, or it re-rolls every frame.
 - Lesson: procedural rotations about world X need the sign checked visually; look-at uses negative pitch for "up".
 
 ## 5. Known Windows gotchas

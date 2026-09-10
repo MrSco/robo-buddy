@@ -30,6 +30,10 @@ pub struct Settings {
     pub sleep_after_min: f64,
     pub sounds_enabled: bool,
     pub bubbles_enabled: bool,
+    /// Wander along the floor when idle.
+    pub wander_enabled: bool,
+    /// "random", "procedural", or a dance clip name from the pack.
+    pub dance_mode: String,
 }
 
 impl Default for Settings {
@@ -48,6 +52,8 @@ impl Default for Settings {
             sleep_after_min: 5.0,
             sounds_enabled: true,
             bubbles_enabled: true,
+            wander_enabled: true,
+            dance_mode: "random".into(),
         }
     }
 }

@@ -20,8 +20,27 @@ export interface Manifest {
   clips?: Record<string, string>;
   states: Record<
     string,
-    { clip: string; loop?: boolean; beatsPerLoop?: number; playbackRate?: number; then?: string; sheet?: string; frames?: number; fps?: number }
+    {
+      clip: string;
+      /** Alternatives picked at random each time the state starts. */
+      clips?: string[];
+      loop?: boolean;
+      beatsPerLoop?: number;
+      playbackRate?: number;
+      then?: string;
+      /** Walk state only: px/s at size 1. */
+      speed?: number;
+      sheet?: string;
+      frames?: number;
+      fps?: number;
+    }
   >;
+  /** Clip names to cycle through while idle. */
+  idleVariants?: string[];
+  /** One-shot clips (or sequences) played now and then while idle. */
+  fidgets?: Array<string | string[]>;
+  /** Dance clip names the user can choose from; "procedural" is the built-in groove. */
+  dances?: string[];
   /** Optional speech-bubble lines per event; one is picked at random. */
   lines?: Partial<Record<"greet" | "poked" | "sleep" | "wake" | "land" | "dance", string[]>>;
   /** Optional sound files per event, relative to the pack. */

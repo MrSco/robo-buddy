@@ -1,13 +1,18 @@
 import type { Music } from "./audio";
+import type { ClipChoice } from "./behavior";
 import type { Manifest, PackRef } from "./packs";
 
 /** Behaviour states resolved by main.ts each frame. Packs may provide a clip per state. */
-export type StateName = "idle" | "dance" | "poked" | "dragged" | "fall" | "sleep";
+export type StateName = "idle" | "dance" | "poked" | "dragged" | "fall" | "sleep" | "fidget" | "walk";
 
 export interface FrameInput {
   t: number;
   dt: number;
   state: StateName;
+  /** Clip to play for this state, resolved by main.ts; null means procedural / none. */
+  clip: ClipChoice | null;
+  /** Body yaw in radians: 0 faces the viewer, +-PI/2 faces along the floor. */
+  facing: number;
   /** 0..1 blend for the dance layer. */
   danceAmount: number;
   /** 0..1 blend for the sleep pose. */
@@ -38,8 +43,8 @@ export interface Renderer {
   bubbleAnchor(): { x: number; y: number };
   /** True when the pack provides a clip for the state, so procedural fallbacks can step aside. */
   hasClip(state: StateName): boolean;
-  /** Length of the state's clip in seconds, for one-shot states like "poked". */
-  clipDuration(state: StateName): number;
+  /** Length of a clip by name in seconds; 0 when unknown. */
+  clipDuration(name: string): number;
   /** Release the loaded character but keep the renderer (and its GL context) usable. */
   unload(): void;
 }
