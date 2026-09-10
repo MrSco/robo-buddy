@@ -41,12 +41,13 @@ pub fn run() {
             let initial = settings::load(app.handle());
             app.manage(settings::SettingsState(std::sync::Mutex::new(initial.clone())));
 
+            let bring_item = MenuItem::with_id(app, "bring", "Bring buddy here", true, None::<&str>)?;
             let settings_item = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
             let pause_item = CheckMenuItem::with_id(app, "pause", "Pause reactions", true, initial.paused, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit Robo Buddy", true, None::<&str>)?;
             let menu = Menu::with_items(
                 app,
-                &[&settings_item, &pause_item, &PredefinedMenuItem::separator(app)?, &quit],
+                &[&bring_item, &settings_item, &pause_item, &PredefinedMenuItem::separator(app)?, &quit],
             )?;
 
             TrayIconBuilder::with_id("main")
@@ -55,6 +56,7 @@ pub fn run() {
                 .menu(&menu)
                 .show_menu_on_left_click(true)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
+                    "bring" => input::bring_here(app.clone()),
                     "settings" => show_settings(app),
                     "pause" => {
                         let checked = pause_item.is_checked().unwrap_or(false);
@@ -86,6 +88,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             input::work_area,
+            input::bring_here,
             settings::get_settings,
             settings::set_settings,
             packs::list_user_packs,

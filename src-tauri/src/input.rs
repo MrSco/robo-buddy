@@ -82,3 +82,11 @@ pub fn start_cursor_thread(app: AppHandle) {
         }
     });
 }
+
+/// Ask the buddy to come to the monitor the cursor is on (tray menu and settings button).
+#[tauri::command]
+pub fn bring_here(app: AppHandle) {
+    let (x, y) = read_cursor().map(|c| (c.x, c.y)).unwrap_or((0, 0));
+    let area = work_area(x, y);
+    let _ = app.emit("bring-here", serde_json::json!({ "x": x, "area": area }));
+}

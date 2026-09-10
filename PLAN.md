@@ -178,6 +178,9 @@ Any missing state falls back to `idle`.
 - Done: model thumbnails in the settings character picker (`src/preview.ts`).
 - Deferred: updater plugin (needs a signing key pair and a hosted latest.json), code signing,
   memory trimming of the WebView2 helper processes, interacting with other windows (sit on title bars, push windows) -> M5.
+- Done: "Bring buddy here" (tray + settings button) teleports him to the floor of the monitor under the cursor. Wandering keeps him on his current monitor, so on a multi-monitor desk he can be out of sight.
+- Done: uncaught errors are mirrored into the hidden window title in every build (read with GetWindowText) since release builds have no devtools.
+- Note: when the screen saver or secure desktop is active, GetCursorPos fails and WebView2 stops painting; the app shows cur=0,0 and an all-zero probe. Not a bug.
 - More dances: only one in the free library. See `docs/dances.md` for the Mixamo route and the Fortnite-emote lookalike list.
 - Lesson: a scheduler that picks an activity must also push its own next-event time, or it re-rolls every frame.
 - Lesson: clips that key only some bones flicker during crossfades (unkeyed bones blend toward the rest pose). Hips translation must be kept for crouches and kneels or the feet leave the floor.

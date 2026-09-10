@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { Music } from "./audio";
 import { Behavior, type ClipChoice } from "./behavior";
@@ -119,6 +120,16 @@ async function boot() {
     p.y = window.screenY;
   }
   physics = p;
+
+  // Tray "Bring buddy here": drop him onto the floor of the monitor under the cursor.
+  await listen<{ x: number; area: { left: number; top: number; right: number; bottom: number } }>("bring-here", (e) => {
+    if (!physics) return;
+    const a = e.payload.area;
+    physics.teleport(Math.max(a.left, Math.min(a.right - physics.w, e.payload.x - physics.w / 2)), a.bottom - physics.h - 120, a);
+    activity();
+    behavior.interrupt(clock.elapsedTime);
+    speak("wake");
+  });
 
   await applySize(settings.size);
   await loadPack(settings.character);
@@ -444,7 +455,7 @@ function loop() {
     frame();
   } catch (err) {
     // One bad frame must not kill the buddy; log the first few and keep going.
-    if (frameErrors++ < 5) console.error("frame failed", err);
+    if (frameErrors++ < 5) reportError("frame", err);
   }
   requestAnimationFrame(loop);
 }
@@ -462,5 +473,14 @@ if (import.meta.env.DEV) {
   });
 }
 
-boot().catch((err) => console.error("boot failed", err));
+// The buddy window has no visible title, so use it as a crash log readable from outside.
+function reportError(where: string, err: unknown) {
+  console.error(where, err);
+  const msg = err instanceof Error ? `${err.message} @ ${(err.stack ?? "").split(String.fromCharCode(10))[1]?.trim() ?? ""}` : String(err);
+  if (IN_TAURI) getCurrentWindow().setTitle(`Robo Buddy | ERROR ${where}: ${msg}`.slice(0, 500)).catch(() => {});
+}
+window.addEventListener("error", (e) => reportError("window", e.error ?? e.message));
+window.addEventListener("unhandledrejection", (e) => reportError("promise", e.reason));
+
+boot().catch((err) => reportError("boot", err));
 loop();

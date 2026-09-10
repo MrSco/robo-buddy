@@ -10,6 +10,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const els = {
   character: $<HTMLSelectElement>("character"),
   import: $<HTMLButtonElement>("import"),
+  bring: $<HTMLButtonElement>("bring"),
   size: $<HTMLInputElement>("size"),
   sizeOut: $<HTMLOutputElement>("size-out"),
   paused: $<HTMLInputElement>("paused"),
@@ -167,6 +168,8 @@ async function main() {
       els.autostart.checked = !els.autostart.checked;
     }
   });
+
+  els.bring.addEventListener("click", () => invoke("bring_here").catch((err) => status(`Could not move him: ${err}`)));
 
   els.import.addEventListener("click", async () => {
     const file = await open({

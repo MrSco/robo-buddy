@@ -94,6 +94,19 @@ export class WindowPhysics {
     return this.area;
   }
 
+  /** Jump to a new spot (and work area) and let gravity settle him. */
+  teleport(x: number, y: number, area: WorkArea) {
+    this.area = area;
+    this.x = x;
+    this.y = y;
+    this.vx = 0;
+    this.vy = 0;
+    this.mode = this.opts.gravity ? "falling" : "rest";
+    if (!this.opts.gravity) this.y = this.floor;
+    this.lastApplied = { x: NaN, y: NaN };
+    this.apply();
+  }
+
   /** Slide horizontally while resting on the floor (walking). Clamped to the work area. */
   nudge(dx: number) {
     if (this.mode !== "rest") return;
