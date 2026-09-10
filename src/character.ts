@@ -103,8 +103,9 @@ function retargetClip(clip: THREE.AnimationClip, bones: Map<BoneName, THREE.Obje
     const vrmName = (MIXAMO_TO_VRM[stripMixamo(nodeName)] ?? nodeName) as BoneName;
     const target = bones.get(vrmName);
     if (!target) continue;
-    // Only rotations retarget safely across rigs. Root translation would fight the window physics.
-    if (prop !== "quaternion") continue;
+    // Rotations always; translation only for the hips (crouches, jumps, kneels). Anything
+    // else would fight the window physics or the rig's proportions.
+    if (prop !== "quaternion" && !(prop === "position" && vrmName === "hips")) continue;
     const t = track.clone();
     t.name = `${target.uuid}.${prop}`;
     tracks.push(t);

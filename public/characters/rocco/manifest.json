@@ -14,8 +14,7 @@
       "clip": "hit",
       "clips": [
         "hit",
-        "hitHead",
-        "wave"
+        "hitHead"
       ],
       "loop": false
     },

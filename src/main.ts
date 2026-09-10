@@ -451,7 +451,14 @@ function loop() {
 
 if (import.meta.env.DEV) {
   Object.defineProperty(window, "__buddy", {
-    get: () => ({ renderer, renderer3d, physics, music, settings, danceAmount, yaw, pitch, cursor, currentState, frame, listPacks, THREE }),
+    get: () => ({
+      renderer, renderer3d, physics, music, settings, danceAmount, yaw, pitch, cursor, currentState, frame, listPacks, THREE, behavior,
+      /** Dev: play a clip as if it were a poke reaction. */
+      play: (name: string) => {
+        pokeClip = { name, loop: false };
+        pokeUntil = clock.elapsedTime + Math.max(0.3, renderer?.clipDuration(name) ?? 0.5);
+      },
+    }),
   });
 }
 

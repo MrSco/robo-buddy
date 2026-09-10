@@ -180,6 +180,7 @@ Any missing state falls back to `idle`.
   memory trimming of the WebView2 helper processes, interacting with other windows (sit on title bars, push windows) -> M5.
 - More dances: only one in the free library. See `docs/dances.md` for the Mixamo route and the Fortnite-emote lookalike list.
 - Lesson: a scheduler that picks an activity must also push its own next-event time, or it re-rolls every frame.
+- Lesson: clips that key only some bones flicker during crossfades (unkeyed bones blend toward the rest pose). Hips translation must be kept for crouches and kneels or the feet leave the floor.
 - Lesson: procedural rotations about world X need the sign checked visually; look-at uses negative pitch for "up".
 
 ## 5. Known Windows gotchas

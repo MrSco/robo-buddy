@@ -67,3 +67,10 @@ Idles worth grabbing while you are there: "Idle", "Breathing Idle", "Happy Idle"
 
 Settings > Dance: "Random each time" picks from the pack's `dances` list per song,
 "Built-in groove" forces the procedural dance, or pick one clip for a deterministic buddy.
+
+## Clips must animate the whole skeleton
+
+During a crossfade three.js blends any bone a clip does not animate toward the rest
+T-pose, which shows up as an arm snapping out for a frame or two. Bake clips from a
+source that keys every bone (Mixamo and Quaternius both do). Partial clips such as the
+synthetic `wave.glb` are fine for tests but should not be used as reactions.

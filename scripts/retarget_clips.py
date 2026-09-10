@@ -299,6 +299,11 @@ def bake(src_rig, tgt_rig, clip, src_ref_world, tgt_ref_world, bone_map, fps=30)
                 delta = q_mul(q_mul(yaw180, src_world[si][1]), q_inv(q_mul(yaw180, src_ref_world[si][1])))
                 w = q_norm(q_mul(delta, tgt_ref_world[ti][1]))
                 local = q_norm(q_mul(q_inv(p_rot), w))
+                # Keep consecutive keyframes on the same hemisphere so slerp never takes
+                # the long way round (a one-frame twist that reads as a flicker).
+                prev = rot_tracks[ti][-1] if rot_tracks[ti] else None
+                if prev is not None and sum(a * b for a, b in zip(prev, local)) < 0:
+                    local = tuple(-c for c in local)
                 rot_tracks[ti].append(local)
                 pos_local = rt
                 if ti == tgt_hips and src_hips is not None:
