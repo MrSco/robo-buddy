@@ -115,7 +115,7 @@ async function boot() {
   physics = p;
 
   // Tray "Bring buddy here": drop him onto the floor of the monitor under the cursor.
-  await listen<{ x: number; area: { left: number; top: number; right: number; bottom: number } }>("bring-here", (e) => {
+  if (IN_TAURI) await listen<{ x: number; area: { left: number; top: number; right: number; bottom: number } }>("bring-here", (e) => {
     if (!physics) return;
     const a = e.payload.area;
     physics.teleport(Math.max(a.left, Math.min(a.right - physics.w, e.payload.x - physics.w / 2)), a.bottom - physics.h - 120, a);
