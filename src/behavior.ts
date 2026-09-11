@@ -78,7 +78,30 @@ export class Behavior {
   /** Called when a dance session starts: pick which dance to do this time. */
   /** Names of the dances this pack offers (clip names), for chat commands. */
   get danceNames(): string[] {
-    return (this.manifest?.dances ?? []).map((d) => (typeof d === "string" ? d : d.clip)).filter((d) => d !== "procedural" && this.durations(d) > 0);
+    return (this.manifest?.dances ?? []).map((d) => (typeof d === "string" ? d : d.clip)).filter((d) => d !== "procedural" && this.durations(d) > 0 && this.danceOn(d));
+  }
+
+  /**
+   * Whether the user left this dance ticked. Dance keys in the enabled set are "dance:<name>";
+   * a set saved before dances were listed there has none, and then every dance counts as on.
+   */
+  danceOn(name: string): boolean {
+    if (!this.enabled) return true;
+    let keyed = false;
+    for (const k of this.enabled) if (k.startsWith("dance:")) { keyed = true; break; }
+    return !keyed || this.enabled.has(`dance:${name}`);
+  }
+
+  /** The dances he may actually do: ticked clips he has, plus the built-in groove if ticked. */
+  private get danceList(): string[] {
+    return (this.manifest?.dances ?? [])
+      .map((d) => (typeof d === "string" ? d : d.clip))
+      .filter((d) => (d === "procedural" || this.durations(d) > 0) && this.danceOn(d));
+  }
+
+  /** False when every dance, the built-in groove included, is unticked: music then leaves him be. */
+  get canDance(): boolean {
+    return this.danceList.length > 0;
   }
 
   /** A dance by name for a chat command; unknown or missing name = a random one. */
@@ -115,12 +138,12 @@ export class Behavior {
 
   chooseDance(): ClipChoice | null {
     const m = this.manifest;
-    const list = (m?.dances ?? []).map((d) => (typeof d === "string" ? d : d.clip)).filter((d) => d === "procedural" || this.durations(d) > 0);
+    const list = this.danceList;
     let pick: string | null = null;
-    if (this.opts.danceMode === "procedural") pick = "procedural";
-    else if (this.opts.danceMode !== "random" && list.includes(this.opts.danceMode)) pick = this.opts.danceMode;
+    // A named choice that is unticked (or missing) falls back to a random ticked one.
+    if (this.opts.danceMode !== "random" && list.includes(this.opts.danceMode)) pick = this.opts.danceMode;
     else if (list.length) pick = list[Math.floor(Math.random() * list.length)];
-    else pick = m?.states.dance ? m.states.dance.clip : "procedural";
+    else pick = null;
     this.danceChoice = pick;
     if (!pick || pick === "procedural") return null;
     const entry = (m?.dances ?? []).find((d) => typeof d !== "string" && d.clip === pick) as { clip: string; beatsPerLoop?: number } | undefined;

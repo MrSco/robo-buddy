@@ -294,9 +294,13 @@ function renderIdleSet(m: Manifest) {
   els.idleset.innerHTML = "";
   const enabled = new Set(settings.idleSets?.[settings.character] ?? []);
   const hasSet = !!settings.idleSets?.[settings.character];
+  // Dances joined this list later: a saved set without any "dance:" key means all dances are on.
+  const danceKeyed = [...enabled].some((k) => k.startsWith("dance:"));
+  const danceKeys = danceKeysOf(m);
   const entries: Array<{ key: string; label: string }> = [
     ...(m.idleVariants ?? []).map((v) => ({ key: v, label: `idle: ${v}` })),
     ...(m.fidgets ?? []).map((f) => ({ key: Behavior.fidgetKey(f), label: `fidget: ${Behavior.fidgetKey(f).replace(/\+/g, " → ")}` })),
+    ...danceKeys.map((k) => ({ key: k, label: `dance: ${k === "dance:procedural" ? "Built-in groove" : k.slice(6).replace(/_/g, " ")}` })),
   ];
   if (!entries.length) {
     els.idleset.textContent = "This character has no idle variations.";
@@ -307,12 +311,15 @@ function renderIdleSet(m: Manifest) {
     label.className = "check";
     const input = document.createElement("input");
     input.type = "checkbox";
-    input.checked = hasSet ? enabled.has(e.key) : true;
+    const isDance = e.key.startsWith("dance:");
+    input.checked = hasSet && (!isDance || danceKeyed) ? enabled.has(e.key) : true;
     input.addEventListener("change", () => {
       const current = new Set(settings.idleSets?.[settings.character] ?? entries.map((x) => x.key));
+      // First dance toggle on an older set: write every dance in explicitly, then apply the change.
+      if (![...current].some((k) => k.startsWith("dance:"))) for (const k of danceKeys) current.add(k);
       if (input.checked) current.add(e.key);
       else current.delete(e.key);
-      void commit({ idleSets: { ...settings.idleSets, [settings.character]: [...current] } });
+      void commit({ idleSets: { ...settings.idleSets, [settings.character]: [...current] } }).then(() => renderDanceChoices(m));
     });
     label.append(input, document.createTextNode(" " + e.label));
     els.idleset.appendChild(label);
@@ -330,6 +337,33 @@ async function manifestFor(pack: PackRef): Promise<Manifest> {
 
 let currentManifest: Manifest | null = null;
 
+/** "dance:<clip>" keys for every dance a manifest offers, the built-in groove included. */
+function danceKeysOf(m: Manifest): string[] {
+  return (m.dances ?? []).map((d) => `dance:${typeof d === "string" ? d : d.clip}`);
+}
+
+/** Whether a dance is ticked in the idle set (all are, until a set lists any dance). */
+function danceTicked(key: string): boolean {
+  const set = settings.idleSets?.[settings.character];
+  if (!set || !set.some((k) => k.startsWith("dance:"))) return true;
+  return set.includes(key);
+}
+
+/** The Dance dropdown: random, the ticked clips, and the built-in groove if ticked. */
+function renderDanceChoices(m: Manifest) {
+  const all = (m.dances ?? []).map((d) => (typeof d === "string" ? d : d.clip));
+  const names = all.filter((d) => d !== "procedural" && danceTicked(`dance:${d}`));
+  const dances = ["random", ...names, ...(all.includes("procedural") && danceTicked("dance:procedural") ? ["procedural"] : [])];
+  els.dance.innerHTML = "";
+  for (const d of dances) {
+    const opt = document.createElement("option");
+    opt.value = d;
+    opt.textContent = d === "random" ? "Random each time" : d === "procedural" ? "Built-in groove" : d.replace(/_/g, " ");
+    els.dance.appendChild(opt);
+  }
+  els.dance.value = dances.includes(settings.danceMode) ? settings.danceMode : "random";
+}
+
 /** The manifest the buddy runs with: reference defaults for imports, plus the library and the user's roles. */
 async function runningManifestFor(pack: PackRef): Promise<Manifest> {
   const base = await manifestFor(pack);
@@ -344,17 +378,7 @@ async function updatePackDetails() {
   if (!pack) return;
   const m = await runningManifestFor(pack);
   currentManifest = m;
-  // Dance choices for this pack.
-  const names = (m.dances ?? []).map((d) => (typeof d === "string" ? d : d.clip)).filter((d) => d !== "procedural");
-  const dances = ["random", ...names, "procedural"];
-  els.dance.innerHTML = "";
-  for (const d of dances) {
-    const opt = document.createElement("option");
-    opt.value = d;
-    opt.textContent = d === "random" ? "Random each time" : d === "procedural" ? "Built-in groove" : d.replace(/_/g, " ");
-    els.dance.appendChild(opt);
-  }
-  els.dance.value = dances.includes(settings.danceMode) ? settings.danceMode : "random";
+  renderDanceChoices(m);
   renderIdleSet(m);
 }
 

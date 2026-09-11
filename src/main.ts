@@ -763,7 +763,8 @@ function frame() {
     const musicOn = settings.musicEnabled && !paused && (manifest?.reactions.music?.enabled ?? true);
     const forced = t < forcedDanceUntil && physics?.mode === "rest" && !asleep;
     const suppressed = t < danceSuppressUntil;
-    const target = (forced || (musicOn && music.dancing && !suppressed)) && !physics?.airborne && physics?.mode !== "held" ? 1 : 0;
+    // With every dance unticked (the built-in groove too) music does not move him at all.
+    const target = (forced || (musicOn && music.dancing && !suppressed)) && behavior.canDance && !physics?.airborne && physics?.mode !== "held" ? 1 : 0;
     danceAmount += (target - danceAmount) * (1 - Math.exp(-dt * (target ? 2.5 : 1.5)));
   }
   sincePoke += dt;
