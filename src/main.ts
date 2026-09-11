@@ -147,6 +147,12 @@ async function boot() {
       if (e.payload.type !== "drop") return;
       for (const path of e.payload.paths) await importDropped(path);
     });
+    // Other always-on-top windows opened later sit above him in the topmost band; take the
+    // top of it back every couple of seconds (no focus change, so nothing is interrupted).
+    setInterval(() => {
+      if (hiddenByFullscreen || settings.paused) return;
+      getCurrentWindow().setAlwaysOnTop(true).catch(() => {});
+    }, 2000);
     // Hide behind fullscreen apps (games, videos) and come back afterwards.
     await listen<{ active: boolean }>("fullscreen", async (e) => {
       fullscreenActive = e.payload.active;

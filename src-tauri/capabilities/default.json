@@ -24,6 +24,7 @@
     "autostart:allow-is-enabled",
     "core:menu:default",
     "core:webview:allow-internal-toggle-devtools",
-    "core:window:allow-is-visible"
+    "core:window:allow-is-visible",
+    "core:window:allow-set-always-on-top"
   ]
 }

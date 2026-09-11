@@ -293,4 +293,30 @@ is commodity and took one session. We keep our codebase and borrow patterns from
   level to stay above it continuously; real music swings around any threshold every beat and never satisfied the old gate.
   Settings show a live level meter with the threshold marker under the sensitivity slider. Changing the dance while he dances
   switches the clip immediately.
+- Camera fit is now per-frame from every bone (padded), perspective-correct including how far the nearest part leans toward
+  the camera, with the feet at a fixed margin; zooms out within a frame or two, back in gently. Clips with root motion toward
+  the camera no longer crop him. He re-asserts always-on-top every 2 s so newer topmost windows (the Claude app, players) do
+  not bury him.
 - Step 2 (deferred until played with): a real Rapier ragdoll with joint limits while airborne, blended back to the idle on landing.
+
+## What is left (Sep 10 2026)
+- Ragdoll step 2: joint-limited Rapier ragdoll while airborne, blended back to the idle on landing.
+- Window interactions: sit on title bars, peek over windows, get pushed by a window dragged into him.
+- Keyboard reactions (typing burst = he watches the keyboard, Ctrl+S = thumbs up).
+- Auto-updater (needs a public manifest endpoint or a GitHub release feed) and code signing.
+- WebView2 memory trimming while asleep / hidden.
+- A "Getting Up" clip for the knocked-down recovery instead of Jump Land.
+
+## M6 — Talk to him (proposed, not started)
+Goal: dynamic phrases and a real conversation, free by default, bring-your-own-key optional.
+- Input: a text box that opens under the bubble on double-click or a hotkey; push-to-talk via Windows' built-in
+  offline speech recognition (WinRT `Windows.Media.SpeechRecognition` from Rust, no cloud, no key) as the mic path.
+- Output: the speech bubble, plus optional voice via the Windows speech synthesiser (WinRT, offline) or the WebView's
+  `speechSynthesis`; a `talk` idle clip and lip-less "talking" head motion while he speaks.
+- Brain: an OpenAI-compatible chat endpoint in settings (URL + key + model). Works unchanged with a local Ollama
+  (free, private), Groq / Gemini free tiers, OpenAI, or Anthropic through its OpenAI-compatible route. Persona prompt per
+  character pack (`manifest.persona`), short memory of the last few turns, hard cap on tokens per reply.
+- Dynamic phrases: once an endpoint is set, batches of idle lines (greet, poked, land, dance, sleep) are generated per pack
+  and cached in `%APPDATA%`, so the bubble stops repeating the same ten strings; falls back to the manifest lines offline.
+- Guardrails: nothing leaves the machine unless an endpoint is configured; the key is stored in Windows Credential
+  Manager, not in settings.json; a per-day request cap in settings.

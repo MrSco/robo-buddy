@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { loadCharacter, type Character } from "./character";
+import { loadCharacter, type BoneName, type Character } from "./character";
 import { applyDance } from "./dance";
 import type { Manifest, PackRef } from "./packs";
 import { applyFlail, applyHeldByArm, applyHeldByLeg, applyIdle, applyLimp, applyLookAt, applySleep } from "./pose";
@@ -32,6 +32,7 @@ export class Renderer3D implements Renderer {
   /** Camera fit state: distance and look-at height, eased so zooming is smooth. */
   private fitDist = 0;
   private fitY = 0;
+  private fitX = 0;
   /** Pendulum state while held: angle and angular velocity (radians). */
   private swing = 0;
   private swingVel = 0;
@@ -100,45 +101,71 @@ export class Renderer3D implements Renderer {
     box.getSize(this.baseSize);
     box.getCenter(this.baseCenter);
     this.fitDist = 0;
+    this.fitX = this.baseCenter.x;
     this.fitCamera(0, 1);
   }
 
+  /** Bones that bound the body, with a padding (fraction of height) for the flesh around each joint. */
+  private static readonly FIT_BONES: Array<[BoneName, number]> = [
+    ["head", 0.15], ["neck", 0.08], ["hips", 0.12], ["spine", 0.1], ["chest", 0.12], ["upperChest", 0.12],
+    ["leftShoulder", 0.08], ["rightShoulder", 0.08], ["leftUpperArm", 0.08], ["rightUpperArm", 0.08],
+    ["leftLowerArm", 0.07], ["rightLowerArm", 0.07], ["leftHand", 0.11], ["rightHand", 0.11],
+    ["leftUpperLeg", 0.1], ["rightUpperLeg", 0.1], ["leftLowerLeg", 0.08], ["rightLowerLeg", 0.08],
+    ["leftFoot", 0.09], ["rightFoot", 0.09], ["leftToes", 0.06], ["rightToes", 0.06],
+  ];
+
   /**
-   * Fit the camera to the pose actually on screen: the standing height plus however far
-   * the hands (or head) reach above it, so raised arms are never cut off. Eased per frame.
+   * Fit the camera to the pose every frame: the bounds of every bone (padded) must fit the
+   * window in both axes, allowing for how far the nearest part leans toward the camera. The
+   * feet keep a fixed margin at the bottom and he never zooms in past standing height. Zooms
+   * out almost instantly so nothing is ever clipped, and back in gently.
    */
   private fitCamera(dt: number, snap = 0) {
     const c = this.character;
     if (!c) return;
     const h = this.baseSize.y;
-    const bottom = this.baseCenter.y - h / 2;
-    let top = bottom + h;
+    const floor = this.baseCenter.y - h / 2;
     c.root.updateMatrixWorld(true);
-    for (const n of ["head", "leftHand", "rightHand", "leftLowerArm", "rightLowerArm"] as const) {
-      const b = c.bone(n);
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = floor;
+    let maxY = floor + h * 0.5;
+    let front = -Infinity;
+    for (const [name, pad] of Renderer3D.FIT_BONES) {
+      const b = c.bone(name);
       if (!b) continue;
       b.getWorldPosition(this.tmp);
-      const y = this.tmp.y + (n === "head" ? h * 0.13 : h * 0.14);
-      if (y > top) top = y;
+      const p = h * pad;
+      if (this.tmp.x - p < minX) minX = this.tmp.x - p;
+      if (this.tmp.x + p > maxX) maxX = this.tmp.x + p;
+      if (this.tmp.y - p < minY) minY = this.tmp.y - p;
+      if (this.tmp.y + p > maxY) maxY = this.tmp.y + p;
+      if (this.tmp.z + p > front) front = this.tmp.z + p;
     }
-    // Keep the feet at a fixed margin above the window bottom; grow upward as needed.
-    let extent = Math.max(h * 1.3, (top - bottom) * 1.14 + h * 0.08);
-    // A tumbling body is wide; make sure its rotated extent fits the window's aspect too.
-    const spinAngle = this.tumble;
-    if (Math.abs(spinAngle) > 0.02) {
-      const w = this.baseSize.x * 0.6 + h * 0.15;
-      const vertical = h * Math.abs(Math.cos(spinAngle)) + w * Math.abs(Math.sin(spinAngle));
-      const horizontal = h * Math.abs(Math.sin(spinAngle)) + w * Math.abs(Math.cos(spinAngle));
-      const aspect = this.cssW / this.cssH;
-      extent = Math.max(extent, vertical * 1.15, (horizontal * 1.15) / aspect);
+    if (!Number.isFinite(minX)) {
+      minX = this.baseCenter.x - this.baseSize.x / 2;
+      maxX = this.baseCenter.x + this.baseSize.x / 2;
+      maxY = floor + h;
+      front = this.baseCenter.z + this.baseSize.z / 2;
     }
-    const dist = extent / 2 / Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
-    const targetY = bottom - h * 0.06 + extent / 2;
-    const k = snap ? 1 : 1 - Math.exp(-dt * 6);
+    const y0 = Math.min(minY, floor) - h * 0.06;
+    const y1 = Math.max(maxY + h * 0.1, y0 + h * 1.3);
+    const cy = (y0 + y1) / 2;
+    const halfV = (y1 - y0) / 2;
+    const cx = (minX + maxX) / 2;
+    const halfH = (maxX - minX) / 2 + h * 0.05;
+    const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    const tanH = tanV * (this.cssW / this.cssH);
+    // Anything closer to the camera than the standing body's front needs the camera further back.
+    const depth = Math.max(0, front - (this.baseCenter.z + this.baseSize.z / 2));
+    const dist = Math.max(halfV / tanV, halfH / tanH) + depth;
+    const k = snap ? 1 : 1 - Math.exp(-dt * (dist > this.fitDist ? 20 : 3));
     this.fitDist += (dist - this.fitDist) * k;
-    this.fitY += (targetY - this.fitY) * k;
-    this.camera.position.set(this.baseCenter.x, this.fitY, this.baseCenter.z + this.fitDist);
-    this.camera.lookAt(this.baseCenter.x, this.fitY, this.baseCenter.z);
+    const kc = snap ? 1 : 1 - Math.exp(-dt * 6);
+    this.fitY += (cy - this.fitY) * kc;
+    this.fitX += (cx - this.fitX) * kc;
+    this.camera.position.set(this.fitX, this.fitY, this.baseCenter.z + this.fitDist);
+    this.camera.lookAt(this.fitX, this.fitY, this.baseCenter.z);
   }
 
   resize(w: number, h: number) {
