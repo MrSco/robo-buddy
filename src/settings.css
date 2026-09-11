@@ -597,6 +597,17 @@ details.adv summary {
 .library .clip.previewing {
   border-color: var(--accent);
 }
+.library .clip.mine {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+.library button.del,
+#remove-pack {
+  color: #ff8a8a;
+}
+.library button.del:hover,
+#remove-pack:hover {
+  border-color: #ff8a8a;
+}
 .library .name {
   white-space: nowrap;
   overflow: hidden;

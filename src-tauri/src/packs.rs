@@ -263,6 +263,32 @@ pub fn save_user_clip(app: AppHandle, request: tauri::ipc::Request<'_>) -> Resul
     Ok(path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or(safe))
 }
 
+/// Remove an imported character (its whole folder under the user's characters dir). Bundled packs have no folder there.
+#[tauri::command]
+pub fn delete_user_pack(app: AppHandle, id: String) -> Result<(), String> {
+    let folder = id.strip_prefix("user:").ok_or("only imported characters can be removed")?;
+    let root = characters_dir(&app).ok_or("no data dir")?;
+    let dir = root.join(Path::new(folder).file_name().ok_or("bad id")?);
+    if !dir.starts_with(&root) || !dir.is_dir() {
+        return Err("character folder not found".into());
+    }
+    fs::remove_dir_all(&dir).map_err(|e| e.to_string())
+}
+
+/// Show one of the user's data folders in Explorer: "characters", "clips" or "voices".
+#[tauri::command]
+pub fn open_user_folder(app: AppHandle, kind: String) -> Result<(), String> {
+    let base = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let dir = match kind.as_str() {
+        "characters" => base.join("characters"),
+        "clips" => base.join("clips"),
+        "voices" => base.join("piper").join("voices"),
+        _ => base,
+    };
+    let _ = fs::create_dir_all(&dir);
+    std::process::Command::new("explorer").arg(&dir).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn delete_user_clip(app: AppHandle, file: String) -> Result<(), String> {
     let dir = clips_dir(&app).ok_or("no data dir")?;

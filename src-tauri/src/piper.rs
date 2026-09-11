@@ -126,6 +126,22 @@ pub async fn piper_download_voice(app: AppHandle, id: String) -> Result<String, 
     Ok(target.to_string_lossy().to_string())
 }
 
+/// Remove a voice (.onnx and its .json) from the managed voices folder only.
+#[tauri::command]
+pub fn piper_delete_voice(app: AppHandle, path: String) -> Result<(), String> {
+    let root = piper_root(&app).ok_or("no data dir")?;
+    let voices = root.join("voices");
+    let p = PathBuf::from(&path);
+    let file = p.file_name().ok_or("bad path")?;
+    let target = voices.join(file);
+    if !target.is_file() || target.extension().map(|e| e != "onnx").unwrap_or(true) {
+        return Err("only voices in the app's voices folder can be removed".into());
+    }
+    fs::remove_file(&target).map_err(|e| e.to_string())?;
+    let _ = fs::remove_file(voices.join(format!("{}.json", file.to_string_lossy())));
+    Ok(())
+}
+
 /// Show the voices folder in Explorer so the user can drop their own .onnx files in.
 #[tauri::command]
 pub fn piper_open_voices(app: AppHandle) -> Result<(), String> {

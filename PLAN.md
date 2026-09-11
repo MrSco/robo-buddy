@@ -423,6 +423,11 @@ Goal: dynamic phrases and a real conversation, free by default, bring-your-own-k
   README has an Install and run section. The procedural groove now only layers over the plain idle clip (a crouch or
   fidget no longer bobs along while the music level rises).
 
+- Managing user content (Sep 11): imported characters get a Remove button under the preview (folder deleted, falls back
+  to Rocco if it was active), user clips a delete button on their card (bundled clips can only be set to "not used"),
+  voices a Delete beside the list (managed folder only), and every tab a Folder button. Rust guards each delete to the
+  app's own data folders.
+
 ## M7 (original proposal) — Webcam motion capture
 Goal: drive the model live from the user's webcam, and record what they do as a clip for the library (a dance, an idle).
 - Tracking in the settings window (it already has a camera-free 3D preview): MediaPipe Pose Landmarker (tasks-vision,

@@ -21,6 +21,10 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const els = {
   character: $<HTMLSelectElement>("character"),
   import: $<HTMLButtonElement>("import"),
+  removePack: $<HTMLButtonElement>("remove-pack"),
+  openCharacters: $<HTMLButtonElement>("open-characters"),
+  openClips: $<HTMLButtonElement>("open-clips"),
+  piperDelete: $<HTMLButtonElement>("piper-delete"),
   bring: $<HTMLButtonElement>("bring"),
   size: $<HTMLInputElement>("size"),
   sizeOut: $<HTMLOutputElement>("size-out"),
@@ -134,6 +138,8 @@ async function previewPack(id: string) {
   if (!pack) return;
   previewing = id;
   for (const b of els.gallery.querySelectorAll("button")) b.classList.toggle("previewing", b.dataset.id === id);
+  els.removePack.hidden = pack.bundled;
+  els.removePack.textContent = `Remove "${pack.name}"`;
   const m = await manifestFor(pack);
   try {
     await getLive().show(pack, m);
@@ -222,6 +228,30 @@ async function renderLibrary() {
     card.className = "clip";
     card.dataset.clip = c.name;
     card.append(name, role, play);
+    if (c.source === "user" && c.file) {
+      card.classList.add("mine");
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "del";
+      del.textContent = "🗑";
+      del.title = "Delete this clip from your library";
+      del.addEventListener("click", async () => {
+        if (!confirm(`Delete the clip "${c.name}"? This removes the file.`)) return;
+        try {
+          if (getLive().previewing === c.name) getLive().stopPreview();
+          await invoke("delete_user_clip", { file: c.file });
+          const roles = { ...(settings.animRoles ?? {}) };
+          delete roles[c.name];
+          invalidateLibrary();
+          await commit({ animRoles: roles });
+          await renderLibrary();
+          status(`Deleted "${c.name}".`);
+        } catch (err) {
+          status(`Could not delete: ${err}`);
+        }
+      });
+      card.appendChild(del);
+    }
     els.library.appendChild(card);
   }
 }
@@ -518,7 +548,11 @@ function wireTabs() {
     for (const p of pages) p.hidden = p.dataset.page !== name;
     // One WebGL preview, shown on the Character page and beside the animation list.
     const home = document.getElementById(name === "library" ? "preview-lib" : name === "capture" ? "preview-cap" : "preview-char");
-    if (home && els.live.parentElement !== home) home.appendChild(els.live);
+    const from = els.live.parentElement;
+    if (home && from && from !== home) {
+      // The canvas and, for a 2D character, its still image travel together.
+      while (from.firstChild) home.appendChild(from.firstChild);
+    }
     try {
       localStorage.setItem("settings-tab", name);
     } catch {
@@ -898,9 +932,44 @@ function wirePersonalityEditor() {
 /** Play buttons by clip name, so the one previewing can show a stop glyph. */
 const playButtons = new Map<string, HTMLButtonElement>();
 
+function wireManagement() {
+  els.openCharacters.addEventListener("click", () => void invoke("open_user_folder", { kind: "characters" }).catch(() => {}));
+  els.openClips.addEventListener("click", () => void invoke("open_user_folder", { kind: "clips" }).catch(() => {}));
+  els.removePack.addEventListener("click", async () => {
+    const pack = packs.find((p) => p.id === previewing);
+    if (!pack || pack.bundled) return;
+    if (!confirm(`Remove "${pack.name}"? Its files are deleted from your characters folder.`)) return;
+    try {
+      await invoke("delete_user_pack", { id: pack.id });
+      if (settings.character === pack.id) await commit({ character: "rocco" });
+      els.removePack.hidden = true;
+      await refreshPacks();
+      await updatePackDetails();
+      status(`Removed "${pack.name}".`);
+    } catch (err) {
+      status(`Could not remove: ${err}`);
+    }
+  });
+  els.piperDelete.addEventListener("click", async () => {
+    const path = els.piperVoice.value;
+    const name = els.piperVoice.selectedOptions[0]?.textContent ?? path;
+    if (!path) return;
+    if (!confirm(`Delete the voice "${name}"?`)) return;
+    try {
+      await invoke("piper_delete_voice", { path });
+      if (settings.piperVoice === path) await commit({ piperVoice: "" });
+      els.piperAddStatus.textContent = `Deleted ${name}.`;
+      await refreshPiper();
+    } catch (err) {
+      els.piperAddStatus.textContent = `Could not delete: ${err}`;
+    }
+  });
+}
+
 async function main() {
   wireTabs();
   wireCapture();
+  wireManagement();
   startMeter();
   wireTalk();
   getLive().onPreviewChange = (name) => {

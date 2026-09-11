@@ -32,6 +32,8 @@
                 <p class="hint">Click one to preview it here, click it again to make it the buddy.</p>
                 <div class="row wrap">
                   <button id="import" type="button" title="Add a model of your own. 3D: GLB, glTF, VRM or FBX with a humanoid skeleton. 2D: an animated WebP, GIF or PNG.">Import model…</button>
+                  <button id="remove-pack" type="button" hidden title="Delete the imported character shown in the preview. Built-in characters cannot be removed.">Remove this character</button>
+                  <button id="open-characters" type="button" title="Open the folder where imported characters live.">Folder…</button>
                   <button id="bring" type="button" title="Teleports the buddy onto the monitor this window is on. Handy when he wandered off to another screen.">Bring buddy to this screen</button>
                 </div>
                 <p class="hint">Imports: GLB, glTF, VRM or FBX for 3D (any humanoid rig; Mixamo, Unreal and VRM bones are recognised), or an animated WebP, GIF or PNG for a 2D buddy. You can also drop a file onto the buddy himself.</p>
@@ -193,6 +195,7 @@
                   <label class="field" title="Voices found in the app's voices folder."><span>Voice</span>
                     <div class="row">
                       <select id="piper-voice" class="grow"></select>
+                      <button id="piper-delete" type="button" title="Delete the selected voice from the voices folder.">Delete</button>
                       <button id="piper-open" type="button" title="Open the voices folder. Drop your own .onnx and .onnx.json pairs there and they appear in the list.">Folder…</button>
                     </div>
                   </label>
@@ -225,6 +228,7 @@
             </div>
             <div class="lib-main">
               <div class="row libfilter">
+                <button id="open-clips" type="button" title="Open the folder where your own clips live. Bundled clips are part of the app and cannot be removed; set them to 'not used' instead.">Folder…</button>
                 <input id="libsearch" type="search" placeholder="Search clips" />
                 <select id="libsource" title="Mine: clips you dropped in. Mixamo and Quaternius: the bundled libraries."><option value="">All sources</option><option value="user">Mine</option><option value="mixamo">Mixamo</option><option value="ual">Quaternius</option></select>
               </div>
@@ -315,6 +319,7 @@
                 <li><b>Make one of yourself:</b> a phone scan from in3D (or similar) exported as GLB, auto-rigged on mixamo.com, downloaded as FBX or GLB.</li>
                 <li><b>2D:</b> an animated WebP, GIF or PNG becomes a flat buddy.</li>
                 <li>Every animation in the library works on every 3D character; nothing is baked per model.</li>
+                <li><b>Managing your stuff:</b> imported characters get a "Remove" button under the preview, your own clips a 🗑 on the Animations tab, voices a Delete next to the voice list, and personalities an editor with Delete. Built-in characters, clips and profiles cannot be removed; switch clips to "not used" instead. Every tab has a Folder… button to the files.</li>
               </ul>
               <h2>Capture: be the animation</h2>
               <p>The Capture tab (or right-click him and choose <b>Copy me</b>) turns your webcam on and tracks your body on your PC; nothing is uploaded. Tick <b>Mirror on the buddy</b> and he copies you live. Press <b>Record</b>, move, press <b>Stop</b>, give it a name and a role, and it lands in your animations, working on every 3D character. Stand back so your whole body is in frame. The camera turns off when you leave the tab or close this window.</p>

@@ -18,6 +18,8 @@ export interface LibraryClip {
   /** Where it came from. */
   source: "ual" | "mixamo" | "user";
   duration?: number;
+  /** File name for clips in the user's folder (deletable); bundled clips have none. */
+  file?: string;
   /** Role implied by the bundled manifests, before user overrides. */
   defaultRole: Role;
 }
@@ -56,6 +58,7 @@ export async function listLibrary(reference?: Manifest): Promise<LibraryClip[]> 
             name: u.name,
             url: convertFileSrc(`${u.dir}\\${u.file}`),
             source: "user" as const,
+            file: u.file,
             defaultRole: "off" as const,
           }))
         : [];
