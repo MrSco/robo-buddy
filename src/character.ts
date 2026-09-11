@@ -269,7 +269,14 @@ export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<
     },
     clipTime: () => current?.time ?? 0,
     beginFrame(dt) {
-      for (const [b, q] of restPose) b.quaternion.copy(q);
+      // The mixer only writes a bone when its value changed since the previous update, so
+      // animated bones must start each frame from their previous mixer output, not the
+      // T-pose: at a loop wrap the last and first keyframes match and the write is skipped,
+      // which showed a one-frame T-pose. Unanimated bones do go back to rest.
+      for (const [b, q] of restPose) {
+        if (animatedBones.has(b)) b.quaternion.copy(rest.get(b) ?? q);
+        else b.quaternion.copy(q);
+      }
       mixer.update(dt);
       for (const [b, q] of rest) q.copy(b.quaternion);
       if (current && !current.isRunning() && current.getEffectiveWeight() === 0) {

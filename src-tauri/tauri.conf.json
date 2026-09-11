@@ -32,9 +32,11 @@
         "url": "settings.html",
         "width": 460,
         "height": 870,
-        "resizable": false,
+        "resizable": true,
         "visible": false,
-        "center": true
+        "center": true,
+        "minWidth": 440,
+        "minHeight": 520
       }
     ],
     "security": {
