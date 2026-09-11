@@ -132,6 +132,9 @@ export class Renderer3D implements Renderer {
     let minY = floor;
     let maxY = floor + h * 0.5;
     let front = -Infinity;
+    // Lowest joint without padding: nothing hangs below the soles when he stands, so padding
+    // the feet would just float him above the taskbar.
+    let lowest = floor;
     for (const [name, pad] of Renderer3D.FIT_BONES) {
       const b = c.bone(name);
       if (!b) continue;
@@ -139,6 +142,7 @@ export class Renderer3D implements Renderer {
       const p = h * pad;
       if (this.tmp.x - p < minX) minX = this.tmp.x - p;
       if (this.tmp.x + p > maxX) maxX = this.tmp.x + p;
+      if (this.tmp.y < lowest) lowest = this.tmp.y;
       if (this.tmp.y - p < minY) minY = this.tmp.y - p;
       if (this.tmp.y + p > maxY) maxY = this.tmp.y + p;
       if (this.tmp.z + p > front) front = this.tmp.z + p;
@@ -149,7 +153,10 @@ export class Renderer3D implements Renderer {
       maxY = floor + h;
       front = this.baseCenter.z + this.baseSize.z / 2;
     }
-    const y0 = Math.min(minY, floor) - h * 0.035;
+    // Standing: two percent of his height under the soles. Tumbling or lying: the lowest
+    // joint plus a little, so a shoulder on the floor is still inside the window.
+    const y0 = Math.min(floor - h * 0.02, lowest - h * 0.03);
+    void minY;
     const y1 = Math.max(maxY + h * 0.1, y0 + h * 1.3);
     const halfV = (y1 - y0) / 2;
     const cx = (minX + maxX) / 2;
