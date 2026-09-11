@@ -40,6 +40,10 @@
           <span>Music sensitivity <output id="sens-out"></output></span>
           <input id="sensitivity" type="range" min="0" max="1" step="0.01" />
         </label>
+        <div class="meter indent" title="Live music level. He dances while the bar stays past the marker.">
+          <div class="meter-track"><div class="meter-fill" id="meter-fill"></div><div class="meter-mark" id="meter-mark"></div></div>
+          <span class="meter-txt" id="meter-txt">listening…</span>
+        </div>
         <label class="check indent"><input id="tempo" type="checkbox" /> Only dance when a steady tempo is detected (filters game audio)</label>
         <label class="field inline indent">
           <span>Dance</span>

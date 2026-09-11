@@ -289,4 +289,8 @@ is commodity and took one session. We keep our codebase and borrow patterns from
   are suppressed while held, airborne or down; limb holds use the hanging clip as their base. Wall bounces reverse the spin.
 - Lesson: a pointerdown must seed the left-button bit itself; the global button poll can lag a frame and the press was read as a
   release, turning a drag into a poke.
+- Music gate: compares a ~1 s average of the level with the threshold (hysteresis 0.8x to stop) instead of requiring the raw
+  level to stay above it continuously; real music swings around any threshold every beat and never satisfied the old gate.
+  Settings show a live level meter with the threshold marker under the sensitivity slider. Changing the dance while he dances
+  switches the clip immediately.
 - Step 2 (deferred until played with): a real Rapier ragdoll with joint limits while airborne, blended back to the idle on landing.

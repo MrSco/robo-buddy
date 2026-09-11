@@ -32,6 +32,12 @@ export class Music {
   /** 1 on a beat, decaying to 0. */
   pulse = 0;
   dancing = false;
+  /**
+   * Slow average of the level (about a second) that the dance gate compares with the
+   * threshold. The instantaneous level of real music swings around any threshold every
+   * beat, which kept resetting the "loud for long enough" timer and he never started.
+   */
+  gateLevel = 0;
   /** When true, dancing also needs a stable tempo estimate. Filters game audio and speech. */
   requireTempo = false;
   private stableSince = -1;
@@ -81,15 +87,18 @@ export class Music {
     this.lastBpmSample = r.bpm;
     const tempoOk = !this.requireTempo || (this.stableSince >= 0 && now - this.stableSince > 3);
 
-    // Dance state with hysteresis so a quiet bar does not stop him.
-    if (this.level > this.threshold && !r.silent && tempoOk) {
+    // Dance state with hysteresis: starts once the average is over the threshold for half a
+    // second, stops only after it sits well under it for two seconds (or on silence).
+    this.gateLevel += (r.level - this.gateLevel) * (1 - Math.exp(-dt * 1.5));
+    const gate = this.dancing ? this.threshold * 0.8 : this.threshold;
+    if (this.gateLevel > gate && !r.silent && tempoOk) {
       if (this.aboveSince < 0) this.aboveSince = now;
       this.belowSince = -1;
-      if (!this.dancing && now - this.aboveSince > 0.8) this.dancing = true;
+      if (!this.dancing && now - this.aboveSince > 0.5) this.dancing = true;
     } else {
       if (this.belowSince < 0) this.belowSince = now;
       this.aboveSince = -1;
-      if (this.dancing && (now - this.belowSince > 2.5 || r.silent)) this.dancing = false;
+      if (this.dancing && (now - this.belowSince > 2.0 || r.silent)) this.dancing = false;
     }
 
     // Beat clock.

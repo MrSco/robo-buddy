@@ -5,6 +5,8 @@ import { listPacks, type Manifest, type PackRef } from "./packs";
 import { LivePreview, thumbnailFor } from "./preview";
 import { Behavior } from "./behavior";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { listen } from "@tauri-apps/api/event";
+import type { AudioFeatures } from "./audio";
 import { listLibrary, invalidateLibrary, ROLES, type LibraryClip } from "./library";
 import { getSettings, onSettingsChanged, setSettings, type ClickThroughMode, type Settings } from "./settings-store";
 
@@ -22,6 +24,9 @@ const els = {
   music: $<HTMLInputElement>("music"),
   sensitivity: $<HTMLInputElement>("sensitivity"),
   sensOut: $<HTMLOutputElement>("sens-out"),
+  meterFill: $<HTMLDivElement>("meter-fill"),
+  meterMark: $<HTMLDivElement>("meter-mark"),
+  meterTxt: $<HTMLSpanElement>("meter-txt"),
   tempo: $<HTMLInputElement>("tempo"),
   clickthrough: $<HTMLSelectElement>("clickthrough"),
   autostart: $<HTMLInputElement>("autostart"),
@@ -291,7 +296,30 @@ function status(msg: string) {
   if (msg) setTimeout(() => (els.status.textContent === msg ? (els.status.textContent = "") : null), 4000);
 }
 
+/** Live music meter: the same slow average the buddy's dance gate uses, against the slider's threshold. */
+function startMeter() {
+  let level = 0;
+  let silent = true;
+  let last = performance.now();
+  listen<AudioFeatures>("audio", (e) => {
+    const now = performance.now();
+    const dt = Math.min(0.2, (now - last) / 1000);
+    last = now;
+    silent = e.payload.silent;
+    level += (e.payload.level - level) * (1 - Math.exp(-dt * 1.5));
+    const threshold = thresholdFromSlider(Number(els.sensitivity.value));
+    const on = !silent && level > threshold;
+    els.meterFill.style.width = `${Math.round(Math.min(1, level) * 100)}%`;
+    els.meterFill.classList.toggle("on", on);
+    els.meterMark.style.left = `${Math.round(threshold * 100)}%`;
+    els.meterTxt.textContent = silent ? "silent" : on ? "dancing" : "too quiet";
+  }).catch(() => {
+    els.meterTxt.textContent = "";
+  });
+}
+
 async function main() {
+  startMeter();
   settings = await getSettings();
   try {
     settings.autostart = await isEnabled();

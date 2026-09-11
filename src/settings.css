@@ -105,6 +105,44 @@ button:hover {
 .indent {
   margin-left: 25px;
 }
+.meter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 0 8px;
+}
+.meter-track {
+  position: relative;
+  flex: 1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border);
+  overflow: hidden;
+}
+.meter-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 4px;
+  background: var(--muted);
+  transition: width 60ms linear, background-color 200ms;
+}
+.meter-fill.on {
+  background: var(--accent);
+}
+.meter-mark {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+}
+.meter-txt {
+  color: var(--muted);
+  font-size: 11px;
+  min-width: 64px;
+  text-align: right;
+}
 output {
   color: var(--text);
   margin-left: 6px;
