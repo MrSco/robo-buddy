@@ -87,13 +87,16 @@ export function stripMixamo(name: string): string {
 /** Resolve any supported bone name to the VRM humanoid name, or undefined. */
 export function humanoidNameOf(nodeName: string): BoneName | undefined {
   const bare = stripMixamo(nodeName.trim());
-  return (
+  const direct =
     MIXAMO_TO_VRM[bare] ??
     UE_TO_VRM[bare] ??
     GENERIC_TO_VRM[bare.toLowerCase()] ??
-    GENERIC_TO_VRM[bare.toLowerCase().replace(/[\s_-]/g, "")] ??
-    undefined
-  );
+    GENERIC_TO_VRM[bare.toLowerCase().replace(/[\s_-]/g, "")];
+  if (direct) return direct;
+  // Sketchfab and some exporters number every bone ("Hips_02", "LeftArm_010", "Head.001"):
+  // try again without the trailing counter. Mixamo's own digits ("Spine1") have no separator.
+  const m = bare.match(/^(.*?)[._]\d+$/);
+  return m ? humanoidNameOf(m[1]) : undefined;
 }
 
 /** Walk a scene graph and collect humanoid bones by any supported naming scheme. */
