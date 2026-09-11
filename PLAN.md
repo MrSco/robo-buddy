@@ -419,6 +419,10 @@ Goal: dynamic phrases and a real conversation, free by default, bring-your-own-k
 - Help tab mentions Capture. Left for later: a "Copy me" toggle that survives closing the settings window (the camera
   lives in that webview, so mirroring stops when it hides), hand and finger tracking, and a get-up clip for M8's ragdoll.
 
+- Packaging (Sep 11): version 0.2.0; `scripts/make-installer.ps1` builds and copies the NSIS setup and MSI into `dist/`;
+  README has an Install and run section. The procedural groove now only layers over the plain idle clip (a crouch or
+  fidget no longer bobs along while the music level rises).
+
 ## M7 (original proposal) — Webcam motion capture
 Goal: drive the model live from the user's webcam, and record what they do as a clip for the library (a dance, an idle).
 - Tracking in the settings window (it already has a camera-free 3D preview): MediaPipe Pose Landmarker (tasks-vision,

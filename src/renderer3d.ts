@@ -281,7 +281,10 @@ export class Renderer3D implements Renderer {
 
     let nod = 0;
     let roll = 0;
-    if (input.music && !calm && !(input.state === "dance" && clipDriven)) {
+    // The procedural groove only layers over the plain idle; a crouch, fidget or the texting
+    // clip would otherwise bob and shuffle along with it while the music level rises.
+    const plainBase = !input.clip || input.clip.name === this.idleClipName();
+    if (input.music && !calm && plainBase && !(input.state === "dance" && clipDriven)) {
       ({ nod, roll } = applyDance(c, input.music, input.danceAmount));
     }
 
