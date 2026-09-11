@@ -7,6 +7,7 @@ use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 mod audio;
 mod chat;
+mod live;
 mod input;
 mod piper;
 mod packs;
@@ -179,6 +180,11 @@ pub fn run() {
             chat::save_user_personalities,
             chat::append_log,
             chat::list_models,
+            live::set_live_key,
+            live::has_live_key,
+            live::live_connect,
+            live::live_usage,
+            live::live_add_seconds,
             piper::piper_status,
             piper::piper_install,
             piper::piper_download_voice,

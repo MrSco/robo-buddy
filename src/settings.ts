@@ -76,6 +76,16 @@ const els = {
   personalityHint: $<HTMLParagraphElement>("personality-hint"),
   chatSttEndpoint: $<HTMLInputElement>("chat-stt-endpoint"),
   ttsEngine: $<HTMLSelectElement>("tts-engine"),
+  talkMode: $<HTMLSelectElement>("talk-mode"),
+  liveFields: $<HTMLDivElement>("live-fields"),
+  pipelineFields: $<HTMLDivElement>("pipeline-fields"),
+  liveKey: $<HTMLInputElement>("live-key"),
+  liveSaveKey: $<HTMLButtonElement>("live-savekey"),
+  liveKeyStatus: $<HTMLSpanElement>("live-keystatus"),
+  liveBackend: $<HTMLInputElement>("live-backend"),
+  liveVoice: $<HTMLInputElement>("live-voice"),
+  liveMinutes: $<HTMLInputElement>("live-minutes"),
+  liveUsage: $<HTMLParagraphElement>("live-usage"),
   piperFields: $<HTMLDivElement>("piper-fields"),
   piperExe: $<HTMLInputElement>("piper-exe"),
   piperVoice: $<HTMLSelectElement>("piper-voice"),
@@ -423,6 +433,13 @@ function render() {
   els.chatSttEndpoint.value = settings.chatSttEndpoint;
   els.ttsEngine.value = settings.ttsEngine;
   els.piperFields.hidden = settings.ttsEngine !== "piper";
+  els.talkMode.value = settings.talkMode === "live" ? "live" : "pipeline";
+  els.liveFields.hidden = settings.talkMode !== "live";
+  els.pipelineFields.classList.toggle("dim", settings.talkMode === "live");
+  els.liveBackend.value = settings.liveBackendModel;
+  els.liveVoice.value = settings.liveVoice;
+  els.liveMinutes.value = String(settings.liveDailyMinutes);
+  if (settings.talkMode === "live") void refreshLiveStatus();
   els.piperExe.value = settings.piperExe;
   els.piperVoicePath.value = settings.piperVoice;
   if (els.piperVoice.options.length) els.piperVoice.value = settings.piperVoice;
@@ -579,6 +596,8 @@ function wireTabs() {
   const show = (name: string) => {
     for (const b of buttons) b.classList.toggle("active", b.dataset.tab === name);
     for (const p of pages) p.hidden = p.dataset.page !== name;
+    // Voices dropped into the folder while the window sat hidden show up on the next visit.
+    if (name === "talk" && settings?.ttsEngine === "piper") void refreshPiper();
     // One WebGL preview, shown on the Character page and beside the animation list.
     const home = document.getElementById(name === "library" ? "preview-lib" : name === "capture" ? "preview-cap" : "preview-char");
     const from = els.live.parentElement;
@@ -613,7 +632,46 @@ async function refreshKeyStatus() {
   }
 }
 
+async function refreshLiveStatus() {
+  try {
+    const has = await invoke<boolean>("has_live_key");
+    const secs = await invoke<number>("live_usage");
+    els.liveKeyStatus.textContent = has ? "a key is saved" : "no key saved";
+    els.liveUsage.textContent = secs > 0 ? `${(secs / 60).toFixed(1)} minutes of Live voice used today.` : "No Live voice used today.";
+  } catch {
+    els.liveKeyStatus.textContent = "";
+  }
+}
+
+function wireLive() {
+  els.talkMode.addEventListener("change", () => {
+    const live = els.talkMode.value === "live";
+    els.liveFields.hidden = !live;
+    els.pipelineFields.classList.toggle("dim", live);
+    void commit({ talkMode: live ? "live" : "pipeline" });
+    if (live) void refreshLiveStatus();
+  });
+  els.liveBackend.addEventListener("change", () => void commit({ liveBackendModel: els.liveBackend.value.trim() || "gpt-5.6-luna" }));
+  els.liveVoice.addEventListener("change", () => void commit({ liveVoice: els.liveVoice.value.trim() }));
+  els.liveMinutes.addEventListener("change", () => void commit({ liveDailyMinutes: Math.max(0, Math.round(Number(els.liveMinutes.value) || 0)) }));
+  els.liveSaveKey.addEventListener("click", async () => {
+    try {
+      await invoke("set_live_key", { key: els.liveKey.value });
+      els.liveKey.value = "";
+      await refreshLiveStatus();
+      els.liveKeyStatus.textContent = "key saved";
+    } catch (err) {
+      els.liveKeyStatus.textContent = `could not save: ${err}`;
+    }
+  });
+  els.liveKey.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") els.liveSaveKey.click();
+  });
+  if (settings?.talkMode === "live") void refreshLiveStatus();
+}
+
 function wireTalk() {
+  wireLive();
   els.chatEnabled.addEventListener("change", () => {
     els.talkFields.classList.toggle("off", !els.chatEnabled.checked);
     void commit({ chatEnabled: els.chatEnabled.checked });

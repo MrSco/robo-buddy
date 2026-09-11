@@ -68,6 +68,11 @@ pub struct Settings {
     pub personality: String,
     /// React to typing (key counts and a couple of shortcuts only; never which keys).
     pub keyboard_enabled: bool,
+    /// "pipeline" (chat + speech models) or "live" (OpenAI GPT-Live).
+    pub talk_mode: String,
+    pub live_backend_model: String,
+    pub live_voice: String,
+    pub live_daily_minutes: u32,
     /// Land on and walk along the top edges of other windows.
     pub surfaces_enabled: bool,
 }
@@ -108,6 +113,10 @@ impl Default for Settings {
             piper_voice: String::new(),
             personality: "pack".into(),
             keyboard_enabled: true,
+            talk_mode: "pipeline".into(),
+            live_backend_model: "gpt-5.6-luna".into(),
+            live_voice: String::new(),
+            live_daily_minutes: 30,
             surfaces_enabled: true,
         }
     }

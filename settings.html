@@ -106,6 +106,33 @@
           <p class="hint">Nothing leaves this PC until this is on. The key is kept in Windows Credential Manager and only goes to the chat endpoint. See the Help tab for a two-minute setup.</p>
           <div class="talk-fields" id="talk-fields">
             <div class="group">
+              <h2>Talk engine</h2>
+              <label class="field" title="How a conversation works. Chat + speech models: a text model answers, a speech model transcribes the mic, a voice reads replies (free tiers exist). Live voice: one OpenAI model listens, thinks and speaks in a real conversation, full duplex; paid, billed per second."><span>Engine</span>
+                <select id="talk-mode">
+                  <option value="pipeline">Chat + speech models (Brain, Ears and Voice below)</option>
+                  <option value="live">Live voice: OpenAI GPT-Live (listens, thinks and speaks)</option>
+                </select>
+              </label>
+              <div id="live-fields" hidden>
+                <p class="hint">One session that hears you and talks back in real time; you can talk over him. Open the talk box (double-click him) to start, close it to end; it also ends after 45 seconds of silence. Costs about $0.05 a minute plus the backend model's tokens, so there is a daily cap. He speaks with an OpenAI voice here, not a Piper one.</p>
+                <label class="field" title="An OpenAI API key with access to gpt-live-1. Stored in Windows Credential Manager, separate from the chat key, and only used for Live sessions."><span>OpenAI API key &mdash; <span id="live-keystatus" class="hint"></span></span>
+                  <div class="row">
+                    <input id="live-key" type="password" placeholder="paste a key, then Save" class="grow" autocomplete="off" />
+                    <button id="live-savekey" type="button">Save key</button>
+                  </div>
+                </label>
+                <div class="row wrap">
+                  <label class="field grow" title="The model that does the thinking and runs his actions (dance, climb, ...). gpt-5.6-luna is the cheaper pick; gpt-5.6-terra the smarter one."><span>Backend model</span>
+                    <input id="live-backend" type="text" list="live-backends" spellcheck="false" />
+                    <datalist id="live-backends"><option value="gpt-5.6-luna"></option><option value="gpt-5.6-terra"></option></datalist>
+                  </label>
+                  <label class="field small" title="Optional voice name for the Live model. Leave blank for the default."><span>Voice (optional)</span><input id="live-voice" type="text" spellcheck="false" placeholder="default" /></label>
+                  <label class="field small" title="Minutes of Live voice per day before he refuses to start another session. 0 = no limit."><span>Daily minutes</span><input id="live-minutes" type="number" min="0" step="5" /></label>
+                </div>
+                <p class="hint" id="live-usage"></p>
+              </div>
+            </div>
+            <div class="group">
               <h2>Personality</h2>
               <div class="row wrap">
                 <label class="field grow" title="Who he is when he talks: the system prompt, the pre-baked lines he says, and how creative the model is."><span>Profile</span><select id="personality"></select></label>
@@ -132,7 +159,7 @@
               </div>
             </div>
 
-            <div class="cols2">
+            <div class="cols2" id="pipeline-fields">
               <div class="group">
                 <h2>Brain</h2>
                 <label class="field" title="Where his replies come from. Groq and Gemini have free tiers; Ollama runs a model on your own PC with no key at all; Custom is any OpenAI-compatible server."><span>Provider</span>
@@ -351,6 +378,7 @@
                 <li><b>Can't see him:</b> right-click the tray icon and choose <b>Bring buddy here</b>. He hides while a fullscreen app is focused.</li>
                 <li><b>He dances to game audio:</b> lower the sensitivity while watching the meter, or turn on the steady-tempo option.</li>
                 <li><b>He won't dance to music:</b> raise the sensitivity until the meter says "dancing" while a song plays.</li>
+                <li><b>Live voice:</b> on the Talk tab, Engine → Live voice needs an OpenAI key. The talk box then opens a real-time voice session: just speak; the mic button mutes. It ends when the box closes or after 45 quiet seconds, and stops for the day at the minutes cap.</li>
                 <li><b>Talk fails:</b> the Test button shows the provider's exact error. Most often it is a wrong key or a model id the provider no longer offers; press ↻ to see the current list.</li>
                 <li><b>Report a glitch:</b> <code>%APPDATA%\com.rocco.robobuddy\buddy.log</code> records odd animation frames with the state they happened in.</li>
               </ul>

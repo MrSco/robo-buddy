@@ -295,6 +295,9 @@ output {
   color: var(--text);
   margin-left: 6px;
 }
+.cols2.dim {
+  opacity: 0.45;
+}
 .talk-fields.off {
   opacity: 0.5;
   pointer-events: none;

@@ -10,7 +10,8 @@ import { Bubble } from "./bubble";
 import { ChatClient, TalkBox, Voice, defaultPersona, loadOrGeneratePhrases, type LineEvent, type Lines } from "./chat";
 import { invalidatePersonalities, resolvePersonality, type ResolvedPersonality } from "./personality";
 import type { MirrorPose } from "./mocap";
-import { abilitiesPrompt, extractTag, parseCommand, type Command } from "./commands";
+import { abilitiesPrompt, commandFromTool, extractTag, parseCommand, toolDefinitions, type Command } from "./commands";
+import { LiveVoice } from "./live";
 import { Sounds } from "./sound";
 import { cursor, IN_TAURI, onKeys, onSurfaces, startInput } from "./input";
 import { listPacks, resolvePack, validateManifest, type Manifest, type PackRef } from "./packs";
@@ -35,6 +36,8 @@ let pack: PackRef | null = null;
 // Talk (M6): the input strip, the conversation, the voice, and generated bubble lines.
 const talk = new TalkBox();
 const voice = new Voice();
+const live = new LiveVoice();
+const liveMode = () => settings.talkMode === "live";
 let personality: ResolvedPersonality | null = null;
 const chat = new ChatClient(() => personality?.persona ?? manifest?.persona ?? defaultPersona(manifest?.name ?? "Buddy"));
 let extraLines: Lines = {};
@@ -511,9 +514,70 @@ function runCommand(cmd: Command): string | null {
   }
 }
 
+/** Start a Live voice session for the open talk box; failures land in the bubble. */
+async function startLive() {
+  if (live.state !== "off") return;
+  try {
+    const cap = settings.liveDailyMinutes;
+    if (cap > 0) {
+      const used = await invoke<number>("live_usage").catch(() => 0);
+      if (used / 60 >= cap) {
+        bubble.say([`Live voice is at today's ${cap} minute cap (Settings > Talk).`], 6, clock.elapsedTime, 1);
+        return;
+      }
+    }
+    bubble.say(["Connecting…"], 8, clock.elapsedTime, 1);
+    const persona = personality?.persona ?? manifest?.persona ?? defaultPersona(manifest?.name ?? "Buddy");
+    const name = manifest?.name ?? "Buddy";
+    await live.connect({
+      instructions:
+        `${persona}\nYou are a small desktop buddy standing on the user's screen, talking out loud in a live conversation. ` +
+        `Keep replies short and conversational, one or two sentences; no lists, no markdown. ` +
+        `Delegate to the backend when the user asks you to do something (dance, climb, sleep, come over, walk, stop, be quiet) or asks a question that needs thought.`,
+      backend: {
+        model: settings.liveBackendModel || "gpt-5.6-luna",
+        instructions: `${persona}\n${chatContext()}\nYou act through tools. When the user asks ${name} to do something a tool covers, call that tool, then reply in one short sentence. Never call a tool the user did not ask for.`,
+        tools: toolDefinitions(behavior.danceNames),
+      },
+      voice: settings.liveVoice || undefined,
+    });
+    bubble.hideIf(1);
+  } catch (err) {
+    bubble.say([`Live voice: ${String(err).slice(0, 110)}`], 8, clock.elapsedTime, 1);
+    if (IN_TAURI) invoke("append_log", { line: `live: ${String(err).slice(0, 300)}` }).catch(() => {});
+  }
+}
+live.onUser = (text, final) => {
+  talk.touch();
+  activity();
+  if (final) talk.remember({ who: "you", text });
+};
+live.onHim = (text, final) => {
+  talk.touch();
+  const shown = text.length > 300 ? text.slice(-300) : text;
+  bubble.say([shown], talk.open ? 600 : 12, clock.elapsedTime, 2);
+  if (final) talk.remember({ who: "him", text });
+};
+live.onTool = async (call) => {
+  const cmd = commandFromTool(call.name, call.args, behavior.danceNames);
+  const note = cmd ? runCommand(cmd) : null;
+  return note ?? "That is not something you can do.";
+};
+live.onStatus = (text) => bubble.say([text], 4, clock.elapsedTime, 1);
+live.onClosed = (reason) => {
+  if (reason !== "close_requested") bubble.say([`Live voice ended (${reason}).`], 5, clock.elapsedTime, 1);
+  if (talk.open && liveMode()) talk.hide();
+};
+
 talk.onSend = async (text) => {
   activity();
   behavior.interrupt(clock.elapsedTime);
+  if (liveMode()) {
+    // Live voice: typed text goes into the same conversation; the reply comes back spoken.
+    if (live.state !== "on") await startLive();
+    if (!live.sendText(text)) bubble.say(["Live voice is not connected."], 4, clock.elapsedTime, 1);
+    return;
+  }
   // Replies outrank quips: a "This slaps" cannot wipe an answer, and while the strip is open
   // the answer stays until the next one (or the strip closes).
   bubble.say(["…"], 40, clock.elapsedTime, 2);
@@ -537,8 +601,10 @@ talk.onStatus = (text) => bubble.say([text], 4, clock.elapsedTime, 1);
 talk.onOpenChange = (open) => {
   ignoringCursor = null; // re-evaluate click-through now that the strip is (in)visible
   if (open && IN_TAURI) getCurrentWindow().setFocus().catch(() => {});
+  if (open && liveMode()) void startLive();
   if (!open) {
     voice.stop();
+    if (live.state !== "off") void live.close();
     bubble.hideIf(2);
   }
 };
@@ -548,7 +614,14 @@ function openTalk() {
     bubble.say(["Turn on Talk in Settings first."], 3, clock.elapsedTime);
     return;
   }
-  talk.micEnabled = !!settings.chatSttModel;
+  // Live voice: the mic is the session itself, and the button mutes it.
+  talk.onMicToggle = liveMode()
+    ? () => {
+        live.setMuted(!live.muted);
+        return live.muted;
+      }
+    : undefined;
+  talk.micEnabled = liveMode() || !!settings.chatSttModel;
   talk.toggle();
 }
 
@@ -747,7 +820,7 @@ function debugTitle(t: number) {
   }
   const title =
     `Robo Buddy | ${p.mode} y=${p.y.toFixed(0)} air=${p.airborne} yaw=${yaw.toFixed(2)} cur=${cursor.x},${cursor.y},${cursor.buttons}` +
-    ` | pack=${pack?.id} state=${currentState} grab=${grabPart ?? '-'} talk=${talk.open} talking=${voice.speaking} keys=${typingRate.toFixed(1)}/${typingAmount.toFixed(2)}/${keyEvents} sup=${physics?.support ?? '-'} snd=${sounds.last} head=${Math.round(p.headPx)} crouch=${Math.round(p.crouchPx)} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
+    ` | pack=${pack?.id} state=${currentState} grab=${grabPart ?? '-'} talk=${talk.open} talking=${voice.speaking || live.speaking} live=${live.state}/${Math.round(live.seconds)}s/${live.lastReason} keys=${typingRate.toFixed(1)}/${typingAmount.toFixed(2)}/${keyEvents} sup=${physics?.support ?? '-'} snd=${sounds.last} head=${Math.round(p.headPx)} crouch=${Math.round(p.crouchPx)} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
     (m ? ` | lvl=${m.level.toFixed(2)} gate=${m.gateLevel.toFixed(2)}/${m.threshold.toFixed(2)} bpm=${m.bpm.toFixed(0)} dance=${m.dancing} amt=${danceAmount.toFixed(2)} beats=${m.beats.toFixed(1)}` : "");
   getCurrentWindow().setTitle(title).catch(() => {});
 }
@@ -762,7 +835,7 @@ function frame() {
   if (music) {
     music.requireTempo = settings.requireTempo;
     // His own voice through the speakers must not start (or stop) a dance.
-    music.hold = voice.busy(1500);
+    music.hold = voice.busy(1500) || live.speaking;
     music.update(dt, t);
     const musicOn = settings.musicEnabled && !paused && (manifest?.reactions.music?.enabled ?? true);
     const forced = t < forcedDanceUntil && physics?.mode === "rest" && !asleep;
@@ -878,7 +951,7 @@ function frame() {
       accelX: physics ? THREE.MathUtils.clamp(physics.accelX / (cssH * scaleFactor * 12), -1.5, 1.5) : 0,
       accelY: physics ? THREE.MathUtils.clamp(physics.accelY / (cssH * scaleFactor * 12), -1.5, 1.5) : 0,
       spin: physics?.spin ?? 0,
-      talking: voice.speaking,
+      talking: voice.speaking || live.speaking,
       flail: flailNow,
       mirror: currentState === "mirror" ? mirrorPose : null,
     };

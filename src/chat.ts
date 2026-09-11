@@ -265,6 +265,8 @@ export class TalkBox {
   onOpenChange?: (open: boolean) => void;
   onStatus?: (text: string) => void;
   micEnabled = true;
+  /** Live voice: when set, the mic button toggles mute instead of recording; returns the new muted state. */
+  onMicToggle?: () => boolean;
 
   constructor() {
     this.el = document.createElement("div");
@@ -298,7 +300,14 @@ export class TalkBox {
 
     this.send.addEventListener("click", () => void this.submit());
     close.addEventListener("click", () => this.hide());
-    this.mic.addEventListener("click", () => void this.toggleRecording());
+    this.mic.addEventListener("click", () => {
+      if (this.onMicToggle) {
+        const muted = this.onMicToggle();
+        this.mic.textContent = muted ? "🔇" : "🎤";
+        this.mic.title = muted ? "Microphone muted; click to unmute" : "Listening; click to mute";
+        this.touch();
+      } else void this.toggleRecording();
+    });
     this.logBtn.addEventListener("click", () => this.toggleLog());
     this.input.addEventListener("input", () => this.touch());
     this.input.addEventListener("keydown", (e) => {
@@ -340,6 +349,13 @@ export class TalkBox {
     this.el.hidden = false;
     this.open = true;
     this.mic.hidden = !this.micEnabled;
+    if (this.onMicToggle) {
+      this.mic.textContent = "🎤";
+      this.mic.title = "Listening; click to mute";
+    } else {
+      this.mic.textContent = "🎤";
+      this.mic.title = "Click to talk, click again when done";
+    }
     this.onOpenChange?.(true);
     this.touch();
     setTimeout(() => this.input.focus(), 30);

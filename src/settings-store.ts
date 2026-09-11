@@ -43,6 +43,14 @@ export interface Settings {
   chatSttEndpoint: string;
   /** "windows" or "piper". */
   ttsEngine: string;
+  /** "pipeline" (chat + speech models) or "live" (OpenAI GPT-Live, one session that listens, thinks and speaks). */
+  talkMode: string;
+  /** Live voice: the backend model that reasons and runs tools. */
+  liveBackendModel: string;
+  /** Live voice: optional voice name; blank = the server's default. */
+  liveVoice: string;
+  /** Live voice: minutes per day, a safety net for a session left open. 0 = no limit. */
+  liveDailyMinutes: number;
   piperExe: string;
   piperVoice: string;
   /** Personality profile id; "pack" = the character's own persona and lines. */
@@ -83,6 +91,10 @@ export const DEFAULT_SETTINGS: Settings = {
   chatDailyCap: 300,
   chatSttEndpoint: "",
   ttsEngine: "windows",
+  talkMode: "pipeline",
+  liveBackendModel: "gpt-5.6-luna",
+  liveVoice: "",
+  liveDailyMinutes: 30,
   piperExe: "",
   piperVoice: "",
   personality: "pack",

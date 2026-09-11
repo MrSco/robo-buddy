@@ -97,6 +97,53 @@ export function extractTag(reply: string, dances: string[]): { text: string; com
   return { text, command };
 }
 
+/** Tool definitions (OpenAI function format) for a backend that acts through tool calls. */
+export function toolDefinitions(dances: string[]): unknown[] {
+  const list = dances.filter((d) => d !== "procedural").map(norm).slice(0, 24);
+  const fn = (name: string, description: string, properties: Record<string, unknown> = {}, required: string[] = []) => ({
+    type: "function",
+    name,
+    description,
+    parameters: { type: "object", properties, required, additionalProperties: false },
+  });
+  return [
+    fn("dance", "Start dancing. Only when the user asks for a dance.", {
+      name: { type: "string", description: `Dance name, one of: ${list.join(", ")}. Omit for a random one.` },
+      seconds: { type: "number", description: "How long to dance, in seconds (default 45)." },
+    }),
+    fn("stop", "Stop whatever you are doing (dancing, walking) and stand still."),
+    fn("sleep", "Go to sleep / take a nap."),
+    fn("wake", "Wake up."),
+    fn("come", "Walk over to the user's mouse cursor."),
+    fn("jump", "Jump once."),
+    fn("climb", "Climb up onto a nearby window."),
+    fn("walk", "Walk a little way to the left or right.", { dir: { type: "string", enum: ["left", "right"] } }, ["dir"]),
+    fn("quiet", "Stay quiet (no idle remarks) for a while.", { minutes: { type: "number", description: "Minutes of quiet (default 10)." } }),
+  ];
+}
+
+/** Turn a tool call from the model into a command, or null if it is not one of ours. */
+export function commandFromTool(name: string, args: Record<string, unknown>, dances: string[]): Command | null {
+  const str = (k: string) => (typeof args[k] === "string" ? (args[k] as string) : undefined);
+  const num = (k: string) => (typeof args[k] === "number" ? (args[k] as number) : undefined);
+  switch (name) {
+    case "dance":
+      return { kind: "dance", name: str("name") ? matchName(str("name")!, dances) : undefined, seconds: num("seconds") };
+    case "stop":
+    case "sleep":
+    case "wake":
+    case "come":
+    case "jump":
+    case "climb":
+      return { kind: name };
+    case "walk":
+      return { kind: "walk", dir: (str("dir") ?? "right").toLowerCase().startsWith("l") ? -1 : 1 };
+    case "quiet":
+      return { kind: "quiet", minutes: num("minutes") || 10 };
+  }
+  return null;
+}
+
 /** The line the system prompt gets, so the model knows what it can do and how to say so. */
 export function abilitiesPrompt(dances: string[]): string {
   const list = dances.filter((d) => d !== "procedural").map(norm).slice(0, 24).join(", ");
