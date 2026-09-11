@@ -418,7 +418,10 @@ export class Renderer3D implements Renderer {
   debugProbe(): string {
     const px = new Uint8Array(4);
     this.gl.readPixels(Math.floor(this.canvas.width / 2), Math.floor(this.canvas.height * 0.55), 1, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, px);
-    return `${Array.from(px).join(",")} err=${this.gl.getError()} lost=${this.gl.isContextLost()} inst=${this.id} renders=${this.renders} same=${this.gl === this.renderer.getContext()} tpose=${this.tposeFrames}:${this.tposeLast}`;
+    const c = this.character;
+    const v = (o: THREE.Object3D | undefined) => (o ? o.getWorldPosition(this.tmp).toArray().map((n) => n.toFixed(2)).join("/") : "-");
+    const geo = c ? `hips=${v(c.bone("hips"))} head=${v(c.bone("head"))} base=${this.baseCenter.toArray().map((n) => n.toFixed(2)).join("/")} size=${this.baseSize.toArray().map((n) => n.toFixed(2)).join("/")} fit=${this.fitDist.toFixed(2)}/${this.fitY.toFixed(2)} rootScale=${c.root.scale.x.toFixed(3)}` : "";
+    return `${Array.from(px).join(",")} err=${this.gl.getError()} lost=${this.gl.isContextLost()} inst=${this.id} renders=${this.renders} same=${this.gl === this.renderer.getContext()} tpose=${this.tposeFrames}:${this.tposeLast} ${geo}`;
   }
 
   /** Screen-space positions of the bones that matter for grabbing. */

@@ -144,20 +144,44 @@ function restoreBindPose(root: THREE.Object3D) {
     for (let p = o.parent; p; p = p.parent) d++;
     return d;
   };
+  const saved = new Map<THREE.Object3D, { p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3 }>();
+  const wp = new THREE.Vector3();
+  const meshBox = new THREE.Box3().setFromObject(root);
+  const boneBox = new THREE.Box3();
   root.traverse((o) => {
     const m = o as THREE.SkinnedMesh;
     if (!m.isSkinnedMesh || !m.skeleton) return;
     // Parents first, so each bone's local transform is taken against an already restored parent.
+    // The inverse bind matrices are relative to the mesh's own frame (the GLTF loader binds with
+    // the identity), so a joint's world matrix at bind time is the mesh's world matrix times the
+    // inverse of its inverse bind matrix.
     const bones = m.skeleton.bones.map((b, i) => ({ b, i, depth: depthOf(b) })).sort((a, b) => a.depth - b.depth);
     for (const { b, i } of bones) {
       if (done.has(b)) continue;
       done.add(b);
-      target.copy(m.skeleton.boneInverses[i]).invert().premultiply(m.bindMatrix);
+      saved.set(b, { p: b.position.clone(), q: b.quaternion.clone(), s: b.scale.clone() });
+      target.copy(m.skeleton.boneInverses[i]).invert().premultiply(m.matrixWorld);
       if (b.parent) target.premultiply(inv.copy(b.parent.matrixWorld).invert());
       target.decompose(b.position, b.quaternion, b.scale);
       b.updateWorldMatrix(false, false);
+      boneBox.expandByPoint(b.getWorldPosition(wp));
     }
   });
+  if (!done.size) return;
+  // Sanity: the restored skeleton must sit where the mesh is. If the file's matrices follow some
+  // other convention the bones would land far away; then the node pose is kept as it was.
+  const mh = meshBox.getSize(new THREE.Vector3()).y;
+  const bh = boneBox.getSize(new THREE.Vector3()).y;
+  const off = boneBox.getCenter(new THREE.Vector3()).distanceTo(meshBox.getCenter(new THREE.Vector3()));
+  if (!(bh > mh * 0.4 && bh < mh * 1.5 && off < mh)) {
+    console.warn(`bind pose restore skipped: bones span ${bh.toFixed(2)} vs mesh ${mh.toFixed(2)}, ${off.toFixed(2)} apart`);
+    for (const [b, t] of saved) {
+      b.position.copy(t.p);
+      b.quaternion.copy(t.q);
+      b.scale.copy(t.s);
+    }
+    root.updateMatrixWorld(true);
+  }
 }
 
 export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<Character> {
