@@ -57,7 +57,7 @@
     "name": "Hanging_Idle",
     "file": "Hanging_Idle.glb",
     "duration": 2.367,
-    "loop": true
+    "loop": false
   },
   {
     "name": "Happy_Idle",

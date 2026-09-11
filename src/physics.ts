@@ -86,6 +86,23 @@ export class WindowPhysics {
     return best;
   }
 
+  /** Ease the grab offset so a window-space point ends up under the cursor (used to hold by a hand). */
+  steerHold(pointX: number, pointY: number, dt: number) {
+    if (this.mode !== "held") return;
+    const k = Math.min(1, dt * 8);
+    this.grabDx += (pointX - this.grabDx) * k;
+    this.grabDy += (pointY - this.grabDy) * k;
+  }
+
+  /** Cursor velocity while held, px/s, from the recent samples. */
+  get holdVelocityX(): number {
+    if (this.samples.length < 2) return 0;
+    const a = this.samples[Math.max(0, this.samples.length - 6)];
+    const b = this.samples[this.samples.length - 1];
+    const dt = (b.t - a.t) / 1000;
+    return dt > 0 ? (b.x - a.x) / dt : 0;
+  }
+
   grab() {
     this.mode = "held";
     this.vx = this.vy = 0;

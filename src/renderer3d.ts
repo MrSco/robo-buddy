@@ -2,8 +2,8 @@ import * as THREE from "three";
 import { loadCharacter, type Character } from "./character";
 import { applyDance } from "./dance";
 import type { Manifest, PackRef } from "./packs";
-import { applyFlail, applyIdle, applyLookAt, applySleep } from "./pose";
-import type { FrameInput, Renderer, StateName } from "./renderer";
+import { applyFlail, applyHeldByArm, applyHeldByLeg, applyIdle, applyLookAt, applySleep } from "./pose";
+import type { FrameInput, GrabPart, Renderer, StateName } from "./renderer";
 
 /** three.js renderer for GLB / VRM characters: clips via the mixer, procedural layers on top. */
 let instances = 0;
@@ -31,6 +31,12 @@ export class Renderer3D implements Renderer {
   /** Camera fit state: distance and look-at height, eased so zooming is smooth. */
   private fitDist = 0;
   private fitY = 0;
+  /** Pendulum state while held: angle and angular velocity (radians). */
+  private swing = 0;
+  private swingVel = 0;
+  private heldAmount = 0;
+  private flipAmount = 0;
+  private lastGrab: GrabPart | null = null;
   private baseCenter = new THREE.Vector3();
   private baseSize = new THREE.Vector3();
 
@@ -153,16 +159,33 @@ export class Renderer3D implements Renderer {
   frame(input: FrameInput) {
     const c = this.character;
     if (!c) return;
-    this.syncClip(input);
+    const grab = input.state === "dragged" ? input.grab : null;
+    if (grab) this.lastGrab = grab.part;
+    const limbHold = !!grab && grab.part !== "head" && grab.part !== "torso";
+    // Held by a limb: keep whatever clip was playing as the base and pose the limbs on top,
+    // instead of switching to the two-handed hanging clip.
+    this.syncClip(limbHold ? { ...input, clip: null } : input);
     c.beginFrame(input.dt);
 
     const root = c.root;
     root.position.y = 0;
-    const clipDriven = input.clip !== null;
+    const clipDriven = input.clip !== null && !limbHold;
 
     // Procedural base pose for whatever the clip does not cover.
     if (input.airborne && !clipDriven) applyFlail(c, input.t);
     else applyIdle(c, input.t, 1 - input.danceAmount * 0.7);
+
+    // Held by a limb: pose that limb toward the cursor and let the body hang from it.
+    this.heldAmount += ((limbHold ? 1 : 0) - this.heldAmount) * Math.min(1, input.dt * 10);
+    const upsideDown = grab?.part === "leftLeg" || grab?.part === "rightLeg";
+    this.flipAmount += ((upsideDown ? 1 : 0) - this.flipAmount) * Math.min(1, input.dt * 6);
+    if (this.heldAmount > 0.001 && this.lastGrab) {
+      if (this.lastGrab === "leftArm" || this.lastGrab === "rightArm") {
+        applyHeldByArm(c, this.lastGrab === "leftArm" ? "left" : "right", input.t, this.heldAmount);
+      } else if (this.lastGrab === "leftLeg" || this.lastGrab === "rightLeg") {
+        applyHeldByLeg(c, this.lastGrab === "leftLeg" ? "left" : "right", input.t, this.heldAmount);
+      }
+    }
 
     let nod = 0;
     let roll = 0;
@@ -185,10 +208,25 @@ export class Renderer3D implements Renderer {
     }
     root.scale.set(1 + squash * 0.6, 1 - squash, 1 + squash * 0.6);
 
-    // Lean into horizontal motion while airborne.
+    // Lean into horizontal motion while airborne; pendulum swing while held.
     const targetLean = input.airborne ? THREE.MathUtils.clamp(-input.vx / 5000, -0.25, 0.25) : 0;
     this.lean += (targetLean - this.lean) * Math.min(1, input.dt * 12);
-    root.rotation.z = this.lean;
+    if (grab) {
+      // Dragging sideways pushes the body the other way; gravity pulls it back, damped.
+      const drive = THREE.MathUtils.clamp(-grab.vx / 6000, -0.6, 0.6);
+      const k = 18;
+      const damping = 4;
+      this.swingVel += (k * (drive - this.swing) - damping * this.swingVel) * input.dt;
+      this.swing += this.swingVel * input.dt;
+    } else {
+      this.swingVel += (-30 * this.swing - 6 * this.swingVel) * input.dt;
+      this.swing += this.swingVel * input.dt;
+    }
+    // Upside down when held by a leg: the whole body flips about the grab side.
+    const flip = this.flipAmount * Math.PI * (this.lastGrab === "leftLeg" ? -1 : 1);
+    root.rotation.z = this.lean + this.swing + flip;
+    // Keep the feet on the floor when upright; when flipped, the pivot moves to the top.
+    root.position.y += this.flipAmount * (this.baseSize.y * 0.98);
     // Turn to face along the floor while walking, back to the viewer otherwise.
     this.facing += (input.facing - this.facing) * Math.min(1, input.dt * 8);
     root.rotation.y = this.facing;
@@ -208,6 +246,75 @@ export class Renderer3D implements Renderer {
     const px = new Uint8Array(4);
     this.gl.readPixels(Math.floor(this.canvas.width / 2), Math.floor(this.canvas.height * 0.55), 1, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, px);
     return `${Array.from(px).join(",")} err=${this.gl.getError()} lost=${this.gl.isContextLost()} inst=${this.id} renders=${this.renders} same=${this.gl === this.renderer.getContext()}`;
+  }
+
+  /** Screen-space positions of the bones that matter for grabbing. */
+  private screenPos(b: THREE.Object3D | undefined): { x: number; y: number } | null {
+    if (!b) return null;
+    b.getWorldPosition(this.tmp).project(this.camera);
+    return { x: ((this.tmp.x + 1) / 2) * this.cssW, y: ((1 - this.tmp.y) / 2) * this.cssH };
+  }
+
+  partAt(x: number, y: number): GrabPart | null {
+    const c = this.character;
+    if (!c) return null;
+    c.root.updateMatrixWorld(true);
+    const candidates: Array<[GrabPart, THREE.Object3D | undefined]> = [
+      ["head", c.bone("head")],
+      ["torso", c.bone("chest") ?? c.bone("spine")],
+      ["torso", c.bone("hips")],
+      ["leftArm", c.bone("leftHand")],
+      ["leftArm", c.bone("leftLowerArm")],
+      ["leftArm", c.bone("leftUpperArm")],
+      ["rightArm", c.bone("rightHand")],
+      ["rightArm", c.bone("rightLowerArm")],
+      ["rightArm", c.bone("rightUpperArm")],
+      ["leftLeg", c.bone("leftFoot")],
+      ["leftLeg", c.bone("leftLowerLeg")],
+      ["leftLeg", c.bone("leftUpperLeg")],
+      ["rightLeg", c.bone("rightFoot")],
+      ["rightLeg", c.bone("rightLowerLeg")],
+      ["rightLeg", c.bone("rightUpperLeg")],
+    ];
+    let best: GrabPart | null = null;
+    let bestD = Infinity;
+    for (const [part, bone] of candidates) {
+      const p = this.screenPos(bone);
+      if (!p) continue;
+      // The torso is wide; give it a little extra reach so clicks on the shirt count.
+      const d = Math.hypot(p.x - x, p.y - y) * (part === "torso" ? 0.7 : 1);
+      if (d < bestD) {
+        bestD = d;
+        best = part;
+      }
+    }
+    return bestD < this.cssH * 0.35 ? best : null;
+  }
+
+  holdPoint(): { x: number; y: number } | null {
+    const c = this.character;
+    if (!c || !this.lastGrab) return null;
+    c.root.updateMatrixWorld(true);
+    switch (this.lastGrab) {
+      case "leftArm":
+        return this.screenPos(c.bone("leftHand"));
+      case "rightArm":
+        return this.screenPos(c.bone("rightHand"));
+      case "leftLeg":
+        return this.screenPos(c.bone("leftFoot"));
+      case "rightLeg":
+        return this.screenPos(c.bone("rightFoot"));
+      case "head": {
+        const p = this.screenPos(c.bone("head"));
+        return p ? { x: p.x, y: p.y - this.cssH * 0.06 } : null;
+      }
+      default: {
+        // Hanging by both hands: midway between them.
+        const l = this.screenPos(c.bone("leftHand"));
+        const r = this.screenPos(c.bone("rightHand"));
+        return l && r ? { x: (l.x + r.x) / 2, y: (l.y + r.y) / 2 } : null;
+      }
+    }
   }
 
   bubbleAnchor() {

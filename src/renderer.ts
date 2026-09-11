@@ -5,6 +5,14 @@ import type { Manifest, PackRef } from "./packs";
 /** Behaviour states resolved by main.ts each frame. Packs may provide a clip per state. */
 export type StateName = "idle" | "dance" | "poked" | "dragged" | "fall" | "sleep" | "fidget" | "walk";
 
+export type GrabPart = "head" | "torso" | "leftArm" | "rightArm" | "leftLeg" | "rightLeg";
+
+export interface GrabInfo {
+  part: GrabPart;
+  /** Horizontal cursor velocity in px/s, for pendulum swing. */
+  vx: number;
+}
+
 export interface FrameInput {
   t: number;
   dt: number;
@@ -13,6 +21,8 @@ export interface FrameInput {
   clip: ClipChoice | null;
   /** Body yaw in radians: 0 faces the viewer, +-PI/2 faces along the floor. */
   facing: number;
+  /** Where he is being held, when dragged: which part and the cursor velocity for swing. */
+  grab: GrabInfo | null;
   /** 0..1 blend for the dance layer. */
   danceAmount: number;
   /** 0..1 blend for the sleep pose. */
@@ -41,6 +51,10 @@ export interface Renderer {
   alphaAt(x: number, y: number): number;
   /** Top of the character's head in CSS pixels; speech bubbles sit above this point. */
   bubbleAnchor(): { x: number; y: number };
+  /** Which body part is under a CSS-pixel point (3D only), or null when nothing is near. */
+  partAt(x: number, y: number): GrabPart | null;
+  /** CSS-pixel position of the point he is held by (a hand, the head...), or null. */
+  holdPoint(): { x: number; y: number } | null;
   /** True when the pack provides a clip for the state, so procedural fallbacks can step aside. */
   hasClip(state: StateName): boolean;
   /** Length of a clip by name in seconds; 0 when unknown. */

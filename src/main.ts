@@ -73,6 +73,7 @@ const bubble = new Bubble();
 const sounds = new Sounds();
 const behavior = new Behavior();
 let pokeClip: ClipChoice | null = null;
+let grabPart: import("./renderer").GrabPart | null = null;
 let lastAct = "idle";
 let lastFree = false;
 let lastClip = "-";
@@ -314,6 +315,7 @@ const GRAB_HOLD = 0.22;
 
 function onGrab(e: PointerEvent) {
   if (e.button !== 0 || !physics || settings.clickThrough === "locked") return;
+  grabPart = renderer?.partAt(e.clientX, e.clientY) ?? null;
   press = { t: clock.elapsedTime, x: cursor.x, y: cursor.y };
   activity();
 }
@@ -527,6 +529,7 @@ function frame() {
       state: currentState,
       clip: renderer?.kind === "3d" ? resolved.clip : null,
       facing,
+      grab: currentState === "dragged" && grabPart ? { part: grabPart, vx: physics?.holdVelocityX ?? 0 } : null,
       danceAmount,
       sleepAmount,
       music,
@@ -539,6 +542,11 @@ function frame() {
       vx: physics?.vx ?? 0,
     };
     renderer.frame(input);
+  }
+  // While held, keep the point he is held by (a hand, the head) under the cursor.
+  if (physics?.mode === "held" && renderer && grabPart) {
+    const hp = renderer.holdPoint();
+    if (hp) physics.steerHold(hp.x * scaleFactor, hp.y * scaleFactor, dt);
   }
   if (!paused || physics?.mode === "held" || physics?.airborne) physics?.step(dt);
   if (renderer) {

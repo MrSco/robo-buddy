@@ -272,3 +272,7 @@ is commodity and took one session. We keep our codebase and borrow patterns from
   focused, frame skipping while asleep/hidden, camera fits the pose so raised arms are never clipped.
 - Deferred: auto-updater (Tauri's updater needs a public endpoint for the manifest; the repo is private), code signing,
   window interactions (sit on title bars), keyboard reactions.
+- Grab-aware holding: the body part under the cursor at press time decides the hold. Head/torso: two-handed hanging clip
+  (re-downloaded from Mixamo with Character Arm-Space 85 so the hands are together). Arm: that arm aims straight up and the body
+  dangles from it. Leg: he flips upside down. The held point is steered under the cursor and dragging sideways swings him like a pendulum.
+- Lesson: procedural limb poses should aim bones at world directions (`aimBone`) rather than add fixed angles, so they work over any base clip.

@@ -70,6 +70,95 @@ export function applyFlail(c: Character, t: number) {
   rotateWorld(c.bone("rightLowerArm"), WORLD_Z, -0.5);
 }
 
+const aimA = new THREE.Vector3();
+const aimB = new THREE.Vector3();
+const aimQ = new THREE.Quaternion();
+const aimW = new THREE.Quaternion();
+const aimP = new THREE.Quaternion();
+const identityQ = new THREE.Quaternion();
+
+/**
+ * Rotate `bone` so the direction toward `child` points along a world-space target,
+ * blended by `amount`. Works from any base pose, unlike fixed angle offsets.
+ */
+export function aimBone(bone: THREE.Object3D | undefined, child: THREE.Object3D | undefined, target: THREE.Vector3, amount = 1) {
+  if (!bone || !child || !bone.parent || amount <= 0.001) return;
+  bone.updateMatrixWorld(true);
+  bone.getWorldPosition(aimA);
+  child.getWorldPosition(aimB);
+  aimB.sub(aimA);
+  if (aimB.lengthSq() < 1e-8) return;
+  aimB.normalize();
+  aimQ.setFromUnitVectors(aimB, target);
+  if (amount < 1) aimQ.slerp(identityQ, 1 - amount);
+  bone.getWorldQuaternion(aimW);
+  aimW.premultiply(aimQ);
+  bone.parent.getWorldQuaternion(aimP);
+  bone.quaternion.copy(aimP.invert().multiply(aimW));
+  bone.updateMatrixWorld(true);
+}
+
+const UP = new THREE.Vector3(0, 1, 0);
+const DOWN = new THREE.Vector3(0, -1, 0);
+const tmpDir = new THREE.Vector3();
+
+/** Held by one arm: that arm points straight up to the cursor, the body dangles below it. */
+export function applyHeldByArm(c: Character, side: "left" | "right", t: number, amount: number) {
+  if (amount <= 0.001) return;
+  const L = side === "left";
+  const upper = c.bone(L ? "leftUpperArm" : "rightUpperArm");
+  const lower = c.bone(L ? "leftLowerArm" : "rightLowerArm");
+  const hand = c.bone(L ? "leftHand" : "rightHand");
+  const oUpper = c.bone(L ? "rightUpperArm" : "leftUpperArm");
+  const oLower = c.bone(L ? "rightLowerArm" : "leftLowerArm");
+  const oHand = c.bone(L ? "rightHand" : "leftHand");
+  c.root.updateMatrixWorld(true);
+  // Held arm straight up; the free arm hangs limp with a slow sway.
+  aimBone(upper, lower, UP, amount);
+  aimBone(lower, hand, UP, amount);
+  tmpDir.set(Math.sin(t * 1.7) * 0.12 * (L ? -1 : 1), -1, 0).normalize();
+  aimBone(oUpper, oLower, tmpDir, amount);
+  aimBone(oLower, oHand, tmpDir, amount);
+  // Legs dangle straight down, slightly apart.
+  tmpDir.set(-0.08, -1, 0).normalize();
+  aimBone(c.bone("leftUpperLeg"), c.bone("leftLowerLeg"), tmpDir, amount);
+  aimBone(c.bone("leftLowerLeg"), c.bone("leftFoot"), tmpDir, amount);
+  tmpDir.set(0.08, -1, 0).normalize();
+  aimBone(c.bone("rightUpperLeg"), c.bone("rightLowerLeg"), tmpDir, amount);
+  aimBone(c.bone("rightLowerLeg"), c.bone("rightFoot"), tmpDir, amount);
+}
+
+/**
+ * Held by a leg. The renderer flips the whole body afterwards, so this is posed upright:
+ * the held leg straight, the free leg bent, and the arms reaching up (down, once flipped).
+ */
+export function applyHeldByLeg(c: Character, side: "left" | "right", t: number, amount: number) {
+  if (amount <= 0.001) return;
+  const L = side === "left";
+  c.root.updateMatrixWorld(true);
+  const heldUpper = c.bone(L ? "leftUpperLeg" : "rightUpperLeg");
+  const heldLower = c.bone(L ? "leftLowerLeg" : "rightLowerLeg");
+  const heldFoot = c.bone(L ? "leftFoot" : "rightFoot");
+  const freeUpper = c.bone(L ? "rightUpperLeg" : "leftUpperLeg");
+  const freeLower = c.bone(L ? "rightLowerLeg" : "leftLowerLeg");
+  const freeFoot = c.bone(L ? "rightFoot" : "leftFoot");
+  aimBone(heldUpper, heldLower, DOWN, amount);
+  aimBone(heldLower, heldFoot, DOWN, amount);
+  // Free leg: thigh slightly forward and out, knee bent back.
+  tmpDir.set(L ? 0.35 : -0.35, -0.85, 0.35).normalize();
+  aimBone(freeUpper, freeLower, tmpDir, amount);
+  tmpDir.set(L ? 0.2 : -0.2, -0.5, -0.85).normalize();
+  aimBone(freeLower, freeFoot, tmpDir, amount);
+  // Arms reach past the head with a lazy sway; after the flip they hang toward the floor.
+  const sway = Math.sin(t * 1.9) * 0.1;
+  tmpDir.set(0.25 + sway, 1, 0).normalize();
+  aimBone(c.bone("leftUpperArm"), c.bone("leftLowerArm"), tmpDir, amount);
+  aimBone(c.bone("leftLowerArm"), c.bone("leftHand"), tmpDir, amount);
+  tmpDir.set(-0.25 + sway, 1, 0).normalize();
+  aimBone(c.bone("rightUpperArm"), c.bone("rightLowerArm"), tmpDir, amount);
+  aimBone(c.bone("rightLowerArm"), c.bone("rightHand"), tmpDir, amount);
+}
+
 /**
  * Turn head (and a little of the neck/chest) toward a yaw/pitch in radians.
  * Positive yaw looks toward the viewer's right, positive pitch looks up.

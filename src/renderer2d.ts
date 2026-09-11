@@ -187,6 +187,14 @@ export class Renderer2D implements Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
+  partAt() {
+    return null;
+  }
+
+  holdPoint() {
+    return null;
+  }
+
   bubbleAnchor() {
     return { x: this.canvas.width / this.dpr / 2, y: (this.crownY * this.canvas.height) / this.dpr };
   }
