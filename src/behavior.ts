@@ -76,6 +76,43 @@ export class Behavior {
   }
 
   /** Called when a dance session starts: pick which dance to do this time. */
+  /** Names of the dances this pack offers (clip names), for chat commands. */
+  get danceNames(): string[] {
+    return (this.manifest?.dances ?? []).map((d) => (typeof d === "string" ? d : d.clip)).filter((d) => d !== "procedural" && this.durations(d) > 0);
+  }
+
+  /** A dance by name for a chat command; unknown or missing name = a random one. */
+  chooseDanceNamed(name?: string): ClipChoice | null {
+    const saved = this.opts.danceMode;
+    this.opts = { ...this.opts, danceMode: name && this.danceNames.includes(name) ? name : "random" };
+    const pick = this.chooseDance();
+    this.opts = { ...this.opts, danceMode: saved };
+    return pick;
+  }
+
+  /** Walk to an x (window left) now, optionally past the edge of what he stands on. */
+  startWalk(t: number, targetX: number, beyond = false, then?: { hopTop: number }) {
+    const walk = this.manifest?.states.walk;
+    if (!walk || this.durations(walk.clip) <= 0) return false;
+    const speed = walk.speed ?? 120;
+    this.fidgetQueue = [];
+    this.activity = { kind: "walk", clip: { name: walk.clip, loop: true }, targetX, speed, beyond, then: then ? "hop" : undefined, hopTop: then?.hopTop };
+    this.activityEnds = t + 30;
+    this.nextEvent = Infinity;
+    return true;
+  }
+
+  /** Play one clip once, now (a chat "do the X"). */
+  forceFidget(t: number, name: string) {
+    const d = this.durations(name);
+    if (d <= 0) return false;
+    this.fidgetQueue = [];
+    this.activity = { kind: "fidget", clip: { name, loop: false } };
+    this.activityEnds = t + d;
+    this.nextEvent = Infinity;
+    return true;
+  }
+
   chooseDance(): ClipChoice | null {
     const m = this.manifest;
     const list = (m?.dances ?? []).map((d) => (typeof d === "string" ? d : d.clip)).filter((d) => d === "procedural" || this.durations(d) > 0);

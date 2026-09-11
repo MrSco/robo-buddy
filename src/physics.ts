@@ -192,8 +192,34 @@ export class WindowPhysics {
   private static readonly HAND = 0.07;
   private hangTimer = 0;
   private mantleT = 0;
+  private mantleFrom = 0;
+  private mantleDur = 0.8;
   /** 0..1 through the pull-up. */
   mantleProgress = 0;
+  /** "pull": hands on the edge, full pull-up. "step": the edge was near his feet, a quick hop up. */
+  mantleKind: "pull" | "step" = "pull";
+
+  /** Falling with a window's top edge between his chest and his feet: a quick step up onto it. */
+  private tryStepUp(): boolean {
+    const cx = this.x + this.w / 2;
+    const lo = this.y + this.h * 0.42;
+    const hi = this.y + this.h - 4;
+    for (let i = 0; i < this.surfaces.length; i++) {
+      const s = this.surfaces[i];
+      if (s.top < lo || s.top > hi) continue;
+      if (cx < s.left + WindowPhysics.EDGE || cx > s.right - WindowPhysics.EDGE) continue;
+      if (this.occluded(i, cx)) continue;
+      this.support = s.hwnd;
+      this.mode = "mantling";
+      this.mantleKind = "step";
+      this.mantleT = 0;
+      this.mantleFrom = this.y;
+      this.mantleDur = 0.25 + (0.45 * (this.y - (s.top - this.h))) / this.h;
+      this.vx = this.vy = this.spin = 0;
+      return true;
+    }
+    return false;
+  }
 
   /** Falling past a window's top edge within arm's reach: grab it and hang. */
   private tryGrab(): boolean {
@@ -352,7 +378,7 @@ export class WindowPhysics {
       this.x += this.vx * dt;
       this.y += this.vy * dt;
       // Descending past a title bar within reach: grab it instead of falling on by.
-      if (this.vy >= 0 && this.surfaces.length && this.tryGrab()) {
+      if (this.vy >= 0 && this.surfaces.length && (this.tryGrab() || this.tryStepUp())) {
         this.apply();
         return;
       }
@@ -404,14 +430,17 @@ export class WindowPhysics {
         this.hangTimer += dt;
         if (this.hangTimer > 0.9) {
           this.mode = "mantling";
+          this.mantleKind = "pull";
           this.mantleT = 0;
+          this.mantleFrom = this.y;
+          this.mantleDur = 0.8;
         }
       } else {
         this.mantleT += dt;
-        const p = Math.min(1, this.mantleT / 0.8);
+        const p = Math.min(1, this.mantleT / this.mantleDur);
         this.mantleProgress = p;
         const ease = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
-        const from = s.top - this.h * WindowPhysics.HAND;
+        const from = this.mantleFrom;
         const to = s.top - this.h;
         this.y = from + (to - from) * ease;
         if (p >= 1) {

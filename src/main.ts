@@ -10,6 +10,7 @@ import { Bubble } from "./bubble";
 import { ChatClient, TalkBox, Voice, defaultPersona, loadOrGeneratePhrases, type LineEvent, type Lines } from "./chat";
 import { invalidatePersonalities, resolvePersonality, type ResolvedPersonality } from "./personality";
 import type { MirrorPose } from "./mocap";
+import { abilitiesPrompt, extractTag, parseCommand, type Command } from "./commands";
 import { Sounds } from "./sound";
 import { cursor, IN_TAURI, onKeys, onSurfaces, startInput } from "./input";
 import { listPacks, resolvePack, validateManifest, type Manifest, type PackRef } from "./packs";
@@ -72,6 +73,11 @@ let lastShortcutAt = -Infinity;
 let keyEvents = 0;
 // Webcam mirroring (M7): the settings window streams poses while "Mirror on the buddy" is on.
 let mirrorOn = false;
+// Chat commands: a forced dance, a commanded nap, and a quiet spell.
+let forcedDanceUntil = -1;
+let danceSuppressUntil = -1;
+let commandedSleepUntil = -1;
+let quietUntil = -1;
 let mirrorPose: MirrorPose | null = null;
 let lastPoseAt = -Infinity;
 let landStrength = 0;
@@ -411,9 +417,68 @@ async function refreshPhrases(packId: string, force = false) {
 }
 
 /** One line about what he is doing, so replies can refer to it. */
-function chatContext(): string {
-  const doing = asleep ? "you were asleep" : currentState === "dance" ? `you are dancing to music at ${Math.round(music?.bpm ?? 0)} bpm` : currentState === "dragged" ? "the user is holding you" : currentState === "walk" ? "you are strolling along the taskbar" : "you are standing on the taskbar";
-  return `Right now ${doing}; local time ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Character pack: ${manifest?.name ?? "buddy"}.`;
+function chatContext(extra = ""): string {
+  const doing = asleep ? "you were asleep" : currentState === "dance" ? `you are dancing${forcedDanceUntil > clock.elapsedTime ? "" : ` to music at ${Math.round(music?.bpm ?? 0)} bpm`}` : currentState === "dragged" ? "the user is holding you" : currentState === "walk" ? "you are strolling along the taskbar" : physics?.onSurface ? "you are standing on top of a window" : "you are standing on the taskbar";
+  return `Right now ${doing}; local time ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Character pack: ${manifest?.name ?? "buddy"}.${extra ? ` ${extra}` : ""}\n${abilitiesPrompt(behavior.danceNames)}`;
+}
+
+/** Do what a chat line (or the model's action tag) asked. Returns a note for the model, or null if nothing happened. */
+function runCommand(cmd: Command): string | null {
+  const t = clock.elapsedTime;
+  if (!physics) return null;
+  switch (cmd.kind) {
+    case "dance": {
+      const pick = behavior.chooseDanceNamed(cmd.name);
+      danceClip = pick;
+      dancedThisSession = true; // keep the music code from re-rolling the choice
+      forcedDanceUntil = t + Math.min(600, Math.max(5, cmd.seconds ?? 45));
+      danceSuppressUntil = -1;
+      behavior.interrupt(t);
+      return `You just started dancing${pick ? ` the ${pick.name.replace(/_/g, " ")}` : ""}.`;
+    }
+    case "stop":
+      forcedDanceUntil = -1;
+      danceSuppressUntil = t + 120;
+      behavior.interrupt(t);
+      return "You stopped what you were doing.";
+    case "sleep":
+      asleep = true;
+      commandedSleepUntil = t + 300;
+      forcedDanceUntil = -1;
+      behavior.interrupt(t);
+      return "You are dozing off now, as asked.";
+    case "wake":
+      commandedSleepUntil = -1;
+      if (asleep) {
+        asleep = false;
+        sounds.play("wake");
+      }
+      return "You woke up.";
+    case "come":
+      if (IN_TAURI) invoke("bring_here").catch(() => {});
+      return "You came over to the user's cursor.";
+    case "jump":
+      if (physics.mode === "rest") physics.hop(physics.y + physics.h * 0.07 - 220);
+      return "You jumped.";
+    case "climb": {
+      const c = physics.climbable();
+      if (c && behavior.startWalk(t, c.x, false, { hopTop: c.top })) return "You are heading off to climb a nearby window.";
+      if (physics.onSurface) return "You are already up on a window.";
+      return "There is no window within reach to climb.";
+    }
+    case "walk": {
+      const b = physics.bounds;
+      const target = Math.max(b.left, Math.min(b.right - physics.w, physics.x + cmd.dir * 420));
+      behavior.startWalk(t, target);
+      return `You are walking to the ${cmd.dir < 0 ? "left" : "right"}.`;
+    }
+    case "quiet":
+      quietUntil = t + cmd.minutes * 60;
+      nextChatter = Math.max(nextChatter, quietUntil);
+      return `You will keep quiet for ${cmd.minutes} minutes: reply with a very short acknowledgement.`;
+    case "play":
+      return behavior.forceFidget(t, cmd.clip) ? `You are performing the ${cmd.clip.replace(/_/g, " ")} move.` : null;
+  }
 }
 
 talk.onSend = async (text) => {
@@ -422,8 +487,14 @@ talk.onSend = async (text) => {
   // Replies outrank quips: a "This slaps" cannot wipe an answer, and while the strip is open
   // the answer stays until the next one (or the strip closes).
   bubble.say(["…"], 40, clock.elapsedTime, 2);
+  // Plain commands act at once; the model is still asked so he can acknowledge in character.
+  const local = parseCommand(text, behavior.danceNames, Object.keys(manifest?.clips ?? {}));
+  const note = local ? runCommand(local) : null;
   try {
-    const reply = await chat.ask(text, chatContext());
+    const raw = await chat.ask(text, chatContext(note ?? ""));
+    const tagged = extractTag(raw, behavior.danceNames);
+    if (tagged.command && !local) runCommand(tagged.command);
+    const reply = tagged.text || (note ? "On it." : raw);
     const words = reply.split(/\s+/).length;
     talk.remember({ who: "him", text: reply });
     bubble.say([reply], talk.open ? 600 : Math.min(24, 3 + words * 0.45), clock.elapsedTime, 2);
@@ -454,6 +525,8 @@ function openTalk() {
 /** Any interaction: resets the sleep timer and wakes him up. */
 function activity() {
   lastActivity = clock.elapsedTime;
+  // A commanded nap ignores passing mouse traffic; a poke or a grab still wakes him.
+  if (asleep && clock.elapsedTime < commandedSleepUntil && physics?.mode !== "held" && sincePoke > 0.2) return;
   if (asleep) {
     asleep = false;
     speak("wake");
@@ -590,7 +663,8 @@ function resolveState(t: number, act: ReturnType<Behavior["update"]>): { state: 
   if (physics?.mode === "hanging") return { state: "hang", clip: behavior.stateClip("hang") };
   if (physics?.mode === "mantling") {
     // Hang for the first part of the pull-up, then the landing crouch rises into the idle.
-    return { state: "mantle", clip: physics.mantleProgress < 0.45 ? behavior.stateClip("hang") : (behavior.stateClip("land") ?? behavior.stateClip("idle")) };
+    const hangFirst = physics.mantleKind === "pull" && physics.mantleProgress < 0.45;
+    return { state: "mantle", clip: hangFirst ? behavior.stateClip("hang") : (behavior.stateClip("land") ?? behavior.stateClip("idle")) };
   }
   if (physics?.airborne) {
     if (airborneSince < 0) airborneSince = t;
@@ -609,7 +683,7 @@ function resolveState(t: number, act: ReturnType<Behavior["update"]>): { state: 
   if (landUntil > t) return { state: "land", clip: landClip };
   if (asleep) return { state: "sleep", clip: null };
   if (danceAmount > 0.5) return { state: "dance", clip: danceClip };
-  if (typingAmount > 0.5) return { state: "typing", clip: behavior.stateClip("typing") ?? act.clip ?? behavior.stateClip("idle") };
+  if (typingAmount > 0.5 && t >= forcedDanceUntil) return { state: "typing", clip: behavior.stateClip("typing") ?? act.clip ?? behavior.stateClip("idle") };
   if (act.kind === "walk") return { state: "walk", clip: act.clip ? { ...act.clip, playbackRate: walkRate(act.speed) } : null };
   if (act.kind === "fidget") return { state: "fidget", clip: act.clip };
   return { state: "idle", clip: act.clip ?? behavior.stateClip("idle") };
@@ -660,14 +734,16 @@ function frame() {
     music.hold = voice.busy(1500);
     music.update(dt, t);
     const musicOn = settings.musicEnabled && !paused && (manifest?.reactions.music?.enabled ?? true);
-    const target = musicOn && music.dancing && !physics?.airborne && physics?.mode !== "held" ? 1 : 0;
+    const forced = t < forcedDanceUntil && physics?.mode === "rest" && !asleep;
+    const suppressed = t < danceSuppressUntil;
+    const target = (forced || (musicOn && music.dancing && !suppressed)) && !physics?.airborne && physics?.mode !== "held" ? 1 : 0;
     danceAmount += (target - danceAmount) * (1 - Math.exp(-dt * (target ? 2.5 : 1.5)));
   }
   sincePoke += dt;
   sinceLand += dt;
   // Typing along: the rate decays between key bursts; a steady 3 keys/s counts as typing.
   typingRate *= Math.exp(-dt * 0.8);
-  const typingTarget = settings.keyboardEnabled && typingRate > 3 && physics?.mode === "rest" && !asleep ? 1 : 0;
+  const typingTarget = settings.keyboardEnabled && typingRate > 3 && physics?.mode === "rest" && !asleep && !talk.open ? 1 : 0;
   if (typingTarget && typingAmount < 0.5) behavior.interrupt(t);
   typingAmount += (typingTarget - typingAmount) * (1 - Math.exp(-dt * (typingTarget ? 3 : 0.7)));
   updatePress(t);
@@ -691,7 +767,7 @@ function frame() {
   // Idle chatter from the generated lines, now and then, when nothing else is going on.
   if (t > nextChatter) {
     nextChatter = t + 240 + Math.random() * 300;
-    if (!asleep && !paused && settings.bubblesEnabled && physics?.mode === "rest" && !talk.open && extraLines.idle?.length) bubble.say(extraLines.idle, 4, t);
+    if (!asleep && !paused && settings.bubblesEnabled && physics?.mode === "rest" && !talk.open && t >= quietUntil && extraLines.idle?.length) bubble.say(extraLines.idle, 4, t);
   }
   const sleepAfter = settings.sleepAfterMin * 60;
   if (!asleep && sleepAfter > 0 && !paused && t - lastActivity > sleepAfter) {

@@ -389,6 +389,14 @@ Goal: dynamic phrases and a real conversation, free by default, bring-your-own-k
   finds a reachable edge (40-460 px above his hands, walkable, unoccluded); the scheduler walks him under it and `hop()`
   gives just enough jump for his hands to reach; on a window he sometimes walks off the edge and drops. All under the
   "Stand on and climb other windows" toggle plus wandering.
+- Chat commands (done): `src/commands.ts` parses plain requests locally (dance / a named dance / for N seconds, stop,
+  sleep, wake, come here, jump, climb, walk left/right, be quiet for N minutes, "do the <clip>") and acts at once; the
+  model gets an abilities line in its system prompt and may append one `<do:...>` tag, which is stripped and run when the
+  local parse found nothing. A commanded dance runs without music (45 s default); "stop" also mutes music dancing for two
+  minutes; a commanded nap ignores mouse traffic for five minutes; "quiet" pauses idle chatter. Typing into the talk strip
+  no longer counts as typing-along.
+- Landing bands (done): edge between crown and chest -> grab and hang; between chest and feet -> a quick step-up mantle
+  (0.25-0.7 s, landing crouch); at or below the feet -> the ordinary landing.
 - Webcam capture (done): Settings > Capture (or right-click > Copy me). MediaPipe Pose Landmarker (lite model and WASM
   bundled under `public/mediapipe/`, nothing leaves the PC) tracks 33 landmarks on the webcam feed with a wire skeleton
   drawn over it. `src/mocap.ts` turns world landmarks into world-space rotation deltas against the canonical rig's T-pose
