@@ -149,9 +149,8 @@ export class Renderer3D implements Renderer {
       maxY = floor + h;
       front = this.baseCenter.z + this.baseSize.z / 2;
     }
-    const y0 = Math.min(minY, floor) - h * 0.06;
+    const y0 = Math.min(minY, floor) - h * 0.035;
     const y1 = Math.max(maxY + h * 0.1, y0 + h * 1.3);
-    const cy = (y0 + y1) / 2;
     const halfV = (y1 - y0) / 2;
     const cx = (minX + maxX) / 2;
     const halfH = (maxX - minX) / 2 + h * 0.05;
@@ -160,6 +159,9 @@ export class Renderer3D implements Renderer {
     // Anything closer to the camera than the standing body's front needs the camera further back.
     const depth = Math.max(0, front - (this.baseCenter.z + this.baseSize.z / 2));
     const dist = Math.max(halfV / tanV, halfH / tanH) + depth;
+    // Whatever pushed the camera back, the bottom of the view stays just under his feet;
+    // the extra room goes above him, not below.
+    const cy = y0 + dist * tanV;
     const k = snap ? 1 : 1 - Math.exp(-dt * (dist > this.fitDist ? 20 : 3));
     this.fitDist += (dist - this.fitDist) * k;
     const kc = snap ? 1 : 1 - Math.exp(-dt * 6);
