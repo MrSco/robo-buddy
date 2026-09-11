@@ -49,7 +49,13 @@ export interface Manifest {
   sounds?: Partial<Record<"poked" | "land" | "wake" | "greet" | "bounce" | "bump" | "grab" | "throw", string>>;
   reactions: {
     music?: { enabled: boolean; threshold?: number };
-    mouse?: { enabled: boolean; lookAtCursor?: boolean; pokeState?: string };
+    mouse?: {
+      enabled: boolean;
+      lookAtCursor?: boolean;
+      pokeState?: string;
+      /** 2D only: mirror the picture to face the cursor. Off by default; a mirrored face or photo reads as a jump. */
+      flipToFace?: boolean;
+    };
     physics?: { gravity?: boolean; throwable?: boolean; walk?: boolean };
   };
 }

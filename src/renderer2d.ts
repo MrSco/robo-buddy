@@ -45,6 +45,8 @@ export class Renderer2D implements Renderer {
   private prevPoke = Infinity;
   private prevLand = Infinity;
   private facingBlend = 1;
+  /** Whether this pack wants to be mirrored to face the cursor (and twist in the dance). */
+  private flipToFace = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -63,6 +65,9 @@ export class Renderer2D implements Renderer {
     if (!next.has("idle")) throw new Error("2D pack needs an idle clip");
     this.unload();
     this.clips = next;
+    this.flipToFace = manifest.reactions.mouse?.flipToFace ?? false;
+    this.facing = 1;
+    this.facingBlend = 1;
   }
 
   unload() {
@@ -142,8 +147,21 @@ export class Renderer2D implements Renderer {
     // Advance the clip. Beat-synced loops run so one loop spans N beats.
     let rate = clip.playbackRate;
     if (clip.beatsPerLoop && input.music && input.music.bpm > 0) {
-      const wanted = (clip.beatsPerLoop * 60) / input.music.bpm;
-      rate = clip.total / wanted;
+      // One loop spans the stated beats, or half or double that: whichever keeps the clip
+      // nearest its own speed, so a slow beat (or a halved tempo estimate) never makes a
+      // frame-stepped loop crawl.
+      let best = clip.playbackRate;
+      let bestErr = Infinity;
+      for (const mult of [0.5, 1, 2]) {
+        const wanted = (clip.beatsPerLoop * mult * 60) / input.music.bpm;
+        const r = clip.total / wanted;
+        const err = Math.abs(Math.log(r / clip.playbackRate));
+        if (err < bestErr) {
+          bestErr = err;
+          best = r;
+        }
+      }
+      rate = best;
     }
     // Asleep without a sleep clip: the idle loop crawls.
     if (input.sleepAmount > 0 && cur.state !== "sleep" && !this.clips.has("sleep")) rate *= 1 - 0.7 * input.sleepAmount;
@@ -187,20 +205,30 @@ export class Renderer2D implements Renderer {
     // Asleep: slumps over a little.
     bendTarget += -0.06 * input.sleepAmount;
     rot += 0.08 * input.sleepAmount;
-    // Leaning toward whatever he is looking at, and tiny nods while he talks.
-    if (!held && !input.airborne) bendTarget += Math.max(-0.5, Math.min(0.5, input.yaw)) * 0.06 * awake;
+    // Looking at the cursor: the top leans toward it, the whole picture tilts a touch, and
+    // looking up or down stretches or squats it slightly. A flat picture cannot turn its head.
+    if (!held && !input.airborne) {
+      const yaw = Math.max(-0.7, Math.min(0.7, input.yaw));
+      const pitch = Math.max(-0.5, Math.min(0.5, input.pitch));
+      bendTarget += yaw * 0.12 * awake;
+      rot += yaw * 0.05 * awake;
+      squashY *= 1 + pitch * 0.04 * awake;
+      squashX *= 1 - pitch * 0.02 * awake;
+    }
     if (input.talking) {
       bob += Math.sin(t * 9) * 0.008;
       bendTarget += Math.sin(t * 2.3) * 0.02;
     }
 
-    // Dancing without a dance clip: a move per eight beats, all on the music's phase.
-    if (input.music && input.danceAmount > 0.001 && !this.clips.has("dance") && !held && !input.airborne) {
-      const a = input.danceAmount;
+    // Dancing: a move per eight beats, all on the music's phase. A pack with its own dance
+    // loop keeps it and gets the same moves layered on top at half strength, which turns a
+    // frame-stepped loop into smooth motion.
+    if (input.music && input.danceAmount > 0.001 && !held && !input.airborne) {
+      const a = input.danceAmount * (this.clips.has("dance") ? 0.5 : 1);
       const m = input.music;
       const beat = m.beats + m.phase; // continuous beat count
       const dip = (1 - Math.cos(m.phase * TAU)) * 0.5; // 0 on the beat, 1 between beats
-      const move = Math.floor(m.beats / 8) % 4;
+      const move = Math.floor(m.beats / 8) % (this.flipToFace ? 4 : 3);
       const half = Math.sin(beat * Math.PI); // -1..1 over two beats
       if (move === 0) {
         // Bounce: down into the beat, up between.
@@ -224,10 +252,6 @@ export class Renderer2D implements Renderer {
         bob += -0.025 * (1 - dip) * a;
         bendTarget += 0.05 * half * a;
       }
-    } else if (input.music && input.danceAmount > 0.001 && this.clips.has("dance")) {
-      // A pack with its own dance loop only gets a hint of bounce on top.
-      const dip = (1 - Math.cos(input.music.phase * TAU)) * 0.5;
-      bob += -0.02 * (1 - dip) * input.danceAmount;
     }
 
     // Poke: a hop, and a shake that ripples up the body.
@@ -272,9 +296,9 @@ export class Renderer2D implements Renderer {
     this.bend += this.bendVel * dt;
     this.bend = Math.max(-0.45, Math.min(0.45, this.bend));
     this.shift += (shiftTarget - this.shift) * Math.min(1, dt * 10);
-    // Face the cursor by flipping horizontally once it is clearly to one side; the flip eases
-    // through a squeeze rather than popping.
-    if (!(input.music && input.danceAmount > 0.5 && !this.clips.has("dance")) && Math.abs(input.yaw) > 0.25) this.facing = input.yaw > 0 ? 1 : -1;
+    // Packs that ask for it are mirrored to face the cursor once it is clearly to one side;
+    // the flip eases through a squeeze rather than popping.
+    if (this.flipToFace && !(input.music && input.danceAmount > 0.5) && Math.abs(input.yaw) > 0.25) this.facing = input.yaw > 0 ? 1 : -1;
     this.facingBlend += (this.facing - this.facingBlend) * Math.min(1, dt * 14);
     const face = Math.abs(this.facingBlend) < 0.15 ? 0.15 * Math.sign(this.facingBlend || 1) : this.facingBlend;
 
