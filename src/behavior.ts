@@ -99,8 +99,16 @@ export class Behavior {
       .filter((d) => (d === "procedural" || this.durations(d) > 0) && this.danceOn(d));
   }
 
-  /** False when every dance, the built-in groove included, is unticked: music then leaves him be. */
+  /**
+   * False when every dance, the built-in groove included, is unticked: music then leaves him
+   * be. Packs with no dance list still dance: a 2D buddy bobs (or plays its dance clip), and a
+   * 3D pack may name a single dance state instead of a list.
+   */
   get canDance(): boolean {
+    const m = this.manifest;
+    if (!m) return false;
+    if (m.renderer === "2d") return true;
+    if (!(m.dances ?? []).length) return !!m.states.dance && this.durations(m.states.dance.clip) > 0;
     return this.danceList.length > 0;
   }
 
@@ -143,6 +151,7 @@ export class Behavior {
     // A named choice that is unticked (or missing) falls back to a random ticked one.
     if (this.opts.danceMode !== "random" && list.includes(this.opts.danceMode)) pick = this.opts.danceMode;
     else if (list.length) pick = list[Math.floor(Math.random() * list.length)];
+    else if (!(m?.dances ?? []).length && m?.states.dance && this.durations(m.states.dance.clip) > 0) pick = m.states.dance.clip;
     else pick = null;
     this.danceChoice = pick;
     if (!pick || pick === "procedural") return null;
