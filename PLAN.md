@@ -374,7 +374,18 @@ Goal: dynamic phrases and a real conversation, free by default, bring-your-own-k
   voices, and troubleshooting; the Character page is grouped (characters, size) and the Window page split into Clicking and
   Behaviour; the import dialog and hints include FBX (packs.rs accepted it already).
 
-## M7 — Webcam motion capture (proposed)
+## M7 — Keyboard, window surfaces, webcam capture (in progress, Sep 11 2026)
+- Keyboard (done): a Rust thread counts key presses four times a second (never which keys; only Ctrl+S and Ctrl+Z are
+  recognised) and streams `keys` events. Three keys per second for a moment puts him in a `typing` state (the pack's
+  `typing` clip, Texting by default); Ctrl+S and Ctrl+Z earn a quip, at most one per 15 s. Setting: React to typing.
+- Window surfaces (done): a Rust thread streams the visible top-level windows (DWM frame bounds, z-order, cloaked and tool
+  windows skipped). Falling, he lands on the first window top edge under his centre that no window in front covers; resting,
+  he rides along when it moves and falls when it closes, minimises or slides away; wandering is bounded by that window.
+  Setting: Stand on other windows. Lesson: GetAsyncKeyState polling misses taps shorter than the poll; bit 0 (pressed since
+  the last poll) catches them.
+- Webcam capture: next.
+
+## M7 (original proposal) — Webcam motion capture
 Goal: drive the model live from the user's webcam, and record what they do as a clip for the library (a dance, an idle).
 - Tracking in the settings window (it already has a camera-free 3D preview): MediaPipe Pose Landmarker (tasks-vision,
   WASM + the lite model bundled locally, no cloud) on a `getUserMedia` stream. 33 world landmarks at 30 fps on CPU/GPU.

@@ -54,6 +54,30 @@ export async function startInput() {
   });
 }
 
+/** A window he can stand on (physical pixels, z-order front first). */
+export interface Surface {
+  hwnd: number;
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+export async function onSurfaces(fn: (list: Surface[]) => void): Promise<void> {
+  if (!IN_TAURI) return;
+  await listen<Surface[]>("surfaces", (e) => fn(e.payload));
+}
+
+export interface KeyBurst {
+  presses: number;
+  combo: "save" | "undo" | null;
+}
+
+export async function onKeys(fn: (k: KeyBurst) => void): Promise<void> {
+  if (!IN_TAURI) return;
+  await listen<KeyBurst>("keys", (e) => fn(e.payload));
+}
+
 export async function getWorkArea(x: number, y: number): Promise<WorkArea> {
   if (!IN_TAURI) return { left: 0, top: 0, right: screen.width, bottom: screen.height };
   return invoke<WorkArea>("work_area", { x, y });

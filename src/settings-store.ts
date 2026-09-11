@@ -47,6 +47,10 @@ export interface Settings {
   piperVoice: string;
   /** Personality profile id; "pack" = the character's own persona and lines. */
   personality: string;
+  /** React to typing (key counts and a couple of shortcuts only). */
+  keyboardEnabled: boolean;
+  /** Land on and walk along the top edges of other windows. */
+  surfacesEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -82,6 +86,8 @@ export const DEFAULT_SETTINGS: Settings = {
   piperExe: "",
   piperVoice: "",
   personality: "pack",
+  keyboardEnabled: true,
+  surfacesEnabled: true,
 };
 
 export async function getSettings(): Promise<Settings> {

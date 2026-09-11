@@ -10,7 +10,7 @@ import { Bubble } from "./bubble";
 import { ChatClient, TalkBox, Voice, defaultPersona, loadOrGeneratePhrases, type LineEvent, type Lines } from "./chat";
 import { invalidatePersonalities, resolvePersonality, type ResolvedPersonality } from "./personality";
 import { Sounds } from "./sound";
-import { cursor, IN_TAURI, startInput } from "./input";
+import { cursor, IN_TAURI, onKeys, onSurfaces, startInput } from "./input";
 import { listPacks, resolvePack, validateManifest, type Manifest, type PackRef } from "./packs";
 import { WindowPhysics } from "./physics";
 import type { FrameInput, Renderer, StateName } from "./renderer";
@@ -64,6 +64,11 @@ let sinceLand = Infinity;
 /** When the current airborne stretch began; short hops keep the idle base instead of the flail. */
 let airborneSince = -1;
 let flailNow = false;
+// Keyboard: a typing rate (keys per second, smoothed) and the last shortcut seen.
+let typingRate = 0;
+let typingAmount = 0;
+let lastShortcutAt = -Infinity;
+let keyEvents = 0;
 let landStrength = 0;
 let yaw = 0;
 let pitch = 0;
@@ -164,6 +169,20 @@ async function boot() {
     // Other always-on-top windows opened later sit above him in the topmost band; take the
     // top of it back every couple of seconds (no focus change, so nothing is interrupted).
     await listen("talk", () => openTalk());
+    await onSurfaces((list) => {
+      if (physics) physics.surfaces = list;
+    });
+    await onKeys((k) => {
+      keyEvents++;
+      typingRate = typingRate * 0.6 + (k.presses / 0.25) * 0.4;
+      if (k.presses > 0) activity();
+      if (k.combo && clock.elapsedTime - lastShortcutAt > 15 && !settings.paused) {
+        lastShortcutAt = clock.elapsedTime;
+        sincePoke = 0;
+        const lines = k.combo === "save" ? ["Saved. Nice.", "Ctrl+S, respect.", "Progress, locked in."] : ["Oops.", "Never happened.", "Undo. Classic."];
+        if (settings.bubblesEnabled) bubble.say(lines, 2.5, clock.elapsedTime);
+      }
+    });
     await listen("personalities-changed", () => {
       invalidatePersonalities();
       chat.reset();
@@ -571,6 +590,7 @@ function resolveState(t: number, act: ReturnType<Behavior["update"]>): { state: 
   if (landUntil > t) return { state: "land", clip: landClip };
   if (asleep) return { state: "sleep", clip: null };
   if (danceAmount > 0.5) return { state: "dance", clip: danceClip };
+  if (typingAmount > 0.5) return { state: "typing", clip: behavior.stateClip("typing") ?? act.clip ?? behavior.stateClip("idle") };
   if (act.kind === "walk") return { state: "walk", clip: act.clip ? { ...act.clip, playbackRate: walkRate(act.speed) } : null };
   if (act.kind === "fidget") return { state: "fidget", clip: act.clip };
   return { state: "idle", clip: act.clip ?? behavior.stateClip("idle") };
@@ -603,7 +623,7 @@ function debugTitle(t: number) {
   }
   const title =
     `Robo Buddy | ${p.mode} y=${p.y.toFixed(0)} air=${p.airborne} yaw=${yaw.toFixed(2)} cur=${cursor.x},${cursor.y},${cursor.buttons}` +
-    ` | pack=${pack?.id} state=${currentState} grab=${grabPart ?? '-'} talk=${talk.open} talking=${voice.speaking} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
+    ` | pack=${pack?.id} state=${currentState} grab=${grabPart ?? '-'} talk=${talk.open} talking=${voice.speaking} keys=${typingRate.toFixed(1)}/${typingAmount.toFixed(2)}/${keyEvents} sup=${physics?.support ?? '-'} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
     (m ? ` | lvl=${m.level.toFixed(2)} gate=${m.gateLevel.toFixed(2)}/${m.threshold.toFixed(2)} bpm=${m.bpm.toFixed(0)} dance=${m.dancing} amt=${danceAmount.toFixed(2)} beats=${m.beats.toFixed(1)}` : "");
   getCurrentWindow().setTitle(title).catch(() => {});
 }
@@ -626,11 +646,16 @@ function frame() {
   }
   sincePoke += dt;
   sinceLand += dt;
+  // Typing along: the rate decays between key bursts; a steady 3 keys/s counts as typing.
+  typingRate *= Math.exp(-dt * 0.8);
+  const typingTarget = settings.keyboardEnabled && typingRate > 3 && physics?.mode === "rest" && !asleep ? 1 : 0;
+  if (typingTarget && typingAmount < 0.5) behavior.interrupt(t);
+  typingAmount += (typingTarget - typingAmount) * (1 - Math.exp(-dt * (typingTarget ? 3 : 0.7)));
   updatePress(t);
   // Standing on the taskbar: sink the window by the camera's margin so the soles meet its edge.
   // Standing on the taskbar: the window covers the taskbar band and the soles sit on its top edge.
   if (physics) physics.floorOverlap = settings.standOnTaskbar && renderer === renderer3d ? physics.taskbarHeight : 0;
-  if (renderer3d) renderer3d.groundPx = physics ? physics.floorOverlap / scaleFactor : 0;
+  if (renderer3d) renderer3d.groundPx = physics ? physics.groundOverlap / scaleFactor : 0;
   updateHead();
   updateLook(dt);
 
@@ -678,8 +703,8 @@ function frame() {
     free,
     x: physics?.x ?? 0,
     w: physics?.w ?? 320,
-    left: physics?.workArea.left ?? 0,
-    right: physics?.workArea.right ?? 1920,
+    left: physics?.bounds.left ?? 0,
+    right: physics?.bounds.right ?? 1920,
   });
   const resolved = resolveState(t, act);
   currentState = resolved.state;

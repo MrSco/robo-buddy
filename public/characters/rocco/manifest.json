@@ -35,6 +35,10 @@
     "land": {
       "clip": "jumpLand",
       "loop": false
+    },
+    "typing": {
+      "clip": "Texting",
+      "loop": true
     }
   },
   "reactions": {

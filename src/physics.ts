@@ -1,5 +1,5 @@
 import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
-import { cursor, getWorkArea, getWorkAreas, IN_TAURI, onLeftRelease, type WorkArea } from "./input";
+import { cursor, getWorkArea, getWorkAreas, IN_TAURI, onLeftRelease, type Surface, type WorkArea } from "./input";
 
 /**
  * Moves the OS window itself: custom drag (so we can measure velocity), throw,
@@ -115,6 +115,7 @@ export class WindowPhysics {
 
   grab() {
     this.mode = "held";
+    this.support = null;
     this.spin = 0;
     this.vx = this.vy = 0;
     this.grabDx = cursor.x - this.x;
@@ -152,9 +153,70 @@ export class WindowPhysics {
 
   /** Physical pixels the window may sink below the work area (the camera's margin under the soles). */
   floorOverlap = 0;
+  /** Other windows he can land on, front to back; updated by the surfaces stream. */
+  surfaces: Surface[] = [];
+  /** The window he is standing on, or null for the taskbar. */
+  support: number | null = null;
 
-  get floor() {
+  private get taskbarFloor() {
     return this.area.bottom - this.h + this.floorOverlap;
+  }
+
+  private surfaceOf(hwnd: number | null) {
+    return hwnd === null ? undefined : this.surfaces.find((s) => s.hwnd === hwnd);
+  }
+
+  /** Window y at rest: on the taskbar, or on the top edge of the window he stands on. */
+  get floor() {
+    const s = this.surfaceOf(this.support);
+    return s ? s.top - this.h : this.taskbarFloor;
+  }
+
+  get onSurface() {
+    return this.surfaceOf(this.support) !== undefined;
+  }
+
+  /** How far the window sinks into the taskbar right now (0 while standing on another window). */
+  get groundOverlap() {
+    return this.onSurface ? 0 : this.floorOverlap;
+  }
+
+  /** Horizontal range he may wander in: the window he stands on, else the work area. */
+  get bounds() {
+    const s = this.surfaceOf(this.support);
+    return s ? { left: s.left, right: s.right } : { left: this.area.left, right: this.area.right };
+  }
+
+  private static readonly EDGE = 28;
+
+  /** True when a window in front of `index` covers the spot on its top edge under his centre. */
+  private occluded(index: number, cx: number): boolean {
+    const s = this.surfaces[index];
+    const py = s.top - 3;
+    for (let j = 0; j < index; j++) {
+      const o = this.surfaces[j];
+      if (cx >= o.left && cx <= o.right && py >= o.top && py <= o.bottom) return true;
+    }
+    return false;
+  }
+
+  /** Where a fall from here ends: the first window top under his feet, else the taskbar. */
+  private landingFloor(): { y: number; hwnd: number | null } {
+    const cx = this.x + this.w / 2;
+    let best = this.taskbarFloor;
+    let hwnd: number | null = null;
+    for (let i = 0; i < this.surfaces.length; i++) {
+      const s = this.surfaces[i];
+      if (cx < s.left + WindowPhysics.EDGE || cx > s.right - WindowPhysics.EDGE) continue;
+      const fy = s.top - this.h;
+      if (fy < this.y - 4) continue; // its top edge is above his feet already
+      if (this.occluded(i, cx)) continue; // that edge is hidden behind another window
+      if (fy < best) {
+        best = fy;
+        hwnd = s.hwnd;
+      }
+    }
+    return { y: best, hwnd };
   }
 
   /** Height of a bottom taskbar on the current monitor (0 when it is elsewhere), physical px. */
@@ -182,7 +244,8 @@ export class WindowPhysics {
   /** Slide horizontally while resting on the floor (walking). Clamped to the work area. */
   nudge(dx: number) {
     if (this.mode !== "rest") return;
-    this.x = Math.max(this.area.left, Math.min(this.area.right - this.w, this.x + dx));
+    const b = this.bounds;
+    this.x = Math.max(b.left, Math.min(b.right - this.w, this.x + dx));
     this.apply();
   }
 
@@ -221,14 +284,16 @@ export class WindowPhysics {
       this.area = this.areaAt(this.x + this.w / 2, this.y + this.h / 2);
       // Never below the floor while held: grabbing a foot near the taskbar would otherwise
       // hang the rest of him off the bottom of the screen.
-      if (this.y > this.floor) this.y = this.floor;
+      if (this.y > this.taskbarFloor) this.y = this.taskbarFloor;
       this.samples.push({ t: performance.now(), x: this.x, y: this.y });
       if (this.samples.length > 12) this.samples.shift();
     } else if (this.mode === "falling") {
       this.vy += GRAVITY * dt;
       this.x += this.vx * dt;
       this.y += this.vy * dt;
-      const floor = this.floor;
+      const landing = this.landingFloor();
+      const floor = landing.y;
+      if (this.y >= floor) this.support = landing.hwnd;
       const left = this.area.left;
       const right = this.area.right - this.w;
       if (this.y >= floor) {
@@ -263,9 +328,18 @@ export class WindowPhysics {
         this.spin = 0;
         this.mode = "rest";
       }
-    } else if (this.mode === "rest" && this.opts.gravity && this.y !== this.floor) {
-      // The floor moved under him (taskbar overlap toggled, camera margin changed): follow it.
-      this.y = this.floor;
+    } else if (this.mode === "rest") {
+      const s = this.surfaceOf(this.support);
+      const cx = this.x + this.w / 2;
+      const idx = s ? this.surfaces.indexOf(s) : -1;
+      if (this.support !== null && (!s || cx < s.left + WindowPhysics.EDGE || cx > s.right - WindowPhysics.EDGE || this.occluded(idx, cx))) {
+        // The window he stood on closed, minimised or slid away: fall to whatever is below.
+        this.support = null;
+        if (this.opts.gravity) this.mode = "falling";
+      } else if (this.opts.gravity && this.y !== this.floor) {
+        // The floor moved under him (his window moved, taskbar overlap toggled): follow it.
+        this.y = this.floor;
+      }
     }
     this.apply();
   }

@@ -204,6 +204,151 @@ fn own_popup_in_front() -> bool {
     }
 }
 
+/// A top-level window he can stand on: its frame bounds in physical pixels, in z-order (front first).
+#[derive(Serialize, Clone, PartialEq, Debug)]
+pub struct Surface {
+    pub hwnd: isize,
+    pub left: i32,
+    pub top: i32,
+    pub right: i32,
+    pub bottom: i32,
+}
+
+#[cfg(windows)]
+fn list_surfaces() -> Vec<Surface> {
+    use windows::core::BOOL;
+    use windows::Win32::Foundation::{HWND, LPARAM, RECT};
+    use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        EnumWindows, GetClassNameW, GetWindowLongW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, GWL_EXSTYLE, WS_EX_TOOLWINDOW,
+    };
+    unsafe extern "system" fn cb(hwnd: HWND, lp: LPARAM) -> BOOL {
+        let out = &mut *(lp.0 as *mut Vec<Surface>);
+        if !IsWindowVisible(hwnd).as_bool() || IsIconic(hwnd).as_bool() {
+            return BOOL(1);
+        }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == std::process::id() {
+            return BOOL(1);
+        }
+        let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+        if ex & WS_EX_TOOLWINDOW.0 != 0 {
+            return BOOL(1);
+        }
+        let mut cloaked = 0u32;
+        let _ = DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, &mut cloaked as *mut u32 as *mut _, std::mem::size_of::<u32>() as u32);
+        if cloaked != 0 {
+            return BOOL(1);
+        }
+        let mut buf = [0u16; 64];
+        let n = GetClassNameW(hwnd, &mut buf) as usize;
+        let class = String::from_utf16_lossy(&buf[..n]);
+        if matches!(class.as_str(), "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd" | "Windows.UI.Core.CoreWindow" | "#32768") {
+            return BOOL(1);
+        }
+        let mut r = RECT::default();
+        if DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &mut r as *mut RECT as *mut _, std::mem::size_of::<RECT>() as u32).is_err() {
+            return BOOL(1);
+        }
+        if r.right - r.left < 200 || r.bottom - r.top < 120 {
+            return BOOL(1);
+        }
+        out.push(Surface { hwnd: hwnd.0 as isize, left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+        BOOL(1)
+    }
+    let mut out: Vec<Surface> = Vec::new();
+    unsafe {
+        let _ = EnumWindows(Some(cb), LPARAM(&mut out as *mut _ as isize));
+    }
+    out.truncate(40);
+    out
+}
+
+#[cfg(not(windows))]
+fn list_surfaces() -> Vec<Surface> {
+    Vec::new()
+}
+
+/// Streams the windows he can stand on, whenever the set or their bounds change.
+pub fn start_surfaces_thread(app: AppHandle) {
+    thread::spawn(move || {
+        let mut last: Vec<Surface> = Vec::new();
+        loop {
+            thread::sleep(Duration::from_millis(150));
+            let enabled = {
+                use tauri::Manager;
+                let state = app.state::<crate::settings::SettingsState>();
+                let s = state.0.lock().unwrap();
+                s.surfaces_enabled
+            };
+            let now = if enabled { list_surfaces() } else { Vec::new() };
+            if now != last {
+                let _ = app.emit("surfaces", &now);
+                last = now;
+            }
+        }
+    });
+}
+
+/// Counts key presses (never which keys) and spots Ctrl+S / Ctrl+Z, four times a second.
+pub fn start_key_thread(app: AppHandle) {
+    thread::spawn(move || {
+        #[cfg(windows)]
+        {
+            use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
+            let mut down = [false; 256];
+            let mut presses = 0u32;
+            let mut combo: Option<&'static str> = None;
+            let mut last_emit = std::time::Instant::now();
+            loop {
+                thread::sleep(Duration::from_millis(15));
+                let enabled = {
+                    use tauri::Manager;
+                    let state = app.state::<crate::settings::SettingsState>();
+                    let s = state.0.lock().unwrap();
+                    s.keyboard_enabled
+                };
+                if !enabled {
+                    presses = 0;
+                    combo = None;
+                    continue;
+                }
+                // SAFETY: GetAsyncKeyState has no preconditions.
+                let ctrl = (unsafe { GetAsyncKeyState(0x11) } as u16 & 0x8000) != 0;
+                for vk in 8usize..=254 {
+                    let raw = unsafe { GetAsyncKeyState(vk as i32) } as u16;
+                    let d = raw & 0x8000 != 0;
+                    // Bit 0: pressed since this thread's previous poll, so taps shorter than the
+                    // poll interval still count.
+                    let tapped = raw & 0x0001 != 0;
+                    if (d && !down[vk]) || (tapped && !d && !down[vk]) {
+                        presses += 1;
+                        if ctrl {
+                            match vk {
+                                0x53 => combo = Some("save"),
+                                0x5A => combo = Some("undo"),
+                                _ => {}
+                            }
+                        }
+                    }
+                    down[vk] = d;
+                }
+                if last_emit.elapsed() >= Duration::from_millis(250) {
+                    if presses > 0 || combo.is_some() {
+                        let _ = app.emit("keys", serde_json::json!({ "presses": presses, "combo": combo }));
+                    }
+                    presses = 0;
+                    combo = None;
+                    last_emit = std::time::Instant::now();
+                }
+            }
+        }
+        #[cfg(not(windows))]
+        let _ = &app;
+    });
+}
+
 pub fn start_fullscreen_thread(app: AppHandle) {
     thread::spawn(move || {
         let mut last: Option<bool> = None;

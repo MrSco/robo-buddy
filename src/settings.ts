@@ -34,6 +34,8 @@ const els = {
   clickthrough: $<HTMLSelectElement>("clickthrough"),
   autostart: $<HTMLInputElement>("autostart"),
   taskbar: $<HTMLInputElement>("taskbar"),
+  keyboard: $<HTMLInputElement>("keyboard"),
+  surfaces: $<HTMLInputElement>("surfaces"),
   sounds: $<HTMLInputElement>("sounds"),
   bubbles: $<HTMLInputElement>("bubbles"),
   sleep: $<HTMLSelectElement>("sleep"),
@@ -360,6 +362,8 @@ function render() {
   els.wander.checked = settings.wanderEnabled;
   els.fullscreen.checked = settings.hideWhenFullscreen;
   els.taskbar.checked = settings.standOnTaskbar;
+  els.keyboard.checked = settings.keyboardEnabled;
+  els.surfaces.checked = settings.surfacesEnabled;
   applying = false;
   void updatePackDetails();
   void renderLibrary();
@@ -801,6 +805,8 @@ async function main() {
   els.wander.addEventListener("change", () => commit({ wanderEnabled: els.wander.checked }));
   els.fullscreen.addEventListener("change", () => commit({ hideWhenFullscreen: els.fullscreen.checked }));
   els.taskbar.addEventListener("change", () => commit({ standOnTaskbar: els.taskbar.checked }));
+  els.keyboard.addEventListener("change", () => commit({ keyboardEnabled: els.keyboard.checked }));
+  els.surfaces.addEventListener("change", () => commit({ surfacesEnabled: els.surfaces.checked }));
   els.libsearch.addEventListener("input", () => void renderLibrary());
   els.libsource.addEventListener("change", () => void renderLibrary());
   try {

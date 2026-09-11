@@ -66,6 +66,10 @@ pub struct Settings {
     pub piper_voice: String,
     /// Personality profile id; "pack" = the character's own persona and lines.
     pub personality: String,
+    /// React to typing (key counts and a couple of shortcuts only; never which keys).
+    pub keyboard_enabled: bool,
+    /// Land on and walk along the top edges of other windows.
+    pub surfaces_enabled: bool,
 }
 
 impl Default for Settings {
@@ -103,6 +107,8 @@ impl Default for Settings {
             piper_exe: String::new(),
             piper_voice: String::new(),
             personality: "pack".into(),
+            keyboard_enabled: true,
+            surfaces_enabled: true,
         }
     }
 }

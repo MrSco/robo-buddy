@@ -107,6 +107,8 @@ pub fn run() {
             input::start_cursor_thread(app.handle().clone());
             input::start_fullscreen_thread(app.handle().clone());
             input::start_topmost_thread(app.handle().clone());
+            input::start_surfaces_thread(app.handle().clone());
+            input::start_key_thread(app.handle().clone());
             audio::start_audio_thread(app.handle().clone());
             Ok(())
         })
