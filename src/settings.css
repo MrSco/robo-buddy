@@ -58,6 +58,46 @@ body {
   color: var(--text);
   background: rgba(91, 156, 255, 0.14);
 }
+.tabs .tab-help {
+  margin-top: auto;
+}
+@media (max-width: 640px) {
+  .tabs .tab-help {
+    margin-top: 0;
+  }
+}
+/* Help page: readable prose. */
+.help p,
+.help li {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.help p {
+  margin: 0 0 10px;
+}
+.help ul,
+.help ol {
+  margin: 0 0 12px;
+  padding-left: 20px;
+}
+.help li {
+  margin-bottom: 5px;
+}
+.help code {
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 12px;
+  background: var(--field);
+  padding: 1px 5px;
+  border-radius: 4px;
+  user-select: text;
+}
+.help h2 {
+  margin-top: 14px;
+}
+.help .group > h2:first-child {
+  margin-top: 0;
+}
 main {
   flex: 1;
   min-width: 0;
@@ -374,10 +414,13 @@ details.adv summary {
   min-width: 260px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
 }
-.pick-controls .hint {
-  margin: 0;
+.pick-controls .group .hint {
+  margin: 8px 0 6px;
+}
+.gallery {
+  margin-bottom: 2px;
 }
 .gallery {
   display: flex;

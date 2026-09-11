@@ -369,6 +369,11 @@ Goal: dynamic phrases and a real conversation, free by default, bring-your-own-k
   without a falling clip, bounces need 1100 px/s, the land line needs strength 0.55 and the land clip 0.7; the user's other
   Piper voices (bluey, friday, glados, hal, jarvis, tars) live in the managed voices folder (not bundled: 63 MB each).
 
+- Settings polish (Sep 11): every option carries a tooltip; a Help tab covers getting started, characters (in3D -> Mixamo
+  -> FBX/GLB), animations and roles, the two-minute Talk setup (Groq, Gemini, Ollama), microphone and local Whisper, Piper
+  voices, and troubleshooting; the Character page is grouped (characters, size) and the Window page split into Clicking and
+  Behaviour; the import dialog and hints include FBX (packs.rs accepted it already).
+
 ## M7 — Webcam motion capture (proposed)
 Goal: drive the model live from the user's webcam, and record what they do as a clip for the library (a dance, an idle).
 - Tracking in the settings window (it already has a camera-free 3D preview): MediaPipe Pose Landmarker (tasks-vision,

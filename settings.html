@@ -15,38 +15,48 @@
         <button type="button" data-tab="talk">Talk</button>
         <button type="button" data-tab="library">Animations</button>
         <button type="button" data-tab="window">Window</button>
+        <button type="button" data-tab="help" class="tab-help">Help</button>
       </nav>
 
       <main>
+        <!-- ============================ Character ============================ -->
         <section class="page" data-page="character">
           <div class="pick">
             <div class="preview" id="preview-char"><canvas id="live"></canvas></div>
             <div class="pick-controls">
-              <div id="gallery" class="gallery"></div>
-              <select id="character" hidden></select>
-              <div class="row">
-                <button id="import" type="button">Import model…</button>
-                <button id="bring" type="button">Bring buddy to this screen</button>
+              <div class="group">
+                <h2>Characters</h2>
+                <div id="gallery" class="gallery"></div>
+                <select id="character" hidden></select>
+                <p class="hint">Click one to preview it here, click it again to make it the buddy.</p>
+                <div class="row wrap">
+                  <button id="import" type="button" title="Add a model of your own. 3D: GLB, glTF, VRM or FBX with a humanoid skeleton. 2D: an animated WebP, GIF or PNG.">Import model…</button>
+                  <button id="bring" type="button" title="Teleports the buddy onto the monitor this window is on. Handy when he wandered off to another screen.">Bring buddy to this screen</button>
+                </div>
+                <p class="hint">Imports: GLB, glTF, VRM or FBX for 3D (any humanoid rig; Mixamo, Unreal and VRM bones are recognised), or an animated WebP, GIF or PNG for a 2D buddy. You can also drop a file onto the buddy himself.</p>
               </div>
-              <p class="hint" id="packs-hint">Click a character to preview it; click again to use it. GLB, VRM, animated WebP, GIF or PNG can be imported.</p>
-              <label class="slider">
-                <span>Size <output id="size-out">100%</output></span>
-                <input id="size" type="range" min="0.5" max="2.5" step="0.05" />
-              </label>
+              <div class="group">
+                <h2>Size</h2>
+                <label class="slider" title="How tall he is on screen. The window grows with him; his feet stay on the taskbar.">
+                  <span>Size <output id="size-out">100%</output></span>
+                  <input id="size" type="range" min="0.5" max="2.5" step="0.05" />
+                </label>
+              </div>
             </div>
           </div>
         </section>
 
+        <!-- ============================ Reactions ============================ -->
         <section class="page" data-page="reactions" hidden>
           <div class="cols2">
             <div class="group">
               <h2>Reactions</h2>
-              <label class="check"><input id="paused" type="checkbox" /> Pause all reactions</label>
-              <label class="check"><input id="mouse" type="checkbox" /> Watch the mouse</label>
-              <label class="check"><input id="physics" type="checkbox" /> Gravity and throwing</label>
-              <label class="check"><input id="sounds" type="checkbox" /> Sounds</label>
-              <label class="check"><input id="bubbles" type="checkbox" /> Speech bubbles</label>
-              <label class="field inline">
+              <label class="check" title="Freeze everything: no dancing, no looking at the mouse, no wandering. He still shows and can be dragged."><input id="paused" type="checkbox" /> Pause all reactions</label>
+              <label class="check" title="He turns his head to follow the mouse pointer anywhere on the desktop."><input id="mouse" type="checkbox" /> Watch the mouse</label>
+              <label class="check" title="Drop him and he falls to the taskbar; fling him and he flies, tumbles and lands. Off: he stays where you put him."><input id="physics" type="checkbox" /> Gravity and throwing</label>
+              <label class="check" title="Short sound effects on pokes, landings, waking and greetings, when the character pack ships them."><input id="sounds" type="checkbox" /> Sounds</label>
+              <label class="check" title="The little speech bubble above his head: greetings, reactions, idle remarks and chat replies."><input id="bubbles" type="checkbox" /> Speech bubbles</label>
+              <label class="field inline" title="With no mouse, music or clicks for this long he dozes off. Anything wakes him.">
                 <span>Fall asleep after</span>
                 <select id="sleep">
                   <option value="0">never</option>
@@ -59,8 +69,8 @@
             </div>
             <div class="group">
               <h2>Music</h2>
-              <label class="check"><input id="music" type="checkbox" /> Dance to music</label>
-              <label class="slider">
+              <label class="check" title="He listens to whatever plays through your speakers (nothing is recorded or sent anywhere) and dances when it sounds like music."><input id="music" type="checkbox" /> Dance to music</label>
+              <label class="slider" title="Higher: quieter audio counts as music. Lower: only loud, steady music gets him dancing. Watch the meter below while adjusting.">
                 <span>Music sensitivity <output id="sens-out"></output></span>
                 <input id="sensitivity" type="range" min="0" max="1" step="0.01" />
               </label>
@@ -68,39 +78,40 @@
                 <div class="meter-track"><div class="meter-fill" id="meter-fill"></div><div class="meter-mark" id="meter-mark"></div></div>
                 <span class="meter-txt" id="meter-txt">listening…</span>
               </div>
-              <label class="check"><input id="tempo" type="checkbox" /> Only dance when a steady tempo is detected (filters game audio)</label>
-              <label class="field inline">
+              <label class="check" title="Also require a steady beat before dancing. Cuts out gunfire, speech and game audio at the cost of a few seconds' delay."><input id="tempo" type="checkbox" /> Only dance when a steady tempo is detected</label>
+              <label class="field inline" title="Which dance he does when music starts. Random picks a different one each time; the built-in groove is procedural and works on every character.">
                 <span>Dance</span>
                 <select id="dance"></select>
               </label>
             </div>
             <div class="group">
               <h2>Idle</h2>
-              <label class="check"><input id="wander" type="checkbox" /> Wander around and fidget when idle</label>
+              <label class="check" title="When nothing is happening he strolls along the taskbar and does little fidgets now and then."><input id="wander" type="checkbox" /> Wander around and fidget when idle</label>
               <details class="idleset" open>
-                <summary>Idle moves for this character</summary>
+                <summary title="Untick any idle loop or fidget you do not want to see on this character.">Idle moves for this character</summary>
                 <div id="idleset" class="idleset-list"></div>
               </details>
             </div>
           </div>
         </section>
 
+        <!-- ============================ Talk ============================ -->
         <section class="page" data-page="talk" hidden>
-          <label class="check big"><input id="chat-enabled" type="checkbox" /> Let him talk (double-click him, or right-click &rarr; Talk to him)</label>
-          <p class="hint">Nothing leaves this PC until this is on. The key is kept in Windows Credential Manager and only goes to the chat endpoint.</p>
+          <label class="check big" title="Turns on chat, the microphone, spoken replies and generated lines. Until this is on, nothing leaves your PC."><input id="chat-enabled" type="checkbox" /> Let him talk (double-click him, or right-click &rarr; Talk to him)</label>
+          <p class="hint">Nothing leaves this PC until this is on. The key is kept in Windows Credential Manager and only goes to the chat endpoint. See the Help tab for a two-minute setup.</p>
           <div class="talk-fields" id="talk-fields">
             <div class="group">
               <h2>Personality</h2>
               <div class="row wrap">
-                <label class="field grow"><span>Profile</span><select id="personality"></select></label>
-                <button id="personality-edit" type="button" class="self-end">View / edit…</button>
+                <label class="field grow" title="Who he is when he talks: the system prompt, the pre-baked lines he says, and how creative the model is."><span>Profile</span><select id="personality"></select></label>
+                <button id="personality-edit" type="button" class="self-end" title="Show the persona and lines of this profile. Built-in ones are read-only; copy one to make your own.">View / edit…</button>
               </div>
               <p class="hint" id="personality-hint"></p>
               <div class="pedit" id="pedit" hidden>
                 <div class="row wrap">
                   <label class="field grow"><span>Name</span><input id="pe-name" type="text" /></label>
-                  <label class="field small"><span>Temperature</span><input id="pe-temp" type="number" min="0" max="2" step="0.1" /></label>
-                  <label class="field small"><span>Max words</span><input id="pe-words" type="number" min="10" max="120" step="5" /></label>
+                  <label class="field small" title="0 = predictable, 1 = lively, above 1 = chaotic."><span>Temperature</span><input id="pe-temp" type="number" min="0" max="2" step="0.1" /></label>
+                  <label class="field small" title="Roughly how long a reply may be."><span>Max words</span><input id="pe-words" type="number" min="10" max="120" step="5" /></label>
                 </div>
                 <label class="field"><span>Description</span><input id="pe-desc" type="text" /></label>
                 <label class="field"><span>Persona (the system prompt; {name} becomes the character's name)</span><textarea id="pe-persona" rows="6" spellcheck="true"></textarea></label>
@@ -119,7 +130,7 @@
             <div class="cols2">
               <div class="group">
                 <h2>Brain</h2>
-                <label class="field"><span>Provider</span>
+                <label class="field" title="Where his replies come from. Groq and Gemini have free tiers; Ollama runs a model on your own PC with no key at all; Custom is any OpenAI-compatible server."><span>Provider</span>
                   <select id="chat-provider">
                     <option value="groq">Groq (free tier)</option>
                     <option value="gemini">Google Gemini (free tier)</option>
@@ -128,15 +139,15 @@
                     <option value="custom">Custom OpenAI-compatible</option>
                   </select>
                 </label>
-                <label class="field"><span>Endpoint</span><input id="chat-endpoint" type="text" spellcheck="false" /></label>
-                <label class="field"><span>API key &mdash; <span id="chat-keyhint"></span></span>
+                <label class="field" title="The base URL of the API, ending in /v1. Filled in for the presets."><span>Endpoint</span><input id="chat-endpoint" type="text" spellcheck="false" /></label>
+                <label class="field" title="Paste the key once. It is stored in Windows Credential Manager, not in a file, and only sent to the chat endpoint above."><span>API key &mdash; <span id="chat-keyhint"></span></span>
                   <div class="row">
                     <input id="chat-key" type="password" placeholder="paste a key, then Save" class="grow" autocomplete="off" />
                     <button id="chat-savekey" type="button">Save key</button>
                   </div>
                 </label>
                 <p class="hint" id="chat-keystatus"></p>
-                <label class="field"><span>Chat model</span>
+                <label class="field" title="Pick from the list the endpoint reports, or type a model id."><span>Chat model</span>
                   <div class="row">
                     <input id="chat-model" type="text" list="chat-models" spellcheck="false" class="grow" placeholder="pick or type a model id" />
                     <datalist id="chat-models"></datalist>
@@ -145,27 +156,27 @@
                 </label>
                 <p class="hint" id="chat-models-status"></p>
                 <div class="row wrap">
-                  <label class="field inline grow"><span>Daily request cap</span><input id="chat-cap" type="number" min="0" step="10" /></label>
-                  <button id="chat-test" type="button" class="self-end">Test</button>
+                  <label class="field inline grow" title="A safety net for paid keys: requests per day, counting chat, transcription and line generation. 0 = no limit."><span>Daily request cap</span><input id="chat-cap" type="number" min="0" step="10" /></label>
+                  <button id="chat-test" type="button" class="self-end" title="Sends one short message and shows the reply.">Test</button>
                 </div>
                 <p class="hint" id="chat-teststatus"></p>
-                <label class="check"><input id="chat-lines" type="checkbox" /> Generate fresh speech-bubble lines in his voice</label>
+                <label class="check" title="Once a week per character and profile he writes himself a fresh set of bubble lines (greetings, pokes, idle remarks). One request each time."><input id="chat-lines" type="checkbox" /> Generate fresh speech-bubble lines in his voice</label>
               </div>
 
               <div class="group">
                 <h2>Ears</h2>
-                <label class="field"><span>Speech model (blank = no microphone)</span>
+                <label class="field" title="A Whisper-style model at the speech endpoint. Groq offers whisper-large-v3-turbo. Leave blank to hide the microphone button."><span>Speech model (blank = no microphone)</span>
                   <div class="row">
                     <input id="chat-stt" type="text" list="stt-models" spellcheck="false" class="grow" />
                     <datalist id="stt-models"></datalist>
                   </div>
                 </label>
-                <label class="field"><span>Speech endpoint (blank = same as the chat endpoint)</span><input id="chat-stt-endpoint" type="text" spellcheck="false" placeholder="e.g. a local Vibe server: http://127.0.0.1:PORT/v1" /></label>
+                <label class="field" title="Send recordings somewhere other than the chat endpoint, such as a local Vibe server. The key is never sent here."><span>Speech endpoint (blank = same as the chat endpoint)</span><input id="chat-stt-endpoint" type="text" spellcheck="false" placeholder="e.g. a local Vibe server: http://127.0.0.1:PORT/v1" /></label>
                 <p class="hint">The microphone sends a short recording to the speech endpoint. A local Whisper server such as Vibe's works there and never sees the key.</p>
 
                 <h2>Voice</h2>
-                <label class="check"><input id="chat-voice" type="checkbox" /> Speak replies out loud</label>
-                <label class="field"><span>Engine</span>
+                <label class="check" title="Read every reply out loud."><input id="chat-voice" type="checkbox" /> Speak replies out loud</label>
+                <label class="field" title="Windows voice: instant, no setup. Piper: a neural voice that runs on your PC, including cloned voices."><span>Engine</span>
                   <select id="tts-engine">
                     <option value="windows">Windows voice</option>
                     <option value="piper">Piper (local neural voice)</option>
@@ -174,15 +185,15 @@
                 <div id="piper-fields">
                   <div class="row wrap">
                     <span class="hint grow" id="piper-status">Checking…</span>
-                    <button id="piper-install" type="button" hidden>Install Piper (22 MB download)</button>
+                    <button id="piper-install" type="button" hidden title="Downloads piper_windows_amd64.zip from the Piper releases and unpacks it into the app's data folder.">Install Piper (22 MB download)</button>
                   </div>
-                  <label class="field"><span>Voice</span>
+                  <label class="field" title="Voices found in the app's voices folder."><span>Voice</span>
                     <div class="row">
                       <select id="piper-voice" class="grow"></select>
-                      <button id="piper-open" type="button" title="Open the voices folder; drop your own .onnx and .onnx.json pairs there">Folder…</button>
+                      <button id="piper-open" type="button" title="Open the voices folder. Drop your own .onnx and .onnx.json pairs there and they appear in the list.">Folder…</button>
                     </div>
                   </label>
-                  <label class="field"><span>Add a voice from the Piper catalogue</span>
+                  <label class="field" title="A few good English voices from the official Piper catalogue, about 60 MB each."><span>Add a voice from the Piper catalogue</span>
                     <div class="row">
                       <select id="piper-add" class="grow"></select>
                       <button id="piper-download" type="button">Download</button>
@@ -200,35 +211,100 @@
           </div>
         </section>
 
+        <!-- ============================ Animations ============================ -->
         <section class="page" data-page="library" hidden>
           <div class="lib-layout">
             <div class="lib-side">
               <div class="preview" id="preview-lib"></div>
               <p class="hint">Previews play on the character you have selected. Every clip works on every 3D character.</p>
-              <div id="dropzone" class="dropzone">Drop FBX or GLB animations here (or onto the buddy) to add your own</div>
+              <div id="dropzone" class="dropzone" title="FBX or GLB files with an animation. Mixamo, Unreal and VRM rigs are retargeted automatically.">Drop FBX or GLB animations here (or onto the buddy) to add your own</div>
+              <p class="hint">Roles: <b>idle</b> loops while he stands, <b>fidget</b> plays once now and then, <b>dance</b> joins the dance list, <b>poke</b> plays when clicked, <b>held</b> replaces the ragdoll while dragged, <b>fall</b> while airborne, <b>walk</b> while strolling.</p>
             </div>
             <div class="lib-main">
               <div class="row libfilter">
                 <input id="libsearch" type="search" placeholder="Search clips" />
-                <select id="libsource"><option value="">All sources</option><option value="user">Mine</option><option value="mixamo">Mixamo</option><option value="ual">Quaternius</option></select>
+                <select id="libsource" title="Mine: clips you dropped in. Mixamo and Quaternius: the bundled libraries."><option value="">All sources</option><option value="user">Mine</option><option value="mixamo">Mixamo</option><option value="ual">Quaternius</option></select>
               </div>
               <div id="library" class="library"></div>
             </div>
           </div>
         </section>
 
+        <!-- ============================ Window ============================ -->
         <section class="page" data-page="window" hidden>
-          <div class="group">
-            <label class="field"><span>Clicking</span>
-              <select id="clickthrough">
-                <option value="pixel">Precise: only the drawn pixels are clickable</option>
-                <option value="window">Whole window is clickable</option>
-                <option value="locked">Locked: never clickable (move via this window)</option>
-              </select>
-            </label>
-            <label class="check"><input id="autostart" type="checkbox" /> Start with Windows</label>
-            <label class="check"><input id="fullscreen" type="checkbox" /> Hide while a fullscreen app is active</label>
-            <label class="check"><input id="taskbar" type="checkbox" /> Stand on the taskbar</label>
+          <div class="cols2">
+            <div class="group">
+              <h2>Clicking</h2>
+              <label class="field" title="Precise: clicks pass through the transparent parts of his window to whatever is behind, only his body catches them. Whole window: the full rectangle catches clicks. Locked: he ignores the mouse entirely; move him with Bring buddy to this screen.">
+                <span>How his window treats the mouse</span>
+                <select id="clickthrough">
+                  <option value="pixel">Precise: only the drawn pixels are clickable</option>
+                  <option value="window">Whole window is clickable</option>
+                  <option value="locked">Locked: never clickable (move via this window)</option>
+                </select>
+              </label>
+              <p class="hint">Click him to poke, hold and drag to carry him, fling to throw, double-click to talk, right-click for the menu.</p>
+            </div>
+            <div class="group">
+              <h2>Behaviour</h2>
+              <label class="check" title="Launch Robo Buddy when you sign in to Windows."><input id="autostart" type="checkbox" /> Start with Windows</label>
+              <label class="check" title="When a game or video takes the whole screen he hides, and comes back when it ends."><input id="fullscreen" type="checkbox" /> Hide while a fullscreen app is active</label>
+              <label class="check" title="His window overlaps the taskbar so his feet rest on its top edge. Off: he stands just above it."><input id="taskbar" type="checkbox" /> Stand on the taskbar</label>
+              <p class="hint">He always stays on top of other windows, and the tray icon has the same menu as right-clicking him.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================ Help ============================ -->
+        <section class="page help" data-page="help" hidden>
+          <div class="cols2">
+            <div class="group">
+              <h2>Getting started</h2>
+              <p>Robo Buddy is a little character who lives on your taskbar. He watches the mouse, dances to your music, and can be picked up, thrown, poked and talked to.</p>
+              <ul>
+                <li><b>Click</b> him to poke. <b>Hold and drag</b> to carry him around; grab an arm or a leg and he hangs from it. <b>Fling</b> him and he flies.</li>
+                <li><b>Double-click</b> to talk (once Talk is on). <b>Right-click</b> for the menu; the tray icon has the same one.</li>
+                <li>Every setting applies immediately. Hover any option for a short explanation.</li>
+              </ul>
+              <h2>Characters</h2>
+              <p>Bundled: Rocco (a 3D scan), Rocco as VRM, a mannequin and a 2D Pixel Pal. Add your own with <b>Import model…</b> on the Character tab or by dropping a file onto the buddy.</p>
+              <ul>
+                <li><b>3D:</b> GLB, glTF, VRM or FBX with a humanoid skeleton. Mixamo, Unreal and VRM bone names are recognised, so a free rig from Mixamo or a VRoid character works out of the box.</li>
+                <li><b>Make one of yourself:</b> a phone scan from in3D (or similar) exported as GLB, auto-rigged on mixamo.com, downloaded as FBX or GLB.</li>
+                <li><b>2D:</b> an animated WebP, GIF or PNG becomes a flat buddy.</li>
+                <li>Every animation in the library works on every 3D character; nothing is baked per model.</li>
+              </ul>
+              <h2>Animations</h2>
+              <p>The Animations tab lists the bundled Mixamo and Quaternius clips plus your own. Give each clip a role (idle, fidget, dance, poke, held, fall, walk) or switch it off. Press ▶ to preview it on the selected character. Drop FBX or GLB animations onto the page or the buddy to add more; Mixamo exports work directly.</p>
+            </div>
+            <div class="group">
+              <h2>Talking: two-minute setup</h2>
+              <ol>
+                <li>Turn on <b>Let him talk</b> on the Talk tab.</li>
+                <li>Pick a provider. <b>Groq</b> is free and fast: create a key at <code>console.groq.com/keys</code>. <b>Gemini</b> is free too: <code>aistudio.google.com/apikey</code>. <b>Ollama</b> needs no key: install it, pull a model, choose Ollama.</li>
+                <li>Paste the key and press <b>Save key</b>. It lands in Windows Credential Manager, never in a file.</li>
+                <li>Press ↻ next to <b>Chat model</b> and pick one, or keep the default. Press <b>Test</b>.</li>
+                <li>Double-click him and say hello. The ☰ button on the strip shows what you both said this session.</li>
+              </ol>
+              <p><b>Personality</b> decides who he is: the persona sent to the model, the lines he says on his own, and how creative he is. Copy a built-in profile to make your own. With <b>Generate fresh speech-bubble lines</b> on, he writes himself new idle remarks once a week.</p>
+              <h2>Microphone</h2>
+              <p>The mic button records until you click it again and sends the clip to the speech endpoint. Groq's <code>whisper-large-v3-turbo</code> is the default. To keep audio local, run a Whisper server such as Vibe's <code>vibe-server</code> and put its address (ending in <code>/v1</code>) in <b>Speech endpoint</b>; the key is never sent there.</p>
+              <h2>Voices</h2>
+              <p><b>Windows voice</b> works with no setup. <b>Piper</b> is a neural voice that runs on your PC:</p>
+              <ol>
+                <li>Choose Piper as the engine and press <b>Install Piper</b> (a 22 MB download into the app's data folder).</li>
+                <li>Download a voice from the catalogue, or press <b>Folder…</b> and drop in any Piper voice: a pair of <code>name.onnx</code> and <code>name.onnx.json</code>. Cloned voices trained for Piper work the same way.</li>
+                <li>Pick it in the <b>Voice</b> list. Replies are spoken with it and his head nods along.</li>
+              </ol>
+              <h2>If something is off</h2>
+              <ul>
+                <li><b>Can't see him:</b> right-click the tray icon and choose <b>Bring buddy here</b>. He hides while a fullscreen app is focused.</li>
+                <li><b>He dances to game audio:</b> lower the sensitivity while watching the meter, or turn on the steady-tempo option.</li>
+                <li><b>He won't dance to music:</b> raise the sensitivity until the meter says "dancing" while a song plays.</li>
+                <li><b>Talk fails:</b> the Test button shows the provider's exact error. Most often it is a wrong key or a model id the provider no longer offers; press ↻ to see the current list.</li>
+                <li><b>Report a glitch:</b> <code>%APPDATA%\com.rocco.robobuddy\buddy.log</code> records odd animation frames with the state they happened in.</li>
+              </ul>
+            </div>
           </div>
         </section>
 

@@ -833,7 +833,7 @@ async function main() {
       directory: false,
       title: "Choose a character model",
       filters: [
-        { name: "3D models", extensions: ["glb", "vrm", "gltf"] },
+        { name: "3D models", extensions: ["glb", "vrm", "gltf", "fbx"] },
         { name: "Animated images", extensions: ["webp", "gif", "png", "apng"] },
       ],
     });
