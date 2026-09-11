@@ -6,10 +6,11 @@ $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 pnpm tauri build
 $version = (Get-Content "$root\src-tauri\tauri.conf.json" | ConvertFrom-Json).version
-New-Item -ItemType Directory -Force "$root\dist" | Out-Null
-$setup = Get-ChildItem "$root\src-tauri\target\release\bundle\nsis\*-setup.exe" | Select-Object -First 1
-$msi = Get-ChildItem "$root\src-tauri\target\release\bundle\msi\*.msi" | Select-Object -First 1
-Copy-Item $setup.FullName "$root\dist\RoboBuddy-Setup-$version.exe" -Force
-Copy-Item $msi.FullName "$root\dist\RoboBuddy-$version.msi" -Force
-Write-Host "Installer: dist\RoboBuddy-Setup-$version.exe"
-Write-Host "MSI:       dist\RoboBuddy-$version.msi"
+# dist\ is Vite's frontend output; installers go to release\.
+New-Item -ItemType Directory -Force "$root\release" | Out-Null
+$setup = Get-ChildItem "$root\src-tauri\target\release\bundle\nsis\*$version*-setup.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$msi = Get-ChildItem "$root\src-tauri\target\release\bundle\msi\*$version*.msi" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+Copy-Item $setup.FullName "$root\release\RoboBuddy-Setup-$version.exe" -Force
+Copy-Item $msi.FullName "$root\release\RoboBuddy-$version.msi" -Force
+Write-Host "Installer: release\RoboBuddy-Setup-$version.exe"
+Write-Host "MSI:       release\RoboBuddy-$version.msi"
