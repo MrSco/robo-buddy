@@ -54,6 +54,18 @@
     "loop": true
   },
   {
+    "name": "Getting_Up",
+    "file": "Getting_Up.glb",
+    "duration": 2.733,
+    "loop": false
+  },
+  {
+    "name": "Getting_Up_2",
+    "file": "Getting_Up_2.glb",
+    "duration": 8.367,
+    "loop": false
+  },
+  {
     "name": "Hanging_Idle",
     "file": "Hanging_Idle.glb",
     "duration": 2.367,
@@ -130,6 +142,12 @@
     "file": "Snake_Hip_Hop.glb",
     "duration": 15.3,
     "loop": true
+  },
+  {
+    "name": "Standing_Up",
+    "file": "Standing_Up.glb",
+    "duration": 11.433,
+    "loop": false
   },
   {
     "name": "Step_Hip_Hop",

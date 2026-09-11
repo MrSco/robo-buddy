@@ -43,6 +43,10 @@
     "hang": {
       "clip": "Hanging_Idle",
       "loop": true
+    },
+    "getup": {
+      "clip": "Getting_Up",
+      "loop": false
     }
   },
   "reactions": {
@@ -107,7 +111,10 @@
     "Neutral_Idle": "/clips/mixamo/Neutral_Idle.glb",
     "Bored": "/clips/mixamo/Bored.glb",
     "Crouch_Look_Around": "/clips/mixamo/Crouch_Look_Around.glb",
-    "Texting": "/clips/mixamo/Texting.glb"
+    "Texting": "/clips/mixamo/Texting.glb",
+    "Getting_Up": "/clips/mixamo/Getting_Up.glb",
+    "Getting_Up_2": "/clips/mixamo/Getting_Up_2.glb",
+    "Standing_Up": "/clips/mixamo/Standing_Up.glb"
   },
   "lines": {
     "greet": [

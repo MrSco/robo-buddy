@@ -10,7 +10,7 @@ import type { AudioFeatures } from "./audio";
 import { listLibrary, invalidateLibrary, ROLES, type LibraryClip } from "./library";
 import { getSettings, onSettingsChanged, setSettings, type ClickThroughMode, type Settings } from "./settings-store";
 import { listPersonalities, loadUserPersonalities, saveUserPersonalities, slugFor, type Personality } from "./personality";
-import { emit } from "@tauri-apps/api/event";
+import { emit, listen as listenEvent } from "@tauri-apps/api/event";
 import { Capture } from "./capture";
 import { PoseRecorder, exportClipGlb } from "./mocap";
 import { canonicalRig } from "./retarget";
@@ -92,6 +92,7 @@ const els = {
   camEmpty: $<HTMLDivElement>("cam-empty"),
   camStart: $<HTMLButtonElement>("cam-start"),
   camMirror: $<HTMLInputElement>("cam-mirror"),
+  camHands: $<HTMLInputElement>("cam-hands"),
   camStatus: $<HTMLSpanElement>("cam-status"),
   camRecord: $<HTMLButtonElement>("cam-record"),
   camRecStatus: $<HTMLSpanElement>("cam-rec-status"),
@@ -665,6 +666,7 @@ function showTab(name: string) {
 async function startCamera() {
   if (!capture) {
     capture = new Capture(els.cam, els.camOverlay);
+    capture.hands = els.camHands.checked;
     capture.onStatus = (t) => (els.camStatus.textContent = t);
     capture.onPose = (pose, t) => {
       getLive().mirror = pose;
@@ -672,8 +674,8 @@ async function startCamera() {
         recorder.push(pose, t);
         els.camRecStatus.textContent = `Recording… ${recorder.seconds.toFixed(1)} s`;
       }
-      // The buddy gets every other frame; plenty for a mirror, gentle on the event bus.
-      if (els.camMirror.checked && poseSeq++ % 2 === 0) void emit("pose", pose).catch(() => {});
+      if (els.camMirror.checked) void emit("pose", pose).catch(() => {});
+      if ((poseSeq++ & 31) === 0 && capture) els.camStatus.textContent = `Tracking at ${capture.fps} fps${capture.hands ? `, ${capture.handsSeen} hand${capture.handsSeen === 1 ? "" : "s"}` : ""}.`;
     };
   }
   try {
@@ -740,6 +742,9 @@ async function saveRecording() {
 function wireCapture() {
   els.camStart.addEventListener("click", () => (capture?.running ? stopCamera() : void startCamera()));
   els.camMirror.addEventListener("change", () => void emit("mirror", { on: els.camMirror.checked }).catch(() => {}));
+  els.camHands.addEventListener("change", () => {
+    if (capture) capture.hands = els.camHands.checked;
+  });
   els.camRecord.addEventListener("click", toggleRecording);
   els.camSave.addEventListener("click", () => void saveRecording());
   // Right-click > Copy me: open here with the camera on and mirroring.
@@ -751,9 +756,13 @@ function wireCapture() {
       void emit("mirror", { on: true }).catch(() => {});
     }
   });
-  // Hiding the window (its close button hides it) stops the camera too.
+  // Hiding the window (its close button hides it) stops the camera too. WebView2 does not
+  // reliably fire visibilitychange for a hidden window, so Rust also sends an event.
   document.addEventListener("visibilitychange", () => {
     if (document.hidden && capture?.running) stopCamera();
+  });
+  void listenEvent("settings-hidden", () => {
+    if (capture?.running) stopCamera();
   });
   // Leaving the tab stops the camera; a webcam light should never stay on unnoticed.
   els.tabs.addEventListener("click", (e) => {

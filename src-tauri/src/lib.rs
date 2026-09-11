@@ -141,6 +141,8 @@ pub fn run() {
             if window.label() == "settings" {
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
+                    // The webview keeps running while hidden; tell it so the webcam goes off.
+                    let _ = window.emit("settings-hidden", ());
                     let _ = window.hide();
                 }
             }

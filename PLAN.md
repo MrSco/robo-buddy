@@ -389,6 +389,16 @@ Goal: dynamic phrases and a real conversation, free by default, bring-your-own-k
   finds a reachable edge (40-460 px above his hands, walkable, unoccluded); the scheduler walks him under it and `hop()`
   gives just enough jump for his hands to reach; on a window he sometimes walks off the edge and drops. All under the
   "Stand on and climb other windows" toggle plus wandering.
+- Hand tracking (done): MediaPipe Hand Landmarker (bundled, loads on demand, "Hands and fingers" toggle on the Capture
+  tab) adds 21 points per hand; finger segments become swing deltas on the 30 finger bones plus a hand bone aimed from
+  the wrist to the knuckles. Poses carry a mask so untracked bones keep the clip's pose, and recordings only write tracks
+  for bones the tracker saw. Handedness is swapped (MediaPipe labels assume a mirrored image) and then mirrored again.
+- Mirror smoothness (done): every frame goes to the buddy and the renderer eases the shown pose toward the latest frame
+  (nlerp, ~22/s), so 30 fps tracking reads smooth at 60 fps. The camera now also stops when the settings window is
+  hidden: Rust emits `settings-hidden` on close (WebView2 does not fire visibilitychange for a hidden window).
+- Get-up clips (done): Getting_Up (2.7 s), Getting_Up_2 (8.4 s) and Standing_Up (11.4 s) from Mixamo, converted and
+  baked into the Mixamo library; the packs' `getup` state uses Getting_Up and the knocked-down recovery plays it instead
+  of the landing crouch.
 - Chat commands (done): `src/commands.ts` parses plain requests locally (dance / a named dance / for N seconds, stop,
   sleep, wake, come here, jump, climb, walk left/right, be quiet for N minutes, "do the <clip>") and acts at once; the
   model gets an abilities line in its system prompt and may append one `<do:...>` tag, which is stripped and run when the

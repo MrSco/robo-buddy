@@ -140,9 +140,10 @@ async function boot() {
     if (landStrength > 0.7 && renderer?.kind === "3d" && downUntil < now && landUntil < now) {
       const tumbled = Math.abs(renderer3d?.tumbleAngle ?? 0) > 0.25 || landStrength > 0.7;
       downUntil = tumbled ? now + 1.1 + Math.random() * 0.6 : -1;
-      landClip = behavior.stateClip("land");
+      // Knocked down: a real getting-up clip when the pack has one; otherwise the landing crouch.
+      landClip = (tumbled ? behavior.stateClip("getup") : null) ?? behavior.stateClip("land");
       const start = tumbled ? downUntil : now;
-      if (landClip) landUntil = start + Math.max(0.4, renderer.clipDuration(landClip.name) * 0.9);
+      if (landClip) landUntil = start + Math.max(0.4, renderer.clipDuration(landClip.name) * (tumbled ? 0.97 : 0.9));
     }
   };
   await p.init();

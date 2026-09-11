@@ -4,7 +4,7 @@ import { applyDance } from "./dance";
 import type { Manifest, PackRef } from "./packs";
 import { applyDangle, applyFlail, applyHeldByArm, applyHeldByLeg, applyIdle, applyLimp, applyLookAt, applySleep } from "./pose";
 import { LimbSprings } from "./secondary";
-import { MirrorApplier } from "./mocap";
+import { MirrorApplier, easePose, type MirrorPose } from "./mocap";
 import { canonicalRig } from "./retarget";
 import type { FrameInput, GrabPart, Renderer, StateName } from "./renderer";
 
@@ -53,6 +53,8 @@ export class Renderer3D implements Renderer {
   private talkAmount = 0;
   private mirrorAmount = 0;
   private mirrorApplier: MirrorApplier | null = null;
+  /** The pose actually shown: eased toward the latest frame so 30 fps input looks smooth at 60. */
+  private mirrorShown: MirrorPose | null = null;
   /** Which side he lies on while knocked down (+1 / -1), chosen when he goes down. */
   private lieSide = 0;
 
@@ -355,8 +357,11 @@ export class Renderer3D implements Renderer {
     this.mirrorAmount += ((input.mirror ? 1 : 0) - this.mirrorAmount) * Math.min(1, input.dt * 8);
     if (input.mirror) {
       if (!this.mirrorApplier) void canonicalRig().then((r) => (this.mirrorApplier = new MirrorApplier(r)));
-      else this.mirrorApplier.apply(c.rig, input.mirror, this.mirrorAmount);
-    }
+      else {
+        this.mirrorShown = easePose(this.mirrorShown, input.mirror, Math.min(1, 1 - Math.exp(-input.dt * 22)));
+        this.mirrorApplier.apply(c.rig, this.mirrorShown, this.mirrorAmount);
+      }
+    } else this.mirrorShown = null;
     const awake = 1 - input.sleepAmount;
     const lookScale = awake * (1 - Math.min(1, Math.abs(this.facing) / 1.2)) * (1 - this.downAmount);
     // Talking: quick little nods, like someone chatting.
