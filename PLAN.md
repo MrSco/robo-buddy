@@ -440,3 +440,52 @@ Goal: drive the model live from the user's webcam, and record what they do as a 
 - Recording: 30 fps quaternion tracks on the canonical rig, trimmed, looped by cross-fading the ends, exported as a GLB
   into the user clips folder and tagged with a role (dance/idle/fidget) like any imported clip.
 - Stretch: two-hand gestures as pokes, mirroring the user's head turn when idle.
+
+## 2D puppet motion (DONE Sep 11 2026)
+
+A flat picture gets the 3D reactions procedurally: the image is drawn as twelve horizontal
+strips whose x offset grows with the square of the height, so the top can bend over while the
+feet stay put; a spring on the bend gives wobbles. Breathing and a slow sway when idle, a lean
+toward the cursor, four dance moves cycling every eight beats (bounce, sway, shuffle, twist),
+a hop plus a shake on poke, squash plus a top-keeps-going wobble on landing, tumbling with the
+spin when thrown, a pendulum swing from the top while held, a stretch while hanging, a slump
+when asleep, nods while talking. Packs with their own clips keep them; the layer only adds.
+
+## M9 — Hand-placed rig editor for 2D characters (proposal)
+
+Goal: a drawn or photographed character (one PNG with transparency) gets limbs that move,
+driven by the same clips the 3D characters use, without any automatic guessing.
+
+Editor (a tab in settings, "Rig"):
+1. Load the image. Draw the silhouette automatically from the alpha channel (flood fill,
+   then a polygon simplification); the user can paint holes closed or cut the outline.
+2. The user places a fixed set of joints by dragging markers onto the picture: hips, chest,
+   neck, head top, shoulders, elbows, wrists, knees, ankles (15 points). A template skeleton
+   in a T-pose starts them near the right place; unused joints (a plane has no knees) can be
+   switched off, which merges that limb into its parent.
+3. Mesh: triangulate the silhouette (ear clipping with a few interior points along each bone),
+   skin each vertex to the two nearest bones by distance along the bone, with a soft falloff.
+   Preview the result live while placing joints; a "wiggle" button plays a short test clip.
+4. Save as `rig.json` next to the image in the character folder (joints in image
+   coordinates, mesh vertices, triangles, weights, which joints are on).
+
+Runtime:
+- A third renderer (`renderer2drig`) draws the mesh with WebGL (three.js `SkinnedMesh` with
+  a flat orthographic camera, the picture as the texture). 2D bones are three.js bones, so
+  the existing retargeter drives them: take the canonical clip, keep each bone's rotation
+  about the screen axis (z) and drop the rest, apply as 2D rotations. Walking, dancing,
+  hanging, waving, the get-up: all come for free, flattened.
+- Depth ordering: limbs drawn in the template's order (far arm, body, near arm) so an arm
+  can pass in front of the torso.
+- The puppet layer above still applies on top (squash, wobble, tumble).
+
+What will and will not look good:
+- Good: cartoon characters, stickers, mascots, anything with visible separate limbs and a
+  frontal pose. The classic "animated drawings" look.
+- Acceptable: a person in a photo standing in an A-pose; textures stretch at the joints
+  but reads fine at desktop-buddy size.
+- Poor: crossed arms, side views, anything where limbs overlap the body (the mesh has no
+  hidden pixels to reveal), and non-humanoids (the plane): those stay on the puppet layer.
+
+Effort: editor 1 day, mesh and skinning half a day, runtime renderer and retarget
+flattening 1 day, polish (depth order, holes, undo) half a day.
