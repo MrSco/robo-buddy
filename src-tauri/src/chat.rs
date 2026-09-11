@@ -138,12 +138,17 @@ pub async fn chat_complete(app: AppHandle, messages: Vec<ChatMessage>, max_token
         return Err("No chat endpoint or model set (Settings > Talk).".into());
     }
     take_request(&app, t.cap)?;
-    let body = serde_json::json!({
+    let mut body = serde_json::json!({
         "model": t.model,
         "messages": messages,
         "max_tokens": max_tokens.unwrap_or(160),
         "temperature": temperature.unwrap_or(0.9),
     });
+    // Groq's reasoning models and the compound system can put their thinking in the reply;
+    // ask for it to be left out (other providers reject unknown fields, so only for Groq).
+    if t.endpoint.contains("groq.com") {
+        body["reasoning_format"] = serde_json::json!("hidden");
+    }
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(45))
         .build()
@@ -164,6 +169,37 @@ pub async fn chat_complete(app: AppHandle, messages: Vec<ChatMessage>, max_token
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
         .ok_or_else(|| "The model sent an empty reply.".into())
+}
+
+/// Model ids the chat endpoint offers (`GET /models`), sorted.
+#[tauri::command]
+pub async fn list_models(app: AppHandle) -> Result<Vec<String>, String> {
+    let t = target(&app);
+    if t.endpoint.is_empty() {
+        return Err("No chat endpoint set.".into());
+    }
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let mut req = client.get(format!("{}/models", t.endpoint));
+    if let Some(k) = read_key() {
+        req = req.bearer_auth(k);
+    }
+    let resp = req.send().await.map_err(|e| format!("Request failed: {e}"))?;
+    let status = resp.status();
+    let text = resp.text().await.map_err(|e| e.to_string())?;
+    if !status.is_success() {
+        return Err(error_text(status, &text));
+    }
+    let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    let mut ids: Vec<String> = v["data"]
+        .as_array()
+        .map(|a| a.iter().filter_map(|m| m["id"].as_str().map(|s| s.to_string())).collect())
+        .unwrap_or_default();
+    ids.sort();
+    ids.dedup();
+    Ok(ids)
 }
 
 /// Speech-to-text through the endpoint's `/audio/transcriptions` (Whisper-style).

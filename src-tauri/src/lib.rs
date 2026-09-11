@@ -8,6 +8,7 @@ use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 mod audio;
 mod chat;
 mod input;
+mod piper;
 mod packs;
 mod settings;
 
@@ -162,6 +163,11 @@ pub fn run() {
             chat::load_user_personalities,
             chat::save_user_personalities,
             chat::append_log,
+            chat::list_models,
+            piper::piper_status,
+            piper::piper_install,
+            piper::piper_download_voice,
+            piper::piper_open_voices,
         ])
         .run(context)
         .expect("error while running Robo Buddy");

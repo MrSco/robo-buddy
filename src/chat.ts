@@ -34,6 +34,31 @@ export interface ChatTuning {
   maxWords: number;
 }
 
+/**
+ * Replies are shown in a bubble and read aloud, so strip anything that is not the answer:
+ * <think> blocks, "Reasoning" sections that end in a "Response" marker, and markdown.
+ */
+export function cleanReply(raw: string): string {
+  let t = raw.replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/<\/?think>/gi, "");
+  // "**Reasoning Recap** ... **Response** Good morning" -> keep what follows the last marker.
+  const marker = /(?:^|\n|\*)\s*\**\s*(?:final\s+)?(?:response|answer|reply)\s*\**\s*[:\-\u2013]?\s*/gi;
+  let last: RegExpExecArray | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = marker.exec(t)) !== null) last = m;
+  if (last) t = t.slice(last.index + last[0].length);
+  t = t
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/\*\*|__/g, "")
+    .replace(/(^|\s)[*_](\S[^*_]*\S|\S)[*_](?=\s|$|[.,!?])/g, "$1$2")
+    .replace(/^\s*[-*\u2022]\s+/gm, "")
+    .replace(/\s*\n\s*/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return t || raw.trim();
+}
+
 export class ChatClient {
   private history: ChatMessage[] = [];
   tuning: ChatTuning = { temperature: 0.9, maxWords: 35 };
@@ -49,11 +74,12 @@ export class ChatClient {
     const system: ChatMessage = { role: "system", content: `${this.persona()}\n${context}` };
     this.history.push({ role: "user", content: text });
     const messages = [system, ...this.history.slice(-10)];
-    const reply = await invoke<string>("chat_complete", {
+    const raw = await invoke<string>("chat_complete", {
       messages,
       maxTokens: Math.round(this.tuning.maxWords * 3 + 40),
       temperature: this.tuning.temperature,
     });
+    const reply = cleanReply(raw);
     this.history.push({ role: "assistant", content: reply });
     return reply;
   }

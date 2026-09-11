@@ -355,6 +355,15 @@ Goal: dynamic phrases and a real conversation, free by default, bring-your-own-k
   `%APPDATA%/com.rocco.robobuddy/piper/` with the user's own `voices/rocco.onnx` (22 kHz, en-us); T-pose sightings are
   appended to `%APPDATA%/.../buddy.log` with state, clip and time so the user can send them back.
 
+- Follow-ups (Sep 11, evening): settings are tabbed (Character, Reactions, Talk, Animations, Window; a side strip that
+  becomes a top strip below 640 px), pages use two columns only above 860 px; the chat model is a pick-or-type box fed by
+  `GET {endpoint}/models` (whisper-ish ids feed the speech box), default `groq/compound`; Groq requests carry
+  `reasoning_format: hidden` and every reply passes `cleanReply` (drops <think> blocks, "Reasoning ... Response" preambles
+  and markdown) before the bubble and the voice; Piper is managed by the app (`piper.rs`: install the 22 MB zip on demand,
+  list `voices/*.onnx`, download from a small catalogue, open the folder) with an advanced override for a custom exe; the
+  personality editor shows the pack's real persona and lines, read-only fields and disabled Save/Delete for built-ins,
+  "Copy to a new profile" to fork.
+
 ## M7 — Webcam motion capture (proposed)
 Goal: drive the model live from the user's webcam, and record what they do as a clip for the library (a dance, an idle).
 - Tracking in the settings window (it already has a camera-free 3D preview): MediaPipe Pose Landmarker (tasks-vision,

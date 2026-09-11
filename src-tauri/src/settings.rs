@@ -93,7 +93,7 @@ impl Default for Settings {
             chat_enabled: false,
             chat_provider: "groq".into(),
             chat_endpoint: "https://api.groq.com/openai/v1".into(),
-            chat_model: "llama-3.3-70b-versatile".into(),
+            chat_model: "groq/compound".into(),
             chat_stt_model: "whisper-large-v3-turbo".into(),
             chat_voice: true,
             chat_generate_lines: true,

@@ -11,7 +11,7 @@ import { listLibrary, invalidateLibrary, ROLES, type LibraryClip } from "./libra
 import { getSettings, onSettingsChanged, setSettings, type ClickThroughMode, type Settings } from "./settings-store";
 import { listPersonalities, loadUserPersonalities, saveUserPersonalities, slugFor, type Personality } from "./personality";
 import { emit } from "@tauri-apps/api/event";
-import type { LineEvent } from "./chat";
+import { defaultPersona, type LineEvent } from "./chat";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -69,7 +69,19 @@ const els = {
   ttsEngine: $<HTMLSelectElement>("tts-engine"),
   piperFields: $<HTMLDivElement>("piper-fields"),
   piperExe: $<HTMLInputElement>("piper-exe"),
-  piperVoice: $<HTMLInputElement>("piper-voice"),
+  piperVoice: $<HTMLSelectElement>("piper-voice"),
+  piperVoicePath: $<HTMLInputElement>("piper-voice-path"),
+  piperStatus: $<HTMLSpanElement>("piper-status"),
+  piperInstall: $<HTMLButtonElement>("piper-install"),
+  piperOpen: $<HTMLButtonElement>("piper-open"),
+  piperAdd: $<HTMLSelectElement>("piper-add"),
+  piperDownload: $<HTMLButtonElement>("piper-download"),
+  piperAddStatus: $<HTMLParagraphElement>("piper-addstatus"),
+  chatModels: $<HTMLDataListElement>("chat-models"),
+  chatModelsRefresh: $<HTMLButtonElement>("chat-models-refresh"),
+  chatModelsStatus: $<HTMLParagraphElement>("chat-models-status"),
+  sttModels: $<HTMLDataListElement>("stt-models"),
+  tabs: $<HTMLElement>("tabs"),
   personalityEdit: $<HTMLButtonElement>("personality-edit"),
   pedit: $<HTMLDivElement>("pedit"),
   peName: $<HTMLInputElement>("pe-name"),
@@ -263,10 +275,13 @@ async function manifestFor(pack: PackRef): Promise<Manifest> {
   return m;
 }
 
+let currentManifest: Manifest | null = null;
+
 async function updatePackDetails() {
   const pack = packs.find((p) => p.id === settings.character) ?? packs[0];
   if (!pack) return;
   const m = await manifestFor(pack);
+  currentManifest = m;
   // Dance choices for this pack.
   const names = (m.dances ?? []).map((d) => (typeof d === "string" ? d : d.clip)).filter((d) => d !== "procedural");
   const dances = ["random", ...names, "procedural"];
@@ -321,9 +336,10 @@ function render() {
   els.chatCap.value = String(settings.chatDailyCap);
   els.chatSttEndpoint.value = settings.chatSttEndpoint;
   els.ttsEngine.value = settings.ttsEngine;
-  els.piperFields.classList.toggle("gone", settings.ttsEngine !== "piper");
+  els.piperFields.hidden = settings.ttsEngine !== "piper";
   els.piperExe.value = settings.piperExe;
-  els.piperVoice.value = settings.piperVoice;
+  els.piperVoicePath.value = settings.piperVoice;
+  if (els.piperVoice.options.length) els.piperVoice.value = settings.piperVoice;
   if (els.personality.options.length) {
     els.personality.value = settings.personality;
     els.personalityHint.textContent = els.personality.selectedOptions[0]?.dataset.desc ?? "";
@@ -380,12 +396,117 @@ function startMeter() {
 
 /** Provider presets: any OpenAI-compatible endpoint works; these fill in the usual values. */
 const PROVIDERS: Record<string, { endpoint: string; model: string; stt: string; keyHint: string }> = {
-  groq: { endpoint: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile", stt: "whisper-large-v3-turbo", keyHint: "free at console.groq.com/keys" },
+  groq: { endpoint: "https://api.groq.com/openai/v1", model: "groq/compound", stt: "whisper-large-v3-turbo", keyHint: "free at console.groq.com/keys" },
   gemini: { endpoint: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-2.0-flash", stt: "", keyHint: "free at aistudio.google.com/apikey" },
   openai: { endpoint: "https://api.openai.com/v1", model: "gpt-4o-mini", stt: "whisper-1", keyHint: "platform.openai.com/api-keys" },
   ollama: { endpoint: "http://localhost:11434/v1", model: "llama3.2", stt: "", keyHint: "not needed" },
   custom: { endpoint: "", model: "", stt: "", keyHint: "for your endpoint" },
 };
+
+interface PiperStatus {
+  root: string;
+  exe: string | null;
+  voices: Array<{ name: string; path: string }>;
+  catalogue: Array<{ id: string; label: string }>;
+}
+
+/** Managed Piper: where it is, which voices are installed, what can be downloaded. */
+async function refreshPiper() {
+  let st: PiperStatus;
+  try {
+    st = await invoke<PiperStatus>("piper_status");
+  } catch (err) {
+    els.piperStatus.textContent = `Piper: ${err}`;
+    return;
+  }
+  const managed = !!st.exe;
+  const custom = settings.piperExe && st.exe !== settings.piperExe && settings.piperExe.trim() !== "";
+  els.piperStatus.textContent = managed
+    ? `Piper is installed${custom ? " (using your own piper.exe instead)" : ""}.`
+    : settings.piperExe
+      ? "Using your own piper.exe."
+      : "Piper is not installed yet.";
+  els.piperInstall.hidden = managed;
+  els.piperInstall.disabled = false;
+  if (managed && !settings.piperExe) {
+    await commit({ piperExe: st.exe! });
+    els.piperExe.value = st.exe!;
+  }
+  els.piperVoice.innerHTML = "";
+  if (!st.voices.length) {
+    const o = document.createElement("option");
+    o.value = "";
+    o.textContent = "no voices yet: download one below or drop .onnx files in the folder";
+    els.piperVoice.appendChild(o);
+  }
+  for (const v of st.voices) {
+    const o = document.createElement("option");
+    o.value = v.path;
+    o.textContent = v.name;
+    els.piperVoice.appendChild(o);
+  }
+  if (settings.piperVoice && !st.voices.some((v) => v.path === settings.piperVoice)) {
+    const o = document.createElement("option");
+    o.value = settings.piperVoice;
+    o.textContent = `${settings.piperVoice.split(/[\\/]/).pop()} (custom path)`;
+    els.piperVoice.appendChild(o);
+  }
+  if (settings.piperVoice) els.piperVoice.value = settings.piperVoice;
+  else if (st.voices.length) {
+    // Nothing chosen yet: take the first installed voice.
+    els.piperVoice.value = st.voices[0].path;
+    els.piperVoicePath.value = st.voices[0].path;
+    await commit({ piperVoice: st.voices[0].path });
+  }
+  els.piperAdd.innerHTML = "";
+  for (const c of st.catalogue) {
+    const o = document.createElement("option");
+    o.value = c.id;
+    o.textContent = st.voices.some((v) => v.name === c.id) ? `${c.label} (installed)` : c.label;
+    els.piperAdd.appendChild(o);
+  }
+}
+
+/** Model ids from the endpoint into the pick lists; whisper-ish ones also go to the speech list. */
+async function refreshModels() {
+  els.chatModelsStatus.textContent = "Fetching models…";
+  try {
+    const ids = await invoke<string[]>("list_models");
+    els.chatModels.innerHTML = "";
+    els.sttModels.innerHTML = "";
+    for (const id of ids) {
+      const o = document.createElement("option");
+      o.value = id;
+      (/whisper|transcri|speech/i.test(id) ? els.sttModels : els.chatModels).appendChild(o);
+    }
+    els.chatModelsStatus.textContent = ids.length ? `${ids.length} models available; click the box to pick one.` : "The endpoint listed no models.";
+  } catch (err) {
+    els.chatModelsStatus.textContent = `Could not list models: ${err}`;
+  }
+}
+
+function wireTabs() {
+  const buttons = Array.from(els.tabs.querySelectorAll<HTMLButtonElement>("button[data-tab]"));
+  const pages = Array.from(document.querySelectorAll<HTMLElement>(".page[data-page]"));
+  const show = (name: string) => {
+    for (const b of buttons) b.classList.toggle("active", b.dataset.tab === name);
+    for (const p of pages) p.hidden = p.dataset.page !== name;
+    try {
+      localStorage.setItem("settings-tab", name);
+    } catch {
+      /* no storage */
+    }
+  };
+  for (const b of buttons) b.addEventListener("click", () => show(b.dataset.tab!));
+  let initial = "character";
+  try {
+    initial = localStorage.getItem("settings-tab") ?? initial;
+  } catch {
+    /* no storage */
+  }
+  if (!pages.some((p) => p.dataset.page === initial)) initial = "character";
+  show(initial);
+}
 
 async function refreshKeyStatus() {
   try {
@@ -410,7 +531,7 @@ function wireTalk() {
       els.chatStt.value = p.stt;
     }
     els.chatKeyHint.textContent = p?.keyHint ?? "";
-    void commit({ chatProvider: els.chatProvider.value, chatEndpoint: els.chatEndpoint.value.trim(), chatModel: els.chatModel.value.trim(), chatSttModel: els.chatStt.value.trim() });
+    void commit({ chatProvider: els.chatProvider.value, chatEndpoint: els.chatEndpoint.value.trim(), chatModel: els.chatModel.value.trim(), chatSttModel: els.chatStt.value.trim() }).then(() => refreshModels());
   });
   els.chatEndpoint.addEventListener("change", () => void commit({ chatEndpoint: els.chatEndpoint.value.trim() }));
   els.chatModel.addEventListener("change", () => void commit({ chatModel: els.chatModel.value.trim() }));
@@ -420,11 +541,47 @@ function wireTalk() {
   els.chatCap.addEventListener("change", () => void commit({ chatDailyCap: Math.max(0, Math.round(Number(els.chatCap.value) || 0)) }));
   els.chatSttEndpoint.addEventListener("change", () => void commit({ chatSttEndpoint: els.chatSttEndpoint.value.trim() }));
   els.ttsEngine.addEventListener("change", () => {
-    els.piperFields.classList.toggle("gone", els.ttsEngine.value !== "piper");
+    els.piperFields.hidden = els.ttsEngine.value !== "piper";
     void commit({ ttsEngine: els.ttsEngine.value });
+    if (els.ttsEngine.value === "piper") void refreshPiper();
   });
   els.piperExe.addEventListener("change", () => void commit({ piperExe: els.piperExe.value.trim().replace(/^"|"$/g, "") }));
-  els.piperVoice.addEventListener("change", () => void commit({ piperVoice: els.piperVoice.value.trim().replace(/^"|"$/g, "") }));
+  els.piperVoicePath.addEventListener("change", () => void commit({ piperVoice: els.piperVoicePath.value.trim().replace(/^"|"$/g, "") }));
+  els.piperVoice.addEventListener("change", () => {
+    els.piperVoicePath.value = els.piperVoice.value;
+    void commit({ piperVoice: els.piperVoice.value });
+  });
+  els.piperInstall.addEventListener("click", async () => {
+    els.piperInstall.disabled = true;
+    els.piperStatus.textContent = "Downloading Piper (22 MB)…";
+    try {
+      const exe = await invoke<string>("piper_install");
+      await commit({ piperExe: exe });
+      els.piperExe.value = exe;
+      await refreshPiper();
+    } catch (err) {
+      els.piperStatus.textContent = `Install failed: ${err}`;
+      els.piperInstall.disabled = false;
+    }
+  });
+  els.piperOpen.addEventListener("click", () => void invoke("piper_open_voices").catch(() => {}));
+  els.piperDownload.addEventListener("click", async () => {
+    const id = els.piperAdd.value;
+    if (!id) return;
+    els.piperDownload.disabled = true;
+    els.piperAddStatus.textContent = `Downloading ${id}… (about 60 MB)`;
+    try {
+      const path = await invoke<string>("piper_download_voice", { id });
+      await commit({ piperVoice: path });
+      els.piperAddStatus.textContent = `Added ${id} and selected it.`;
+      await refreshPiper();
+    } catch (err) {
+      els.piperAddStatus.textContent = `Download failed: ${err}`;
+    } finally {
+      els.piperDownload.disabled = false;
+    }
+  });
+  els.chatModelsRefresh.addEventListener("click", () => void refreshModels());
   els.personality.addEventListener("change", () => {
     els.personalityHint.textContent = els.personality.selectedOptions[0]?.dataset.desc ?? "";
     void commit({ personality: els.personality.value });
@@ -437,6 +594,7 @@ function wireTalk() {
       els.chatKey.value = "";
       await refreshKeyStatus();
       els.chatKeyStatus.textContent = "Key saved. " + els.chatKeyStatus.textContent;
+      void refreshModels();
     } catch (err) {
       els.chatKeyStatus.textContent = `Could not save the key: ${err}`;
     }
@@ -513,11 +671,17 @@ function editorToProfile(id: string): Personality {
 
 function showEditor(p: Personality) {
   els.pedit.hidden = false;
-  els.peName.value = p.name;
+  const editable = !!p.user;
+  // "As the character" shows what the current pack actually uses, so it can be copied and tweaked.
+  const packName = currentManifest?.name ?? "Buddy";
+  const persona = p.persona ?? (p.id === "pack" ? currentManifest?.persona ?? defaultPersona(packName) : "");
+  const lines = p.lines ?? (p.id === "pack" ? ((currentManifest?.lines ?? {}) as Personality["lines"]) : undefined);
+  els.peName.value = p.id === "pack" ? `${packName} (as the character)` : p.name;
   els.peDesc.value = p.description ?? "";
-  els.pePersona.value = p.persona ?? (p.id === "pack" ? "(the character pack's own persona, or the built-in default when it has none)" : "");
+  els.pePersona.value = persona;
   els.peTemp.value = String(p.llm?.temperature ?? 0.9);
   els.peWords.value = String(p.llm?.maxWords ?? 35);
+  for (const el of [els.peName, els.peDesc, els.pePersona, els.peTemp, els.peWords]) el.readOnly = !editable;
   els.peLines.innerHTML = "";
   for (const [key, label] of LINE_EVENTS) {
     const l = document.createElement("label");
@@ -525,14 +689,15 @@ function showEditor(p: Personality) {
     span.textContent = label;
     const ta = document.createElement("textarea");
     ta.id = `pe-line-${key}`;
-    ta.value = (p.lines?.[key] ?? []).join("\n");
+    ta.value = (lines?.[key] ?? []).join("\n");
+    ta.readOnly = !editable;
     l.append(span, ta);
     els.peLines.appendChild(l);
   }
-  const editable = !!p.user;
   els.peSave.disabled = !editable;
   els.peDelete.disabled = !editable;
-  els.peStatus.textContent = editable ? "" : p.id === "pack" ? "Built in. Save as new to make your own." : "Built in and read-only. Save as new to make an editable copy.";
+  els.peSaveAs.textContent = editable ? "Save as new" : "Copy to a new profile";
+  els.peStatus.textContent = editable ? "" : "Built in and read-only. Copy it to a new profile to change anything.";
 }
 
 function wirePersonalityEditor() {
@@ -557,7 +722,9 @@ function wirePersonalityEditor() {
   };
   els.peSaveAs.addEventListener("click", async () => {
     const users = await loadUserPersonalities();
-    const id = slugFor(els.peName.value.trim() || "profile", profiles.map((p) => p.id));
+    const baseName = els.peName.value.replace(/\s*\(as the character\)\s*$/i, "").trim() || "profile";
+    els.peName.value = baseName;
+    const id = slugFor(baseName, profiles.map((p) => p.id));
     const p = editorToProfile(id);
     await persist([...users, p], id);
     showEditor({ ...p, user: true });
@@ -585,6 +752,7 @@ function wirePersonalityEditor() {
 const playButtons = new Map<string, HTMLButtonElement>();
 
 async function main() {
+  wireTabs();
   startMeter();
   wireTalk();
   getLive().onPreviewChange = (name) => {
@@ -598,6 +766,9 @@ async function main() {
   }
   await refreshPacks();
   render();
+  void refreshPiper();
+  void refreshModels();
+
 
   els.character.addEventListener("change", () => commit({ character: els.character.value }));
   els.size.addEventListener("input", () => {

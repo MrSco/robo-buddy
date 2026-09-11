@@ -7,200 +7,227 @@
     <link rel="stylesheet" href="/src/settings.css" />
   </head>
   <body>
-    <main>
-      <h1>Robo Buddy</h1>
+    <div class="shell">
+      <nav class="tabs" id="tabs">
+        <h1>Robo Buddy</h1>
+        <button type="button" data-tab="character" class="active">Character</button>
+        <button type="button" data-tab="reactions">Reactions</button>
+        <button type="button" data-tab="talk">Talk</button>
+        <button type="button" data-tab="library">Animations</button>
+        <button type="button" data-tab="window">Window</button>
+      </nav>
 
-      <div class="cols">
-      <section class="s-character">
-        <h2>Character</h2>
-        <div class="pick">
-          <div class="preview"><canvas id="live"></canvas></div>
-          <div class="pick-controls">
-            <div id="gallery" class="gallery"></div>
-            <select id="character" hidden></select>
-            <div class="row">
-              <button id="import" type="button">Import model…</button>
-              <button id="bring" type="button">Bring buddy to this screen</button>
-            </div>
-            <p class="hint" id="packs-hint">Click a character to preview it; click again to use it. GLB, VRM, animated WebP, GIF or PNG can be imported.</p>
-          </div>
-        </div>
-        <label class="slider">
-          <span>Size <output id="size-out">100%</output></span>
-          <input id="size" type="range" min="0.5" max="2.5" step="0.05" />
-        </label>
-      </section>
-
-      <section class="s-reactions">
-        <h2>Reactions</h2>
-        <label class="check"><input id="paused" type="checkbox" /> Pause all reactions</label>
-        <label class="check"><input id="mouse" type="checkbox" /> Watch the mouse</label>
-        <label class="check"><input id="physics" type="checkbox" /> Gravity and throwing</label>
-        <label class="check"><input id="music" type="checkbox" /> Dance to music</label>
-        <label class="slider indent">
-          <span>Music sensitivity <output id="sens-out"></output></span>
-          <input id="sensitivity" type="range" min="0" max="1" step="0.01" />
-        </label>
-        <div class="meter indent" title="Live music level. He dances while the bar stays past the marker.">
-          <div class="meter-track"><div class="meter-fill" id="meter-fill"></div><div class="meter-mark" id="meter-mark"></div></div>
-          <span class="meter-txt" id="meter-txt">listening…</span>
-        </div>
-        <label class="check indent"><input id="tempo" type="checkbox" /> Only dance when a steady tempo is detected (filters game audio)</label>
-        <label class="field inline indent">
-          <span>Dance</span>
-          <select id="dance"></select>
-        </label>
-        <label class="check"><input id="wander" type="checkbox" /> Wander around and fidget when idle</label>
-        <details class="idleset">
-          <summary>Idle moves for this character</summary>
-          <div id="idleset" class="idleset-list"></div>
-        </details>
-        <div class="grid2">
-          <label class="check"><input id="sounds" type="checkbox" /> Sounds</label>
-          <label class="check"><input id="bubbles" type="checkbox" /> Speech bubbles</label>
-        </div>
-        <label class="field inline">
-          <span>Fall asleep after</span>
-          <select id="sleep">
-            <option value="0">never</option>
-            <option value="2">2 minutes</option>
-            <option value="5">5 minutes</option>
-            <option value="15">15 minutes</option>
-            <option value="30">30 minutes</option>
-          </select>
-        </label>
-      </section>
-
-      <section class="s-window">
-        <h2>Window</h2>
-        <label class="field">
-          <span>Clicking</span>
-          <select id="clickthrough">
-            <option value="pixel">Precise: only the drawn pixels are clickable</option>
-            <option value="window">Whole window is clickable</option>
-            <option value="locked">Locked: never clickable (move via this window)</option>
-          </select>
-        </label>
-        <label class="check"><input id="autostart" type="checkbox" /> Start with Windows</label>
-        <label class="check"><input id="fullscreen" type="checkbox" /> Hide while a fullscreen app is active</label>
-        <label class="check"><input id="taskbar" type="checkbox" /> Stand on the taskbar (overlap it slightly)</label>
-      </section>
-
-      <section class="s-talk">
-        <h2>Talk</h2>
-        <label class="check"><input id="chat-enabled" type="checkbox" /> Let him talk (double-click him, or right-click &rarr; Talk)</label>
-        <div class="indent talk-fields" id="talk-fields">
-          <label class="field inline">
-            <span>Personality</span>
-            <select id="personality"></select>
-          </label>
-          <div class="row">
-            <p class="hint grow" id="personality-hint"></p>
-            <button id="personality-edit" type="button">View / edit…</button>
-          </div>
-          <div class="pedit" id="pedit" hidden>
-            <div class="row">
-              <label class="field grow"><span>Name</span><input id="pe-name" type="text" /></label>
-              <label class="field"><span>Temperature</span><input id="pe-temp" type="number" min="0" max="2" step="0.1" /></label>
-              <label class="field"><span>Max words</span><input id="pe-words" type="number" min="10" max="120" step="5" /></label>
-            </div>
-            <label class="field"><span>Description</span><input id="pe-desc" type="text" /></label>
-            <label class="field"><span>Persona (system prompt; {name} becomes the character's name)</span><textarea id="pe-persona" rows="5" spellcheck="true"></textarea></label>
-            <p class="hint">Lines he can say, one per line. Leave a box empty to say nothing for that event.</p>
-            <div class="pe-lines" id="pe-lines"></div>
-            <div class="row">
-              <button id="pe-save" type="button">Save</button>
-              <button id="pe-saveas" type="button">Save as new</button>
-              <button id="pe-delete" type="button">Delete</button>
-              <button id="pe-close" type="button">Close</button>
-              <span class="hint grow" id="pe-status"></span>
+      <main>
+        <section class="page" data-page="character">
+          <div class="pick">
+            <div class="preview"><canvas id="live"></canvas></div>
+            <div class="pick-controls">
+              <div id="gallery" class="gallery"></div>
+              <select id="character" hidden></select>
+              <div class="row">
+                <button id="import" type="button">Import model…</button>
+                <button id="bring" type="button">Bring buddy to this screen</button>
+              </div>
+              <p class="hint" id="packs-hint">Click a character to preview it; click again to use it. GLB, VRM, animated WebP, GIF or PNG can be imported.</p>
+              <label class="slider">
+                <span>Size <output id="size-out">100%</output></span>
+                <input id="size" type="range" min="0.5" max="2.5" step="0.05" />
+              </label>
             </div>
           </div>
-          <div class="row">
-            <label class="field grow">
-              <span>Provider</span>
-              <select id="chat-provider">
-                <option value="groq">Groq (free tier)</option>
-                <option value="gemini">Google Gemini (free tier)</option>
-                <option value="openai">OpenAI</option>
-                <option value="ollama">Ollama (local, no key)</option>
-                <option value="custom">Custom OpenAI-compatible</option>
+        </section>
+
+        <section class="page" data-page="reactions" hidden>
+          <div class="cols2">
+            <div class="group">
+              <h2>Reactions</h2>
+              <label class="check"><input id="paused" type="checkbox" /> Pause all reactions</label>
+              <label class="check"><input id="mouse" type="checkbox" /> Watch the mouse</label>
+              <label class="check"><input id="physics" type="checkbox" /> Gravity and throwing</label>
+              <label class="check"><input id="sounds" type="checkbox" /> Sounds</label>
+              <label class="check"><input id="bubbles" type="checkbox" /> Speech bubbles</label>
+              <label class="field inline">
+                <span>Fall asleep after</span>
+                <select id="sleep">
+                  <option value="0">never</option>
+                  <option value="2">2 minutes</option>
+                  <option value="5">5 minutes</option>
+                  <option value="15">15 minutes</option>
+                  <option value="30">30 minutes</option>
+                </select>
+              </label>
+            </div>
+            <div class="group">
+              <h2>Music</h2>
+              <label class="check"><input id="music" type="checkbox" /> Dance to music</label>
+              <label class="slider">
+                <span>Music sensitivity <output id="sens-out"></output></span>
+                <input id="sensitivity" type="range" min="0" max="1" step="0.01" />
+              </label>
+              <div class="meter" title="Live music level. He dances while the bar stays past the marker.">
+                <div class="meter-track"><div class="meter-fill" id="meter-fill"></div><div class="meter-mark" id="meter-mark"></div></div>
+                <span class="meter-txt" id="meter-txt">listening…</span>
+              </div>
+              <label class="check"><input id="tempo" type="checkbox" /> Only dance when a steady tempo is detected (filters game audio)</label>
+              <label class="field inline">
+                <span>Dance</span>
+                <select id="dance"></select>
+              </label>
+            </div>
+            <div class="group">
+              <h2>Idle</h2>
+              <label class="check"><input id="wander" type="checkbox" /> Wander around and fidget when idle</label>
+              <details class="idleset" open>
+                <summary>Idle moves for this character</summary>
+                <div id="idleset" class="idleset-list"></div>
+              </details>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" data-page="talk" hidden>
+          <label class="check big"><input id="chat-enabled" type="checkbox" /> Let him talk (double-click him, or right-click &rarr; Talk to him)</label>
+          <p class="hint">Nothing leaves this PC until this is on. The key is kept in Windows Credential Manager and only goes to the chat endpoint.</p>
+          <div class="talk-fields" id="talk-fields">
+            <div class="group">
+              <h2>Personality</h2>
+              <div class="row wrap">
+                <label class="field grow"><span>Profile</span><select id="personality"></select></label>
+                <button id="personality-edit" type="button" class="self-end">View / edit…</button>
+              </div>
+              <p class="hint" id="personality-hint"></p>
+              <div class="pedit" id="pedit" hidden>
+                <div class="row wrap">
+                  <label class="field grow"><span>Name</span><input id="pe-name" type="text" /></label>
+                  <label class="field small"><span>Temperature</span><input id="pe-temp" type="number" min="0" max="2" step="0.1" /></label>
+                  <label class="field small"><span>Max words</span><input id="pe-words" type="number" min="10" max="120" step="5" /></label>
+                </div>
+                <label class="field"><span>Description</span><input id="pe-desc" type="text" /></label>
+                <label class="field"><span>Persona (the system prompt; {name} becomes the character's name)</span><textarea id="pe-persona" rows="6" spellcheck="true"></textarea></label>
+                <p class="hint">Lines he can say, one per line. Leave a box empty to say nothing for that event.</p>
+                <div class="pe-lines" id="pe-lines"></div>
+                <div class="row wrap">
+                  <button id="pe-save" type="button">Save</button>
+                  <button id="pe-saveas" type="button">Save as new</button>
+                  <button id="pe-delete" type="button">Delete</button>
+                  <button id="pe-close" type="button">Close</button>
+                  <span class="hint grow" id="pe-status"></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="cols2">
+              <div class="group">
+                <h2>Brain</h2>
+                <label class="field"><span>Provider</span>
+                  <select id="chat-provider">
+                    <option value="groq">Groq (free tier)</option>
+                    <option value="gemini">Google Gemini (free tier)</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="ollama">Ollama (local, no key)</option>
+                    <option value="custom">Custom OpenAI-compatible</option>
+                  </select>
+                </label>
+                <label class="field"><span>Endpoint</span><input id="chat-endpoint" type="text" spellcheck="false" /></label>
+                <label class="field"><span>API key &mdash; <span id="chat-keyhint"></span></span>
+                  <div class="row">
+                    <input id="chat-key" type="password" placeholder="paste a key, then Save" class="grow" autocomplete="off" />
+                    <button id="chat-savekey" type="button">Save key</button>
+                  </div>
+                </label>
+                <p class="hint" id="chat-keystatus"></p>
+                <label class="field"><span>Chat model</span>
+                  <div class="row">
+                    <input id="chat-model" type="text" list="chat-models" spellcheck="false" class="grow" placeholder="pick or type a model id" />
+                    <datalist id="chat-models"></datalist>
+                    <button id="chat-models-refresh" type="button" title="Fetch the model list from the endpoint">↻</button>
+                  </div>
+                </label>
+                <p class="hint" id="chat-models-status"></p>
+                <div class="row wrap">
+                  <label class="field inline grow"><span>Daily request cap</span><input id="chat-cap" type="number" min="0" step="10" /></label>
+                  <button id="chat-test" type="button" class="self-end">Test</button>
+                </div>
+                <p class="hint" id="chat-teststatus"></p>
+                <label class="check"><input id="chat-lines" type="checkbox" /> Generate fresh speech-bubble lines in his voice</label>
+              </div>
+
+              <div class="group">
+                <h2>Ears</h2>
+                <label class="field"><span>Speech model (blank = no microphone)</span>
+                  <div class="row">
+                    <input id="chat-stt" type="text" list="stt-models" spellcheck="false" class="grow" />
+                    <datalist id="stt-models"></datalist>
+                  </div>
+                </label>
+                <label class="field"><span>Speech endpoint (blank = same as the chat endpoint)</span><input id="chat-stt-endpoint" type="text" spellcheck="false" placeholder="e.g. a local Vibe server: http://127.0.0.1:PORT/v1" /></label>
+                <p class="hint">The microphone sends a short recording to the speech endpoint. A local Whisper server such as Vibe's works there and never sees the key.</p>
+
+                <h2>Voice</h2>
+                <label class="check"><input id="chat-voice" type="checkbox" /> Speak replies out loud</label>
+                <label class="field"><span>Engine</span>
+                  <select id="tts-engine">
+                    <option value="windows">Windows voice</option>
+                    <option value="piper">Piper (local neural voice)</option>
+                  </select>
+                </label>
+                <div id="piper-fields">
+                  <div class="row wrap">
+                    <span class="hint grow" id="piper-status">Checking…</span>
+                    <button id="piper-install" type="button" hidden>Install Piper (22 MB download)</button>
+                  </div>
+                  <label class="field"><span>Voice</span>
+                    <div class="row">
+                      <select id="piper-voice" class="grow"></select>
+                      <button id="piper-open" type="button" title="Open the voices folder; drop your own .onnx and .onnx.json pairs there">Folder…</button>
+                    </div>
+                  </label>
+                  <label class="field"><span>Add a voice from the Piper catalogue</span>
+                    <div class="row">
+                      <select id="piper-add" class="grow"></select>
+                      <button id="piper-download" type="button">Download</button>
+                    </div>
+                  </label>
+                  <p class="hint" id="piper-addstatus"></p>
+                  <details class="adv">
+                    <summary>Advanced: use a piper.exe from somewhere else</summary>
+                    <label class="field"><span>piper.exe</span><input id="piper-exe" type="text" spellcheck="false" /></label>
+                    <label class="field"><span>Voice model path (.onnx)</span><input id="piper-voice-path" type="text" spellcheck="false" /></label>
+                  </details>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" data-page="library" hidden>
+          <p class="hint">Every clip works on every 3D character. Drop FBX or GLB animations here (or onto the buddy) to add your own, then pick where each one is used.</p>
+          <div id="dropzone" class="dropzone">Drop animation or model files here</div>
+          <div class="row libfilter">
+            <input id="libsearch" type="search" placeholder="Search clips" />
+            <select id="libsource"><option value="">All sources</option><option value="user">Mine</option><option value="mixamo">Mixamo</option><option value="ual">Quaternius</option></select>
+          </div>
+          <div id="library" class="library"></div>
+        </section>
+
+        <section class="page" data-page="window" hidden>
+          <div class="group">
+            <label class="field"><span>Clicking</span>
+              <select id="clickthrough">
+                <option value="pixel">Precise: only the drawn pixels are clickable</option>
+                <option value="window">Whole window is clickable</option>
+                <option value="locked">Locked: never clickable (move via this window)</option>
               </select>
             </label>
-            <label class="field grow">
-              <span>Chat model</span>
-              <input id="chat-model" type="text" spellcheck="false" />
-            </label>
+            <label class="check"><input id="autostart" type="checkbox" /> Start with Windows</label>
+            <label class="check"><input id="fullscreen" type="checkbox" /> Hide while a fullscreen app is active</label>
+            <label class="check"><input id="taskbar" type="checkbox" /> Stand on the taskbar</label>
           </div>
-          <label class="field">
-            <span>Endpoint</span>
-            <input id="chat-endpoint" type="text" spellcheck="false" />
-          </label>
-          <label class="field">
-            <span>API key &mdash; <span id="chat-keyhint"></span></span>
-            <div class="row">
-              <input id="chat-key" type="password" placeholder="paste a key, then Save" class="grow" autocomplete="off" />
-              <button id="chat-savekey" type="button">Save key</button>
-            </div>
-          </label>
-          <p class="hint" id="chat-keystatus"></p>
-          <div class="row">
-            <label class="field grow">
-              <span>Speech model (blank = no mic)</span>
-              <input id="chat-stt" type="text" spellcheck="false" />
-            </label>
-            <label class="field grow">
-              <span>Speech endpoint (blank = same)</span>
-              <input id="chat-stt-endpoint" type="text" spellcheck="false" placeholder="e.g. a local Vibe server" />
-            </label>
-          </div>
-          <div class="row">
-            <label class="field grow">
-              <span>Voice</span>
-              <select id="tts-engine">
-                <option value="windows">Windows voice</option>
-                <option value="piper">Piper (local .onnx voice)</option>
-              </select>
-            </label>
-            <label class="check grow"><input id="chat-voice" type="checkbox" /> Speak replies out loud</label>
-          </div>
-          <div class="row" id="piper-fields">
-            <label class="field grow">
-              <span>piper.exe</span>
-              <input id="piper-exe" type="text" spellcheck="false" placeholder="C:\tools\piper\piper.exe" />
-            </label>
-            <label class="field grow">
-              <span>Voice model (.onnx)</span>
-              <input id="piper-voice" type="text" spellcheck="false" placeholder="C:\voices\rocco.onnx" />
-            </label>
-          </div>
-          <label class="check"><input id="chat-lines" type="checkbox" /> Generate fresh speech-bubble lines in his voice</label>
-          <div class="row">
-            <label class="field inline grow">
-              <span>Daily request cap</span>
-              <input id="chat-cap" type="number" min="0" step="10" />
-            </label>
-            <button id="chat-test" type="button">Test</button>
-          </div>
-          <p class="hint" id="chat-teststatus"></p>
-          <p class="hint">Nothing leaves this PC until this is on. The key is kept in Windows Credential Manager and only goes to the chat endpoint. The microphone sends a short recording to the speech endpoint; a local Whisper server such as Vibe's works there too.</p>
-        </div>
-      </section>
-      </div>
+        </section>
 
-      <section class="s-library">
-        <h2>Animation library</h2>
-        <p class="hint">Every clip works on every 3D character. Drop FBX or GLB animations here (or onto the buddy) to add your own, then pick where each one is used.</p>
-        <div id="dropzone" class="dropzone">Drop animation or model files here</div>
-        <div class="row libfilter">
-          <input id="libsearch" type="search" placeholder="Search clips" />
-          <select id="libsource"><option value="">All sources</option><option value="user">Mine</option><option value="mixamo">Mixamo</option><option value="ual">Quaternius</option></select>
-        </div>
-        <div id="library" class="library"></div>
-      </section>
-
-      <p class="status" id="status"></p>
-    </main>
+        <p class="status" id="status"></p>
+      </main>
+    </div>
     <script type="module" src="/src/settings.ts"></script>
   </body>
 </html>

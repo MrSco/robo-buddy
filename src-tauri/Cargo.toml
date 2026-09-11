@@ -24,6 +24,7 @@ log = "0.4"
 rustfft = "6"
 reqwest = { version = "0.13", features = ["json", "multipart"] }
 keyring = { version = "3", features = ["windows-native"] }
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 [target.'cfg(windows)'.dependencies]
 wasapi = "0.24"

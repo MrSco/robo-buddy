@@ -72,7 +72,7 @@ export const DEFAULT_SETTINGS: Settings = {
   chatEnabled: false,
   chatProvider: "groq",
   chatEndpoint: "https://api.groq.com/openai/v1",
-  chatModel: "llama-3.3-70b-versatile",
+  chatModel: "groq/compound",
   chatSttModel: "whisper-large-v3-turbo",
   chatVoice: true,
   chatGenerateLines: true,
