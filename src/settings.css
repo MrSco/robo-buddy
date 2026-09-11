@@ -173,6 +173,53 @@ output {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.dropzone {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.dropzone.over {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.libfilter input {
+  flex: 1;
+  background: #2a2d34;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 10px;
+  font: inherit;
+}
+.library {
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 4px 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.library .name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.library .src {
+  color: var(--muted);
+  font-size: 10px;
+  margin-left: 6px;
+}
+.library select,
+.library button {
+  padding: 3px 6px;
+  font-size: 12px;
+}
 .idleset {
   margin-top: 4px;
 }

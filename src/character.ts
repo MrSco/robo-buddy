@@ -1,9 +1,12 @@
 import * as THREE from "three";
-import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { VRMLoaderPlugin, VRMUtils, type VRM, type VRMHumanBoneName } from "@pixiv/three-vrm";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
+import { VRMLoaderPlugin, VRMUtils, type VRM } from "@pixiv/three-vrm";
+import { findHumanoidBones, humanoidNameOf, missingBones, type BoneName } from "./humanoid";
 import type { Manifest, PackRef } from "./packs";
+import { buildRig, canonicalRig, hasOwnSkeleton, retargetClip, type Rig } from "./retarget";
 
-export type BoneName = VRMHumanBoneName;
+export type { BoneName } from "./humanoid";
 export type { Manifest } from "./packs";
 
 export interface PlayOptions {
@@ -15,97 +18,110 @@ export interface PlayOptions {
   playbackRate?: number;
 }
 
-/** One character on stage, regardless of whether it came from a VRM or a plain GLB. */
+/** One character on stage, regardless of file format or skeleton naming. */
 export interface Character {
   manifest: Manifest;
   root: THREE.Object3D;
   vrm?: VRM;
-  /** Humanoid bones keyed by VRM names; works for VRM and Mixamo rigs alike. */
+  rig: Rig;
+  /** Humanoid bones keyed by VRM names; works for any supported rig. */
   bone(name: BoneName): THREE.Object3D | undefined;
   /**
    * Per-frame base rotations that procedural layers reset to before adding their own.
-   * Equals the T-pose rest when no clip is playing, otherwise the clip's output for this frame.
+   * Equals the rest pose when no clip is playing, otherwise the clip's output for this frame.
    */
   rest: Map<THREE.Object3D, THREE.Quaternion>;
   /** Bones written by the currently playing clip; procedural idle leaves these alone. */
   animatedBones: Set<THREE.Object3D>;
+  /** Height in metres after unit normalisation. */
   height: number;
-  /** Advance the animation mixer and refresh `rest`. Call once per frame before posing. */
   beginFrame(dt: number): void;
   hasClip(name: string): boolean;
   clipDuration(name: string): number;
+  /** Add a clip authored for another rig (or this one); retargeted on the fly. */
+  addClip(name: string, clip: THREE.AnimationClip, source: Rig | "self"): void;
   play(name: string, opts: PlayOptions): void;
   stop(fade?: number): void;
-  /** Elapsed seconds of the current action, for one-shot completion checks. */
   clipTime(): number;
   update(dt: number): void;
   dispose(): void;
 }
 
-// Mixamo bone name -> VRM humanoid name. Mirrors scripts/glb_to_vrm.py.
-const MIXAMO_TO_VRM: Record<string, BoneName> = {
-  Hips: "hips",
-  Spine: "spine",
-  Spine1: "chest",
-  Spine2: "upperChest",
-  Neck: "neck",
-  Head: "head",
-  LeftShoulder: "leftShoulder",
-  LeftArm: "leftUpperArm",
-  LeftForeArm: "leftLowerArm",
-  LeftHand: "leftHand",
-  RightShoulder: "rightShoulder",
-  RightArm: "rightUpperArm",
-  RightForeArm: "rightLowerArm",
-  RightHand: "rightHand",
-  LeftUpLeg: "leftUpperLeg",
-  LeftLeg: "leftLowerLeg",
-  LeftFoot: "leftFoot",
-  LeftToeBase: "leftToes",
-  RightUpLeg: "rightUpperLeg",
-  RightLeg: "rightLowerLeg",
-  RightFoot: "rightFoot",
-  RightToeBase: "rightToes",
-};
-for (const side of ["Left", "Right"] as const) {
-  const s = side.toLowerCase();
-  MIXAMO_TO_VRM[`${side}HandThumb1`] = `${s}ThumbMetacarpal` as BoneName;
-  MIXAMO_TO_VRM[`${side}HandThumb2`] = `${s}ThumbProximal` as BoneName;
-  MIXAMO_TO_VRM[`${side}HandThumb3`] = `${s}ThumbDistal` as BoneName;
-  for (const finger of ["Index", "Middle", "Ring", "Pinky"] as const) {
-    const f = finger === "Pinky" ? "Little" : finger;
-    MIXAMO_TO_VRM[`${side}Hand${finger}1`] = `${s}${f}Proximal` as BoneName;
-    MIXAMO_TO_VRM[`${side}Hand${finger}2`] = `${s}${f}Intermediate` as BoneName;
-    MIXAMO_TO_VRM[`${side}Hand${finger}3`] = `${s}${f}Distal` as BoneName;
+export interface LoadedModel {
+  root: THREE.Object3D;
+  animations: THREE.AnimationClip[];
+  vrm?: VRM;
+}
+
+function isFbx(url: string) {
+  return /\.fbx(\?|$)/i.test(url);
+}
+
+/** Load a GLB, glTF, VRM or FBX file into a scene graph plus any embedded animations. */
+export async function loadModel(url: string): Promise<LoadedModel> {
+  if (isFbx(url)) {
+    const loader = new FBXLoader();
+    const group = await loader.loadAsync(url);
+    return { root: group, animations: group.animations ?? [] };
   }
-}
-
-function stripMixamo(name: string): string {
-  return name.replace(/^mixamorig:?/, "");
-}
-
-function makeLoader(): GLTFLoader {
   const loader = new GLTFLoader();
   loader.register((parser) => new VRMLoaderPlugin(parser));
-  return loader;
+  const gltf = await loader.loadAsync(url);
+  const vrm = gltf.userData.vrm as VRM | undefined;
+  return { root: vrm ? vrm.scene : gltf.scene, animations: gltf.animations, vrm };
 }
 
 /**
- * Rewrite a clip's track targets so they address this character's bones.
- * Source nodes may be Mixamo-named (with or without the prefix) or VRM-named.
+ * Bring a model into metres and Y-up: FBX and some exports arrive in centimetres and/or
+ * Z-up (Blender, Unreal). Uses the humanoid bones when available so a wide T-pose cannot
+ * be mistaken for the up axis.
  */
-function retargetClip(clip: THREE.AnimationClip, bones: Map<BoneName, THREE.Object3D>): THREE.AnimationClip {
+function normaliseUnits(root: THREE.Object3D, bones: Map<BoneName, THREE.Object3D>): number {
+  root.updateMatrixWorld(true);
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const hips = bones.get("hips");
+  const head = bones.get("head");
+  let up: THREE.Vector3;
+  if (hips && head) {
+    up = head.getWorldPosition(a).sub(hips.getWorldPosition(b));
+  } else {
+    const size = new THREE.Box3().setFromObject(root).getSize(a);
+    up = size.z > size.y * 1.5 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
+  }
+  if (Math.abs(up.z) > Math.abs(up.y)) {
+    // Z-up: rotate so +Z becomes +Y (or -Z if the model is upside down).
+    root.rotateX(up.z > 0 ? -Math.PI / 2 : Math.PI / 2);
+    root.updateMatrixWorld(true);
+  }
+  const box = new THREE.Box3().setFromObject(root);
+  let height = box.getSize(a).y;
+  if (height > 20) {
+    root.scale.multiplyScalar(0.01);
+  } else if (height > 0 && height < 0.2) {
+    root.scale.multiplyScalar(100);
+  }
+  root.updateMatrixWorld(true);
+  height = new THREE.Box3().setFromObject(root).getSize(a).y;
+  return height;
+}
+
+/** Rewrite a clip's track names so they address this character's bones (same-rig clips only). */
+function bindToSelf(clip: THREE.AnimationClip, bones: Map<BoneName, THREE.Object3D>, root: THREE.Object3D): THREE.AnimationClip {
+  const byName = new Map<string, THREE.Object3D>();
+  root.traverse((o) => byName.set(o.name, o));
   const tracks: THREE.KeyframeTrack[] = [];
   for (const track of clip.tracks) {
     const dot = track.name.lastIndexOf(".");
     const nodeName = track.name.slice(0, dot);
     const prop = track.name.slice(dot + 1);
-    const vrmName = (MIXAMO_TO_VRM[stripMixamo(nodeName)] ?? nodeName) as BoneName;
-    const target = bones.get(vrmName);
+    let target = byName.get(nodeName);
+    if (!target) {
+      const h = humanoidNameOf(nodeName);
+      if (h) target = bones.get(h);
+    }
     if (!target) continue;
-    // Rotations always; translation only for the hips (crouches, jumps, kneels). Anything
-    // else would fight the window physics or the rig's proportions.
-    if (prop !== "quaternion" && !(prop === "position" && vrmName === "hips")) continue;
+    if (prop !== "quaternion" && !(prop === "position" && target === bones.get("hips"))) continue;
     const t = track.clone();
     t.name = `${target.uuid}.${prop}`;
     tracks.push(t);
@@ -114,11 +130,8 @@ function retargetClip(clip: THREE.AnimationClip, bones: Map<BoneName, THREE.Obje
 }
 
 export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<Character> {
-  const loader = makeLoader();
-  const gltf: GLTF = await loader.loadAsync(pack.base + manifest.model);
-
-  const vrm = gltf.userData.vrm as VRM | undefined;
-  const root = vrm ? vrm.scene : gltf.scene;
+  const model = await loadModel(pack.base + manifest.model);
+  const { root, vrm } = model;
 
   if (vrm) {
     VRMUtils.removeUnnecessaryVertices(root);
@@ -134,17 +147,17 @@ export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<
       if (node) bones.set(name, node);
     }
   } else {
-    root.traverse((o) => {
-      const vrmName = MIXAMO_TO_VRM[stripMixamo(o.name)];
-      if (vrmName && !bones.has(vrmName)) bones.set(vrmName, o);
-    });
+    for (const [k, v] of findHumanoidBones(root)) bones.set(k, v);
   }
+  const missing = missingBones(bones);
+  if (missing.length) console.warn(`${manifest.name}: no humanoid bones for ${missing.join(", ")}; clips will not fully apply`);
 
   root.traverse((o) => {
     if ((o as THREE.SkinnedMesh).isSkinnedMesh) o.frustumCulled = false;
   });
+  const height = normaliseUnits(root, bones);
+  const rig = buildRig(root, bones);
 
-  // Give every bone a stable uuid-based name lookup for retargeted tracks.
   const byUuid = new Map<string, THREE.Object3D>();
   for (const b of bones.values()) byUuid.set(b.uuid, b);
 
@@ -153,31 +166,55 @@ export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<
   const rest = new Map<THREE.Object3D, THREE.Quaternion>();
   for (const [b, q] of restPose) rest.set(b, q.clone());
 
-  root.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(root);
-  const height = box.getSize(new THREE.Vector3()).y;
-
-  // Clips: embedded in the model, plus any external files named in the manifest.
+  // Clips are retargeted lazily on first use: with a large library, fitting every clip to
+  // this rig up front would add seconds to startup. `pending` holds the source until then.
   const clips = new Map<string, THREE.AnimationClip>();
-  for (const clip of gltf.animations) clips.set(clip.name, retargetClip(clip, bones));
-  for (const [name, file] of Object.entries(manifest.clips ?? {})) {
-    try {
-      // Absolute paths point at the app's shared clip library (/clips/...), else relative to the pack.
-      const url = file.startsWith("/") ? file : pack.base + file;
-      const extra = await loader.loadAsync(url);
-      const first = extra.animations[0];
-      if (first) clips.set(name, retargetClip(first, bones));
-    } catch (err) {
-      console.warn(`clip "${name}" failed to load from ${file}`, err);
-    }
-  }
-
+  const pending = new Map<string, { clip: THREE.AnimationClip; source: Rig | "self" }>();
+  const durations = new Map<string, number>();
   const mixer = new THREE.AnimationMixer(root);
   let current: THREE.AnimationAction | null = null;
   const animatedBones = new Set<THREE.Object3D>();
 
+  const addClip = (name: string, clip: THREE.AnimationClip, source: Rig | "self") => {
+    pending.set(name, { clip, source });
+    durations.set(name, clip.duration);
+    clips.delete(name);
+  };
+  const materialise = (name: string): THREE.AnimationClip | undefined => {
+    const ready = clips.get(name);
+    if (ready) return ready;
+    const p = pending.get(name);
+    if (!p) return undefined;
+    const bound = p.source === "self" ? bindToSelf(p.clip, bones, root) : retargetClip(p.clip, p.source, rig);
+    bound.name = name;
+    clips.set(name, bound);
+    pending.delete(name);
+    return bound;
+  };
+
+  // Clips embedded in the model file are already authored for this skeleton.
+  for (const clip of model.animations) addClip(clip.name, clip, "self");
+
+  // External clip files, fetched in parallel. Flat library clips come from the canonical rig;
+  // files that carry their own skeleton (converted FBX, other rigs) are retargeted from it.
+  const canon = canonicalRig();
+  await Promise.all(
+    Object.entries(manifest.clips ?? {}).map(async ([name, file]) => {
+      try {
+        const url = file.startsWith("/") ? file : pack.base + file;
+        const extra = await loadModel(url);
+        const first = extra.animations[0];
+        if (!first) return;
+        const source = hasOwnSkeleton(extra.root) ? buildRig(extra.root) : await canon;
+        addClip(name, first, source);
+      } catch (err) {
+        console.warn(`clip "${name}" failed to load from ${file}`, err);
+      }
+    }),
+  );
+
   function actionFor(name: string): THREE.AnimationAction | null {
-    const clip = clips.get(name);
+    const clip = materialise(name);
     if (!clip) return null;
     return mixer.clipAction(clip, root);
   }
@@ -186,12 +223,14 @@ export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<
     manifest,
     root,
     vrm,
+    rig,
     rest,
     animatedBones,
     height,
     bone: (name) => bones.get(name),
-    hasClip: (name) => clips.has(name),
-    clipDuration: (name) => clips.get(name)?.duration ?? 0,
+    hasClip: (name) => clips.has(name) || pending.has(name),
+    clipDuration: (name) => durations.get(name) ?? 0,
+    addClip,
     play(name, opts) {
       const action = actionFor(name);
       if (!action) return;
@@ -207,12 +246,12 @@ export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<
       }
       action.timeScale = scale;
       // Weights must always sum to one, or the mixer blends toward the rest T-pose.
-      // Crossfade only when another action is actually carrying weight; otherwise start at full weight.
       const prevWeight = current && current !== action ? current.getEffectiveWeight() : 0;
-      if (current && current !== action && prevWeight > 0.01) {
+      if (current && current !== action && prevWeight > 0.01 && fade > 0) {
         current.fadeOut(fade);
         action.fadeIn(fade).play();
       } else {
+        if (current && current !== action) current.stop();
         action.setEffectiveWeight(1);
         action.play();
       }
@@ -230,7 +269,6 @@ export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<
     },
     clipTime: () => current?.time ?? 0,
     beginFrame(dt) {
-      // Start from the T-pose, let the mixer overwrite what it animates, then snapshot as the base.
       for (const [b, q] of restPose) b.quaternion.copy(q);
       mixer.update(dt);
       for (const [b, q] of rest) q.copy(b.quaternion);

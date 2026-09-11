@@ -37,6 +37,10 @@ pub struct Settings {
     pub dance_mode: String,
     /// Per pack id: the idle variants / fidgets left enabled. Missing = all.
     pub idle_sets: HashMap<String, Vec<String>>,
+    /// Per clip name: user-assigned role ("idle", "fidget", "dance", "poke", "held", "fall", "off").
+    pub anim_roles: HashMap<String, String>,
+    /// Hide the buddy while a fullscreen app has focus.
+    pub hide_when_fullscreen: bool,
 }
 
 impl Default for Settings {
@@ -58,6 +62,8 @@ impl Default for Settings {
             wander_enabled: true,
             dance_mode: "random".into(),
             idle_sets: HashMap::new(),
+            anim_roles: HashMap::new(),
+            hide_when_fullscreen: true,
         }
     }
 }

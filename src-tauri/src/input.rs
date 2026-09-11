@@ -119,3 +119,50 @@ pub fn bring_here(app: AppHandle) {
     let area = work_area(x, y);
     let _ = app.emit("bring-here", serde_json::json!({ "x": x, "area": area }));
 }
+
+
+/// True when the foreground window covers an entire monitor (a fullscreen game or video),
+/// so the buddy can get out of the way.
+#[cfg(windows)]
+fn foreground_is_fullscreen() -> bool {
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST};
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowRect, GetShellWindow, GetDesktopWindow};
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.0.is_null() || hwnd == GetShellWindow() || hwnd == GetDesktopWindow() {
+            return false;
+        }
+        let mut r = RECT::default();
+        if GetWindowRect(hwnd, &mut r).is_err() {
+            return false;
+        }
+        let hmon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        let mut info = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+        if !GetMonitorInfoW(hmon, &mut info).as_bool() {
+            return false;
+        }
+        let m = info.rcMonitor;
+        r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom
+    }
+}
+
+#[cfg(not(windows))]
+fn foreground_is_fullscreen() -> bool {
+    false
+}
+
+/// Poll the foreground window and emit `fullscreen` {active} when it changes.
+pub fn start_fullscreen_thread(app: AppHandle) {
+    thread::spawn(move || {
+        let mut last: Option<bool> = None;
+        loop {
+            let now = foreground_is_fullscreen();
+            if last != Some(now) {
+                let _ = app.emit("fullscreen", serde_json::json!({ "active": now }));
+                last = Some(now);
+            }
+            thread::sleep(Duration::from_millis(500));
+        }
+    });
+}

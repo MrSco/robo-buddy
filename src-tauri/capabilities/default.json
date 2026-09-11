@@ -21,6 +21,9 @@
     "dialog:allow-open",
     "autostart:allow-enable",
     "autostart:allow-disable",
-    "autostart:allow-is-enabled"
+    "autostart:allow-is-enabled",
+    "core:menu:default",
+    "core:webview:allow-internal-toggle-devtools",
+    "core:window:allow-is-visible"
   ]
 }

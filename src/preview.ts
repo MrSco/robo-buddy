@@ -74,6 +74,22 @@ export class LivePreview {
     loop();
   }
 
+  /** Play a library clip on the character currently shown (3D only). */
+  async playClip(name: string, url: string) {
+    const c = this.character;
+    if (!c) return;
+    if (!c.hasClip(name)) {
+      const { loadModel } = await import("./character");
+      const { buildRig, canonicalRig, hasOwnSkeleton } = await import("./retarget");
+      const extra = await loadModel(url);
+      const first = extra.animations[0];
+      if (!first || c !== this.character) return;
+      const source = hasOwnSkeleton(extra.root) ? buildRig(extra.root) : await canonicalRig();
+      c.addClip(name, first, source);
+    }
+    c.play(name, { loop: true });
+  }
+
   /** Render one posed frame of a character (idle clip advanced a little) and return a PNG. */
   renderOnce(c: Character): string {
     this.scene.add(c.root);

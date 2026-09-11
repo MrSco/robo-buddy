@@ -27,6 +27,12 @@ export class Renderer3D implements Renderer {
   private cssW = 320;
   private cssH = 440;
   private crown = new THREE.Vector3();
+  private tmp = new THREE.Vector3();
+  /** Camera fit state: distance and look-at height, eased so zooming is smooth. */
+  private fitDist = 0;
+  private fitY = 0;
+  private baseCenter = new THREE.Vector3();
+  private baseSize = new THREE.Vector3();
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -72,15 +78,39 @@ export class Renderer3D implements Renderer {
     if (!c) return;
     c.root.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(c.root);
-    const size = box.getSize(new THREE.Vector3());
-    const center = box.getCenter(new THREE.Vector3());
-    // Frame 1.3x the model height, with the model pushed toward the bottom so the feet
-    // keep a small margin and the top quarter stays free for speech bubbles.
-    const height = size.y * 1.3;
-    const dist = height / 2 / Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
-    const targetY = center.y + size.y * 0.09;
-    this.camera.position.set(center.x, targetY, center.z + dist);
-    this.camera.lookAt(center.x, targetY, center.z);
+    box.getSize(this.baseSize);
+    box.getCenter(this.baseCenter);
+    this.fitDist = 0;
+    this.fitCamera(0, 1);
+  }
+
+  /**
+   * Fit the camera to the pose actually on screen: the standing height plus however far
+   * the hands (or head) reach above it, so raised arms are never cut off. Eased per frame.
+   */
+  private fitCamera(dt: number, snap = 0) {
+    const c = this.character;
+    if (!c) return;
+    const h = this.baseSize.y;
+    const bottom = this.baseCenter.y - h / 2;
+    let top = bottom + h;
+    c.root.updateMatrixWorld(true);
+    for (const n of ["head", "leftHand", "rightHand", "leftLowerArm", "rightLowerArm"] as const) {
+      const b = c.bone(n);
+      if (!b) continue;
+      b.getWorldPosition(this.tmp);
+      const y = this.tmp.y + (n === "head" ? h * 0.13 : h * 0.14);
+      if (y > top) top = y;
+    }
+    // Keep the feet at a fixed margin above the window bottom; grow upward as needed.
+    const extent = Math.max(h * 1.3, (top - bottom) * 1.14 + h * 0.08);
+    const dist = extent / 2 / Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    const targetY = bottom - h * 0.06 + extent / 2;
+    const k = snap ? 1 : 1 - Math.exp(-dt * 6);
+    this.fitDist += (dist - this.fitDist) * k;
+    this.fitY += (targetY - this.fitY) * k;
+    this.camera.position.set(this.baseCenter.x, this.fitY, this.baseCenter.z + this.fitDist);
+    this.camera.lookAt(this.baseCenter.x, this.fitY, this.baseCenter.z);
   }
 
   resize(w: number, h: number) {
@@ -168,6 +198,7 @@ export class Renderer3D implements Renderer {
     applyLookAt(c, input.yaw * lookScale, (input.pitch + pokePitch + nod) * lookScale, roll * awake);
     if (!(input.state === "sleep" && clipDriven)) applySleep(c, input.t, input.sleepAmount);
     c.update(input.dt);
+    this.fitCamera(input.dt);
     this.renderer.render(this.scene, this.camera);
     this.renders++;
   }

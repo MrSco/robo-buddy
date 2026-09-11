@@ -4,6 +4,8 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { Music } from "./audio";
 import { Behavior, type ClipChoice } from "./behavior";
+import { applyLibrary, invalidateLibrary, listLibrary } from "./library";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Bubble } from "./bubble";
 import { Sounds } from "./sound";
 import { cursor, IN_TAURI, startInput } from "./input";
@@ -124,6 +126,19 @@ async function boot() {
     speak("wake");
   });
 
+  if (IN_TAURI) {
+    // Drop a model or animation file onto the buddy to import it.
+    await getCurrentWebview().onDragDropEvent(async (e) => {
+      if (e.payload.type !== "drop") return;
+      for (const path of e.payload.paths) await importDropped(path);
+    });
+    // Hide behind fullscreen apps (games, videos) and come back afterwards.
+    await listen<{ active: boolean }>("fullscreen", async (e) => {
+      fullscreenActive = e.payload.active;
+      await applyVisibility();
+    });
+  }
+
   await applySize(settings.size);
   await loadPack(settings.character);
   applySettings(settings);
@@ -131,7 +146,10 @@ async function boot() {
     settingsEvents++;
     const prev = settings;
     settings = s;
-    if (s.character !== prev.character) await loadPack(s.character);
+    if (s.character !== prev.character || JSON.stringify(s.animRoles) !== JSON.stringify(prev.animRoles)) {
+      invalidateLibrary();
+      await loadPack(s.character);
+    }
     if (s.size !== prev.size) await applySize(s.size);
     applySettings(s);
   });
@@ -143,7 +161,9 @@ async function loadPack(id: string) {
   try {
     const ref = await resolvePack(id);
     const raw = await (await fetch(ref.base + "manifest.json")).json();
-    const m = validateManifest(raw);
+    const base = validateManifest(raw);
+    // Every library clip is available to every 3D pack; user roles decide where it is used.
+    const m = base.renderer === "3d" ? applyLibrary(base, await listLibrary(), settings.animRoles ?? {}) : base;
 
     // Both renderers stay alive for the life of the app; a pack loads into one of them and
     // only becomes the active renderer once it is fully loaded, so the previous character
@@ -202,6 +222,57 @@ async function applySize(scale: number) {
   if (wasOnFloor && physics.opts.gravity) physics.mode = "falling";
 }
 
+let fullscreenActive = false;
+let hiddenByFullscreen = false;
+async function applyVisibility() {
+  if (!IN_TAURI) return;
+  const win = getCurrentWindow();
+  const shouldHide = fullscreenActive && settings.hideWhenFullscreen && !settings.paused;
+  if (shouldHide && !hiddenByFullscreen) {
+    hiddenByFullscreen = true;
+    await win.hide();
+  } else if (!shouldHide && hiddenByFullscreen) {
+    hiddenByFullscreen = false;
+    await win.show();
+  }
+}
+
+/** Stage a dropped file, decide whether it is a model or an animation, and file it. */
+async function importDropped(path: string) {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  if (!["glb", "gltf", "vrm", "fbx", "webp", "gif", "png", "apng"].includes(ext)) {
+    speak("poked");
+    return;
+  }
+  try {
+    const staged = await invoke<string>("stage_dropped", { source: path });
+    let kind: "model" | "clip" = "model";
+    if (["glb", "gltf", "fbx"].includes(ext)) {
+      // An animation file has no mesh; a model does.
+      const { loadModel } = await import("./character");
+      const { convertFileSrc } = await import("@tauri-apps/api/core");
+      const probe = await loadModel(convertFileSrc(staged));
+      let hasMesh = false;
+      probe.root.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh) hasMesh = true;
+      });
+      kind = hasMesh ? "model" : probe.animations.length ? "clip" : "model";
+    }
+    const result = await invoke<{ kind: string; id?: string; name: string }>("finalize_import", { staged, kind, name: null });
+    invalidateLibrary();
+    if (result.kind === "model" && result.id) {
+      const { setSettings } = await import("./settings-store");
+      await setSettings({ ...settings, character: result.id });
+    } else {
+      await loadPack(settings.character);
+      bubble.say([`Got "${result.name}". Tag it in Settings.`], 3.5, clock.elapsedTime);
+    }
+  } catch (err) {
+    reportError("import", err);
+    bubble.say([`Couldn't import that: ${String(err).slice(0, 60)}`], 4, clock.elapsedTime);
+  }
+}
+
 function applySettings(s: Settings) {
   if (physics) {
     const phys = manifest?.reactions.physics ?? {};
@@ -216,6 +287,7 @@ function applySettings(s: Settings) {
   behavior.enabled = set ? new Set(set) : null;
   if (!s.bubblesEnabled) bubble.hide();
   ignoringCursor = null; // force the click-through mode to be re-applied
+  void applyVisibility();
 }
 
 function speak(event: NonNullable<Manifest["lines"]> extends Partial<Record<infer K, string[]>> ? K : never, seconds = 2.5) {
@@ -275,7 +347,10 @@ function onOpenSettings() {
 }
 stage3d.addEventListener("dblclick", onOpenSettings);
 stage2d.addEventListener("dblclick", onOpenSettings);
-document.addEventListener("contextmenu", (e) => e.preventDefault());
+document.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  if (IN_TAURI && settings.clickThrough !== "locked") invoke("context_menu").catch(() => {});
+});
 
 function cursorInCanvas(): { x: number; y: number } | null {
   if (!physics || !cursor.valid) return null;
@@ -475,7 +550,14 @@ function frame() {
 }
 
 let frameErrors = 0;
+let frameSkip = 0;
 function loop() {
+  // Power saving: asleep or hidden, only every third frame is processed.
+  const lazy = (asleep && sleepAmount > 0.99) || hiddenByFullscreen;
+  if (lazy && frameSkip++ % 3 !== 0) {
+    requestAnimationFrame(loop);
+    return;
+  }
   try {
     frame();
   } catch (err) {

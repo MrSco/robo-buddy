@@ -25,6 +25,9 @@ export interface Settings {
   danceMode: string;
   /** Per pack id: idle variants / fidgets the user left enabled. Missing = all. */
   idleSets: Record<string, string[]>;
+  /** Per library clip name: role override ("idle", "fidget", "dance", "poke", "held", "fall", "walk", "off"). */
+  animRoles: Record<string, string>;
+  hideWhenFullscreen: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -44,6 +47,8 @@ export const DEFAULT_SETTINGS: Settings = {
   wanderEnabled: true,
   danceMode: "random",
   idleSets: {},
+  animRoles: {},
+  hideWhenFullscreen: true,
 };
 
 export async function getSettings(): Promise<Settings> {

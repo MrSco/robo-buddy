@@ -256,3 +256,19 @@ is commodity and took one session. We keep our codebase and borrow patterns from
 - Same GLTFLoader plus the `@pixiv/three-vrm` plugin. Gives a standard humanoid bone map, built-in look-at, and expressions.
 - Opens the whole VRoid Studio (free) and VRoid Hub ecosystem, plus every model Desktop Mate users already have.
 - VRM's humanoid map also solves retargeting generically: Mixamo, Reallusion and VRM rigs all map to the same humanoid bone list.
+
+## M5 — Any animation on any model (DONE Sep 10 2026)
+- Runtime humanoid retargeting (`src/retarget.ts`): clips are expressed as world-rotation deltas against a T-pose and fitted
+  to the target rig at load, lazily on first use. Bone maps for Mixamo, Unreal/Quaternius, VRM and common Blender names
+  (`src/humanoid.ts`); A-posed rigs are straightened for the reference; facing and Z-up are detected and corrected.
+  Verified on Rocco (Mixamo), the Quaternius mannequin (Unreal rig, GLB and FBX) and Rocco VRM.
+- Native FBX for models and animations via three.js FBXLoader; units and up-axis normalised on load.
+- Shared library (`src/library.ts`): bundled UAL + Mixamo clips plus user clips in `%APPDATA%/.../clips/`; every 3D pack sees
+  every clip; per-clip roles (idle/fidget/dance/poke/held/fall/walk/off) live in settings and override manifest defaults.
+- Import: drag a model or animation onto the buddy or the settings window; the file is staged, classified by whether it has a
+  mesh, and filed as a pack or a clip. The Import button still works. FBX textures beside the file are brought along.
+- Settings: animation library panel with search, source filter, role picker and preview-on-model.
+- Polish: single-instance (a second launch summons the buddy), right-click menu on the buddy, hide while a fullscreen app is
+  focused, frame skipping while asleep/hidden, camera fits the pose so raised arms are never clipped.
+- Deferred: auto-updater (Tauri's updater needs a public endpoint for the manifest; the repo is private), code signing,
+  window interactions (sit on title bars), keyboard reactions.

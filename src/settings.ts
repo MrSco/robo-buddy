@@ -4,6 +4,8 @@ import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { listPacks, type Manifest, type PackRef } from "./packs";
 import { LivePreview, thumbnailFor } from "./preview";
 import { Behavior } from "./behavior";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { listLibrary, invalidateLibrary, ROLES, type LibraryClip } from "./library";
 import { getSettings, onSettingsChanged, setSettings, type ClickThroughMode, type Settings } from "./settings-store";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -31,6 +33,11 @@ const els = {
   live: $<HTMLCanvasElement>("live"),
   gallery: $<HTMLDivElement>("gallery"),
   idleset: $<HTMLDivElement>("idleset"),
+  fullscreen: $<HTMLInputElement>("fullscreen"),
+  dropzone: $<HTMLDivElement>("dropzone"),
+  libsearch: $<HTMLInputElement>("libsearch"),
+  libsource: $<HTMLSelectElement>("libsource"),
+  library: $<HTMLDivElement>("library"),
   status: $<HTMLParagraphElement>("status"),
 };
 
@@ -94,6 +101,83 @@ async function renderGallery() {
   }
   // Thumbnails borrowed the live canvas; show the active pack in it now.
   await previewPack(settings.character);
+}
+
+let libraryClips: LibraryClip[] = [];
+
+async function renderLibrary() {
+  const ref = packs.find((p) => p.id === "rocco");
+  const refManifest = ref ? await manifestFor(ref) : undefined;
+  libraryClips = await listLibrary(refManifest);
+  const q = els.libsearch.value.trim().toLowerCase();
+  const src = els.libsource.value;
+  els.library.innerHTML = "";
+  for (const c of libraryClips) {
+    if (src && c.source !== src) continue;
+    if (q && !c.name.toLowerCase().includes(q)) continue;
+    const name = document.createElement("div");
+    name.className = "name";
+    name.title = c.name;
+    name.textContent = c.name.replace(/_/g, " ");
+    const tag = document.createElement("span");
+    tag.className = "src";
+    tag.textContent = c.source === "user" ? "mine" : c.source;
+    name.appendChild(tag);
+    const role = document.createElement("select");
+    for (const r of ROLES) {
+      const o = document.createElement("option");
+      o.value = r;
+      o.textContent = r === "off" ? "not used" : r;
+      role.appendChild(o);
+    }
+    role.value = settings.animRoles?.[c.name] ?? c.defaultRole;
+    role.addEventListener("change", () => {
+      const roles = { ...(settings.animRoles ?? {}) };
+      if (role.value === c.defaultRole) delete roles[c.name];
+      else roles[c.name] = role.value;
+      void commit({ animRoles: roles });
+    });
+    const play = document.createElement("button");
+    play.type = "button";
+    play.textContent = "▶";
+    play.title = "Preview on the selected character";
+    play.addEventListener("click", () => void getLive().playClip(c.name, c.url));
+    els.library.append(name, role, play);
+  }
+}
+
+async function importFile(path: string) {
+  const ext = path.split(".").pop()?.toLowerCase() ?? "";
+  try {
+    status(`Importing ${path.split(/[\\/]/).pop()}…`);
+    const staged = await invoke<string>("stage_dropped", { source: path });
+    let kind: "model" | "clip" = "model";
+    if (["glb", "gltf", "fbx"].includes(ext)) {
+      const { loadModel } = await import("./character");
+      const { convertFileSrc } = await import("@tauri-apps/api/core");
+      const probe = await loadModel(convertFileSrc(staged));
+      let hasMesh = false;
+      probe.root.traverse((o) => {
+        if ((o as { isMesh?: boolean }).isMesh) hasMesh = true;
+      });
+      kind = hasMesh ? "model" : probe.animations.length ? "clip" : "model";
+    } else if (!["webp", "gif", "png", "apng", "vrm"].includes(ext)) {
+      status(`Unsupported file type .${ext}`);
+      return;
+    }
+    const result = await invoke<{ kind: string; id?: string; name: string }>("finalize_import", { staged, kind, name: null });
+    invalidateLibrary();
+    if (result.kind === "model" && result.id) {
+      await refreshPacks();
+      await commit({ character: result.id });
+      status(`Imported "${result.name}".`);
+    } else {
+      await renderLibrary();
+      status(`Added animation "${result.name}". Pick a role for it below.`);
+    }
+  } catch (err) {
+    status(`Import failed: ${err}`);
+  }
 }
 
 function renderIdleSet(m: Manifest) {
@@ -190,8 +274,10 @@ function render() {
   const nearest = opts.reduce((a, b) => (Math.abs(b - settings.sleepAfterMin) < Math.abs(a - settings.sleepAfterMin) ? b : a));
   els.sleep.value = String(nearest);
   els.wander.checked = settings.wanderEnabled;
+  els.fullscreen.checked = settings.hideWhenFullscreen;
   applying = false;
   void updatePackDetails();
+  void renderLibrary();
 }
 
 async function commit(patch: Partial<Settings>) {
@@ -234,6 +320,18 @@ async function main() {
   els.sleep.addEventListener("change", () => commit({ sleepAfterMin: Number(els.sleep.value) }));
   els.dance.addEventListener("change", () => commit({ danceMode: els.dance.value }));
   els.wander.addEventListener("change", () => commit({ wanderEnabled: els.wander.checked }));
+  els.fullscreen.addEventListener("change", () => commit({ hideWhenFullscreen: els.fullscreen.checked }));
+  els.libsearch.addEventListener("input", () => void renderLibrary());
+  els.libsource.addEventListener("change", () => void renderLibrary());
+  try {
+    await getCurrentWebview().onDragDropEvent(async (e) => {
+      els.dropzone.classList.toggle("over", e.payload.type === "enter" || e.payload.type === "over");
+      if (e.payload.type !== "drop") return;
+      for (const path of e.payload.paths) await importFile(path);
+    });
+  } catch {
+    // not in Tauri
+  }
   els.clickthrough.addEventListener("change", () => commit({ clickThrough: els.clickthrough.value as ClickThroughMode }));
   els.autostart.addEventListener("change", async () => {
     try {

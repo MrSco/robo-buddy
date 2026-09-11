@@ -11,6 +11,9 @@ through your speakers.
 - Dev: `pnpm install`, then `pnpm tauri dev`.
 - Build: `pnpm tauri build` produces NSIS and MSI installers under `src-tauri/target/release/bundle`.
 
+Drop a GLB, VRM or FBX model onto the buddy to use it, or drop an FBX/GLB animation to add it to
+the shared library; every clip is retargeted to every model at load, nothing is baked per rig.
+
 Character packs live in `public/characters/` (bundled) and
 `%APPDATA%/com.rocco.robobuddy/characters/` (user). Each has a `manifest.json`;
 see `public/characters/rocco/manifest.json` and `pixel-pal/manifest.json` for the two formats.

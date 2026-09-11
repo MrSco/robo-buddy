@@ -237,7 +237,7 @@
     "name": "Sword_Idle",
     "file": "Sword_Idle.glb",
     "duration": 1.667,
-    "loop": false
+    "loop": true
   },
   {
     "name": "Walk_Formal_Loop",

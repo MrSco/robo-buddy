@@ -420,8 +420,20 @@ def main(argv):
         write_clip(out, name, tgt, times, rots, hips, th)
         index.append({"name": name, "file": f"{name}.glb", "duration": round(clip.duration, 3), "loop": name.endswith("_Loop")})
         print(f"baked {name}: {len(times)} frames, {len(rots)} bones -> {os.path.getsize(out)} bytes")
-    with open(os.path.join(out_dir, "index.json"), "w") as f:
-        json.dump(sorted(index, key=lambda x: x["name"]), f, indent=2)
+    # The index covers every clip in the folder, not just this run.
+    existing = {}
+    idx_path = os.path.join(out_dir, "index.json")
+    if os.path.exists(idx_path):
+        try:
+            existing = {e["name"]: e for e in json.load(open(idx_path))}
+        except Exception:
+            existing = {}
+    for e in index:
+        existing[e["name"]] = e
+    present = {os.path.splitext(f)[0] for f in os.listdir(out_dir) if f.endswith(".glb")}
+    merged = [e for n, e in existing.items() if n in present]
+    with open(idx_path, "w") as f:
+        json.dump(sorted(merged, key=lambda x: x["name"]), f, indent=2)
     print(f"wrote {len(index)} clips to {out_dir}")
 
 
