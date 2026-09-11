@@ -3,7 +3,7 @@ import type { ClipChoice } from "./behavior";
 import type { Manifest, PackRef } from "./packs";
 
 /** Behaviour states resolved by main.ts each frame. Packs may provide a clip per state. */
-export type StateName = "idle" | "dance" | "poked" | "dragged" | "fall" | "sleep" | "fidget" | "walk";
+export type StateName = "idle" | "dance" | "poked" | "dragged" | "fall" | "sleep" | "fidget" | "walk" | "land";
 
 export type GrabPart = "head" | "torso" | "leftArm" | "rightArm" | "leftLeg" | "rightLeg";
 
@@ -39,6 +39,11 @@ export interface FrameInput {
   airborne: boolean;
   /** Horizontal velocity in px/s while airborne, for leaning. */
   vx: number;
+  /** Window acceleration normalised to roughly +-1 for a hard yank (screen space, y down). */
+  accelX: number;
+  accelY: number;
+  /** Tumble rate in rad/s while airborne. */
+  spin: number;
 }
 
 export interface Renderer {

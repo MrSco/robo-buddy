@@ -13,6 +13,7 @@ export interface PhysicsOptions {
 }
 
 const GRAVITY = 3200; // px/s^2
+const THREE_CLAMP = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const BOUNCE = 0.35;
 const FLOOR_FRICTION = 6; // 1/s
 const SETTLE_SPEED = 40; // px/s
@@ -29,6 +30,15 @@ export class WindowPhysics {
   onPoke?: () => void;
   /** Set by the caller: fired when the window hits the floor with some speed. */
   onLand?: (speed: number) => void;
+  /** Smoothed window acceleration in px/s^2 (screen space, y down), for secondary motion. */
+  accelX = 0;
+  accelY = 0;
+  /** Angular velocity handed to the renderer at release, rad/s (sign = spin direction). */
+  spin = 0;
+  private prevX = NaN;
+  private prevY = NaN;
+  private prevVx = 0;
+  private prevVy = 0;
 
   private grabDx = 0;
   private grabDy = 0;
@@ -105,6 +115,7 @@ export class WindowPhysics {
 
   grab() {
     this.mode = "held";
+    this.spin = 0;
     this.vx = this.vy = 0;
     this.grabDx = cursor.x - this.x;
     this.grabDy = cursor.y - this.y;
@@ -130,6 +141,8 @@ export class WindowPhysics {
         this.vy = (b.y - a.y) / dt;
       }
     }
+    // A fast sideways throw sets him tumbling; the renderer integrates and damps it.
+    this.spin = this.opts.throwable ? THREE_CLAMP(-this.vx / 900, -6, 6) : 0;
     this.mode = this.opts.gravity ? "falling" : "rest";
     // Pick the monitor he was released over right now; the physics would otherwise clamp
     // him back into the old monitor's bounds while the async lookup was still in flight.
@@ -170,8 +183,30 @@ export class WindowPhysics {
     return this.mode === "falling" && this.y < this.floor - 1;
   }
 
+  /** Finite-difference acceleration of the window itself, whatever is moving it. */
+  private trackAccel(dt: number) {
+    if (dt <= 0) return;
+    if (Number.isNaN(this.prevX)) {
+      this.prevX = this.x;
+      this.prevY = this.y;
+      return;
+    }
+    const vx = (this.x - this.prevX) / dt;
+    const vy = (this.y - this.prevY) / dt;
+    const ax = (vx - this.prevVx) / dt;
+    const ay = (vy - this.prevVy) / dt;
+    const k = Math.min(1, dt * 14);
+    this.accelX += (THREE_CLAMP(ax, -40000, 40000) - this.accelX) * k;
+    this.accelY += (THREE_CLAMP(ay, -40000, 40000) - this.accelY) * k;
+    this.prevVx = vx;
+    this.prevVy = vy;
+    this.prevX = this.x;
+    this.prevY = this.y;
+  }
+
   step(dt: number) {
     dt = Math.min(dt, 0.05);
+    this.trackAccel(dt);
     if (this.mode === "held") {
       this.x = cursor.x - this.grabDx;
       this.y = cursor.y - this.grabDy;
@@ -190,6 +225,8 @@ export class WindowPhysics {
       const right = this.area.right - this.w;
       if (this.y >= floor) {
         this.y = floor;
+        // Whatever spin he had ends at the first contact; the renderer springs him upright.
+        this.spin = 0;
         if (Math.abs(this.vy) > 120) {
           this.onLand?.(Math.abs(this.vy));
           this.vy = -this.vy * BOUNCE;
@@ -211,6 +248,7 @@ export class WindowPhysics {
       }
       if (this.y === floor && Math.abs(this.vx) < SETTLE_SPEED && this.vy === 0) {
         this.vx = 0;
+        this.spin = 0;
         this.mode = "rest";
       }
     }

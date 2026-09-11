@@ -3,6 +3,7 @@ import { loadCharacter, type Character } from "./character";
 import { applyDance } from "./dance";
 import type { Manifest, PackRef } from "./packs";
 import { applyFlail, applyHeldByArm, applyHeldByLeg, applyIdle, applyLookAt, applySleep } from "./pose";
+import { LimbSprings } from "./secondary";
 import type { FrameInput, GrabPart, Renderer, StateName } from "./renderer";
 
 /** three.js renderer for GLB / VRM characters: clips via the mixer, procedural layers on top. */
@@ -36,6 +37,10 @@ export class Renderer3D implements Renderer {
   private swingVel = 0;
   private heldAmount = 0;
   private flipAmount = 0;
+  private springs = new LimbSprings();
+  private springAmount = 0;
+  private tumble = 0;
+  private tumbleVel = 0;
   private lastGrab: GrabPart | null = null;
   private baseCenter = new THREE.Vector3();
   private baseSize = new THREE.Vector3();
@@ -109,7 +114,16 @@ export class Renderer3D implements Renderer {
       if (y > top) top = y;
     }
     // Keep the feet at a fixed margin above the window bottom; grow upward as needed.
-    const extent = Math.max(h * 1.3, (top - bottom) * 1.14 + h * 0.08);
+    let extent = Math.max(h * 1.3, (top - bottom) * 1.14 + h * 0.08);
+    // A tumbling body is wide; make sure its rotated extent fits the window's aspect too.
+    const spinAngle = this.tumble;
+    if (Math.abs(spinAngle) > 0.02) {
+      const w = this.baseSize.x * 0.6 + h * 0.15;
+      const vertical = h * Math.abs(Math.cos(spinAngle)) + w * Math.abs(Math.sin(spinAngle));
+      const horizontal = h * Math.abs(Math.sin(spinAngle)) + w * Math.abs(Math.cos(spinAngle));
+      const aspect = this.cssW / this.cssH;
+      extent = Math.max(extent, vertical * 1.15, (horizontal * 1.15) / aspect);
+    }
     const dist = extent / 2 / Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
     const targetY = bottom - h * 0.06 + extent / 2;
     const k = snap ? 1 : 1 - Math.exp(-dt * 6);
@@ -193,6 +207,12 @@ export class Renderer3D implements Renderer {
       ({ nod, roll } = applyDance(c, input.music, input.danceAmount));
     }
 
+    // Secondary motion while held or airborne: limbs lag behind the window's acceleration.
+    const wantSprings = input.state === "dragged" || input.airborne || input.state === "land";
+    this.springAmount += ((wantSprings ? 1 : 0) - this.springAmount) * Math.min(1, input.dt * (wantSprings ? 8 : 3));
+    const rigid = grab && grab.part !== "head" && grab.part !== "torso" ? grab.part : null;
+    this.springs.update(c, input.dt, input.t, input.accelX, input.accelY, this.springAmount, rigid);
+
     // Poke: hop with the head thrown back, unless the pack has its own poked clip.
     let pokePitch = 0;
     if (input.sincePoke < 0.45 && !(input.state === "poked" && clipDriven)) {
@@ -222,9 +242,27 @@ export class Renderer3D implements Renderer {
       this.swingVel += (-30 * this.swing - 6 * this.swingVel) * input.dt;
       this.swing += this.swingVel * input.dt;
     }
+    // Tumble while airborne after a throw; on the ground the spring pulls him upright again.
+    if (input.airborne && Math.abs(input.spin) > 0.01) {
+      this.tumbleVel += (input.spin - this.tumbleVel) * Math.min(1, input.dt * 4);
+      this.tumble += this.tumbleVel * input.dt;
+    } else {
+      // Shortest way back to upright (or to the flip target).
+      this.tumble = ((this.tumble + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+      this.tumbleVel += (-40 * this.tumble - 9 * this.tumbleVel) * input.dt;
+      this.tumble += this.tumbleVel * input.dt;
+      if (Math.abs(this.tumble) < 0.002 && Math.abs(this.tumbleVel) < 0.01) this.tumble = this.tumbleVel = 0;
+    }
     // Upside down when held by a leg: the whole body flips about the grab side.
     const flip = this.flipAmount * Math.PI * (this.lastGrab === "leftLeg" ? -1 : 1);
-    root.rotation.z = this.lean + this.swing + flip;
+    root.rotation.z = this.lean + this.swing + flip + this.tumble;
+    // Tumbling about the feet would swing him off screen; offset so the spin is about the middle.
+    root.position.x = 0;
+    if (Math.abs(this.tumble) > 0.001) {
+      const half = this.baseSize.y * 0.5;
+      root.position.y += half - half * Math.cos(this.tumble);
+      root.position.x = half * Math.sin(this.tumble);
+    }
     // Keep the feet on the floor when upright; when flipped, the pivot moves to the top.
     root.position.y += this.flipAmount * (this.baseSize.y * 0.98);
     // Turn to face along the floor while walking, back to the viewer otherwise.

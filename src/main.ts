@@ -73,6 +73,8 @@ const bubble = new Bubble();
 const sounds = new Sounds();
 const behavior = new Behavior();
 let pokeClip: ClipChoice | null = null;
+let landClip: ClipChoice | null = null;
+let landUntil = -1;
 let grabPart: import("./renderer").GrabPart | null = null;
 let lastAct = "idle";
 let lastFree = false;
@@ -99,6 +101,11 @@ async function boot() {
     if (landStrength > 0.4) {
       speak("land");
       sounds.play("land");
+    }
+    // A hard landing plays the pack's landing clip (Jump Land by default) before idling.
+    if (landStrength > 0.35 && renderer?.kind === "3d") {
+      landClip = behavior.stateClip("land");
+      if (landClip) landUntil = clock.elapsedTime + Math.max(0.4, renderer.clipDuration(landClip.name) * 0.9);
     }
   };
   await p.init();
@@ -412,6 +419,7 @@ function resolveState(t: number, act: ReturnType<Behavior["update"]>): { state: 
   if (physics?.mode === "held") return { state: "dragged", clip: behavior.stateClip("dragged") };
   if (physics?.airborne) return { state: "fall", clip: behavior.stateClip("fall") };
   if (pokeUntil > t) return { state: "poked", clip: pokeClip };
+  if (landUntil > t) return { state: "land", clip: landClip };
   if (asleep) return { state: "sleep", clip: null };
   if (danceAmount > 0.5) return { state: "dance", clip: danceClip };
   if (act.kind === "walk") return { state: "walk", clip: act.clip ? { ...act.clip, playbackRate: walkRate(act.speed) } : null };
@@ -540,6 +548,9 @@ function frame() {
       landStrength,
       airborne: physics?.airborne ?? false,
       vx: physics?.vx ?? 0,
+      accelX: physics ? THREE.MathUtils.clamp(physics.accelX / (cssH * scaleFactor * 12), -1.5, 1.5) : 0,
+      accelY: physics ? THREE.MathUtils.clamp(physics.accelY / (cssH * scaleFactor * 12), -1.5, 1.5) : 0,
+      spin: physics?.spin ?? 0,
     };
     renderer.frame(input);
   }

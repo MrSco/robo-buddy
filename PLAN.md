@@ -276,3 +276,12 @@ is commodity and took one session. We keep our codebase and borrow patterns from
   (re-downloaded from Mixamo with Character Arm-Space 85 so the hands are together). Arm: that arm aims straight up and the body
   dangles from it. Leg: he flips upside down. The held point is steered under the cursor and dragging sideways swings him like a pendulum.
 - Lesson: procedural limb poses should aim bones at world directions (`aimBone`) rather than add fixed angles, so they work over any base clip.
+
+## Ragdoll, step 1 (DONE Sep 10 2026)
+- Physically driven limbs while held or airborne (`src/secondary.ts`): each arm, leg and the head is a damped spring driven by the
+  window's own acceleration (`WindowPhysics.accelX/Y`, finite differences smoothed). Yank sideways and the limbs lag and swing back;
+  drop him and they trail upward. Layered over whatever clip plays; a limb the cursor holds stays rigid.
+- Throw spin: releasing with sideways speed sets `spin`; the renderer integrates a tumble while airborne, rotates about the body's
+  middle and widens the camera fit to the rotated extent so no part leaves the window. Spin is zeroed on floor contact; a stiff spring
+  brings him upright, then a hard landing plays the pack's `land` clip (Jump Land) before the idle resumes.
+- Step 2 (deferred until played with): a real Rapier ragdoll with joint limits while airborne, blended back to the idle on landing.

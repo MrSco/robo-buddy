@@ -34,6 +34,10 @@
     "fall": {
       "clip": "Falling_Idle",
       "loop": true
+    },
+    "land": {
+      "clip": "jumpLand",
+      "loop": false
     }
   },
   "reactions": {
