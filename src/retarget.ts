@@ -35,8 +35,8 @@ export interface Rig {
   flipped: boolean;
 }
 
-const R180 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
-const R180_INV = R180.clone().invert();
+export const R180 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+export const R180_INV = R180.clone().invert();
 
 function orderOf(root: THREE.Object3D): THREE.Object3D[] {
   const out: THREE.Object3D[] = [];
@@ -49,7 +49,7 @@ function localOf(o: THREE.Object3D): TRS {
 }
 
 /** World TRS for every node given a set of local transforms. */
-function worldOf(rig: Rig, local: Map<THREE.Object3D, TRS>): Map<THREE.Object3D, TRS> {
+export function worldOf(rig: Rig, local: Map<THREE.Object3D, TRS>): Map<THREE.Object3D, TRS> {
   const out = new Map<THREE.Object3D, TRS>();
   const tmp = new THREE.Vector3();
   for (const o of rig.order) {

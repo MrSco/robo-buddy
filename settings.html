@@ -14,6 +14,7 @@
         <button type="button" data-tab="reactions">Reactions</button>
         <button type="button" data-tab="talk">Talk</button>
         <button type="button" data-tab="library">Animations</button>
+        <button type="button" data-tab="capture">Capture</button>
         <button type="button" data-tab="window">Window</button>
         <button type="button" data-tab="help" class="tab-help">Help</button>
       </nav>
@@ -232,6 +233,43 @@
           </div>
         </section>
 
+        <!-- ============================ Capture ============================ -->
+        <section class="page" data-page="capture" hidden>
+          <div class="cap-layout">
+            <div class="cap-main">
+              <div class="cap-cam">
+                <video id="cam" autoplay playsinline muted></video>
+                <canvas id="cam-overlay"></canvas>
+                <div class="cap-empty" id="cam-empty">Camera off</div>
+              </div>
+              <div class="row wrap cap-controls">
+                <button id="cam-start" type="button" title="Turns the webcam on and starts tracking your body. Nothing is recorded or sent anywhere.">Start camera</button>
+                <label class="check" title="The buddy on your desktop copies you live while this is on."><input id="cam-mirror" type="checkbox" /> Mirror on the buddy</label>
+                <span class="hint grow" id="cam-status">Camera off.</span>
+              </div>
+            </div>
+            <div class="cap-side">
+              <div class="preview" id="preview-cap"></div>
+              <div class="group">
+                <h2>Record a move</h2>
+                <div class="row wrap">
+                  <button id="cam-record" type="button" disabled title="Records your movement as an animation clip. Press again to stop.">● Record</button>
+                  <span class="hint grow" id="cam-rec-status"></span>
+                </div>
+                <label class="field"><span>Clip name</span><input id="cam-name" type="text" placeholder="my-dance" spellcheck="false" /></label>
+                <label class="field inline" title="Where the clip is used once saved. You can change it later on the Animations tab.">
+                  <span>Use as</span>
+                  <select id="cam-role"><option value="dance">dance</option><option value="idle">idle</option><option value="fidget">fidget</option><option value="off">just keep it</option></select>
+                </label>
+                <label class="check" title="Blend the last half second into the first so the clip repeats without a jump. Good for dances and idles, off for one-shots."><input id="cam-loop" type="checkbox" checked /> Make it loop</label>
+                <button id="cam-save" type="button" disabled>Save to my animations</button>
+                <p class="hint" id="cam-save-status"></p>
+                <p class="hint">Stand back so your whole body is in frame, face the camera, and keep the background simple. It works on every 3D character.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- ============================ Window ============================ -->
         <section class="page" data-page="window" hidden>
           <div class="cols2">
@@ -276,6 +314,8 @@
                 <li><b>2D:</b> an animated WebP, GIF or PNG becomes a flat buddy.</li>
                 <li>Every animation in the library works on every 3D character; nothing is baked per model.</li>
               </ul>
+              <h2>Capture: be the animation</h2>
+              <p>The Capture tab (or right-click him and choose <b>Copy me</b>) turns your webcam on and tracks your body on your PC; nothing is uploaded. Tick <b>Mirror on the buddy</b> and he copies you live. Press <b>Record</b>, move, press <b>Stop</b>, give it a name and a role, and it lands in your animations, working on every 3D character. Stand back so your whole body is in frame. The camera turns off when you leave the tab or close this window.</p>
               <h2>Animations</h2>
               <p>The Animations tab lists the bundled Mixamo and Quaternius clips plus your own. Give each clip a role (idle, fidget, dance, poke, held, fall, walk) or switch it off. Press ▶ to preview it on the selected character. Drop FBX or GLB animations onto the page or the buddy to add more; Mixamo exports work directly.</p>
             </div>

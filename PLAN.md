@@ -383,7 +383,17 @@ Goal: dynamic phrases and a real conversation, free by default, bring-your-own-k
   he rides along when it moves and falls when it closes, minimises or slides away; wandering is bounded by that window.
   Setting: Stand on other windows. Lesson: GetAsyncKeyState polling misses taps shorter than the poll; bit 0 (pressed since
   the last poll) catches them.
-- Webcam capture: next.
+- Webcam capture (done): Settings > Capture (or right-click > Copy me). MediaPipe Pose Landmarker (lite model and WASM
+  bundled under `public/mediapipe/`, nothing leaves the PC) tracks 33 landmarks on the webcam feed with a wire skeleton
+  drawn over it. `src/mocap.ts` turns world landmarks into world-space rotation deltas against the canonical rig's T-pose
+  (limb bones by direction, hips/chest/head by a right-up basis; mirrored so your left drives his right; One Euro filtered;
+  hips height from the hip-to-ankle span) and `MirrorApplier` puts them on any rig with the clip retargeter's delta method.
+  The settings preview mirrors live; "Mirror on the buddy" streams every other frame as a `pose` event and he enters a
+  `mirror` state. Record / Stop / Save turns frames into a 30 fps clip on the canonical rig (loop ends eased together),
+  exports a GLB and files it under the user's clips with a role. WebView2 asks for camera permission once per origin.
+
+- Help tab mentions Capture. Left for later: a "Copy me" toggle that survives closing the settings window (the camera
+  lives in that webview, so mirroring stops when it hides), hand and finger tracking, and a get-up clip for M8's ragdoll.
 
 ## M7 (original proposal) — Webcam motion capture
 Goal: drive the model live from the user's webcam, and record what they do as a clip for the library (a dance, an idle).

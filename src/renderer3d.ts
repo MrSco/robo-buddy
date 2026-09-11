@@ -4,6 +4,8 @@ import { applyDance } from "./dance";
 import type { Manifest, PackRef } from "./packs";
 import { applyDangle, applyFlail, applyHeldByArm, applyHeldByLeg, applyIdle, applyLimp, applyLookAt, applySleep } from "./pose";
 import { LimbSprings } from "./secondary";
+import { MirrorApplier } from "./mocap";
+import { canonicalRig } from "./retarget";
 import type { FrameInput, GrabPart, Renderer, StateName } from "./renderer";
 
 /** three.js renderer for GLB / VRM characters: clips via the mixer, procedural layers on top. */
@@ -49,6 +51,8 @@ export class Renderer3D implements Renderer {
   private tumbleVel = 0;
   private downAmount = 0;
   private talkAmount = 0;
+  private mirrorAmount = 0;
+  private mirrorApplier: MirrorApplier | null = null;
   /** Which side he lies on while knocked down (+1 / -1), chosen when he goes down. */
   private lieSide = 0;
 
@@ -347,15 +351,21 @@ export class Renderer3D implements Renderer {
     this.facing += (input.facing - this.facing) * Math.min(1, input.dt * 8);
     root.rotation.y = this.facing;
 
+    // Copying the webcam: the captured pose replaces the clip's limbs, torso and head.
+    this.mirrorAmount += ((input.mirror ? 1 : 0) - this.mirrorAmount) * Math.min(1, input.dt * 8);
+    if (input.mirror) {
+      if (!this.mirrorApplier) void canonicalRig().then((r) => (this.mirrorApplier = new MirrorApplier(r)));
+      else this.mirrorApplier.apply(c.rig, input.mirror, this.mirrorAmount);
+    }
     const awake = 1 - input.sleepAmount;
     const lookScale = awake * (1 - Math.min(1, Math.abs(this.facing) / 1.2)) * (1 - this.downAmount);
     // Talking: quick little nods, like someone chatting.
     this.talkAmount += ((input.talking ? 1 : 0) - this.talkAmount) * Math.min(1, input.dt * 6);
     if (this.talkAmount > 0.001) nod += (Math.sin(input.t * 9) * 0.05 + Math.sin(input.t * 2.3) * 0.03) * this.talkAmount;
-    applyLookAt(c, input.yaw * lookScale, (input.pitch + pokePitch + nod) * lookScale, roll * awake);
+    if (this.mirrorAmount < 0.5) applyLookAt(c, input.yaw * lookScale, (input.pitch + pokePitch + nod) * lookScale, roll * awake);
     // Secondary motion while held, airborne or down: limbs lag behind the window's acceleration.
     // After look-at, which resets the head and neck each frame, so the head spring survives.
-    const wantSprings = input.state === "dragged" || input.airborne || input.state === "land" || down;
+    const wantSprings = (input.state === "dragged" || input.airborne || input.state === "land" || down) && !input.mirror;
     this.springAmount += ((wantSprings ? 1 : 0) - this.springAmount) * Math.min(1, input.dt * (wantSprings ? 8 : 3));
     const rigid = grab && grab.part !== "head" && grab.part !== "torso" ? grab.part : null;
     this.springs.update(c, input.dt, input.t, input.accelX, input.accelY, this.springAmount, rigid);

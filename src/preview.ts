@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { loadCharacter, type Character } from "./character";
 import type { Manifest, PackRef } from "./packs";
 import { applyIdle } from "./pose";
+import { MirrorApplier, type MirrorPose } from "./mocap";
+import { canonicalRig } from "./retarget";
 
 /**
  * Live animated preview of a character pack for the settings window: the model plays
@@ -19,6 +21,9 @@ export class LivePreview {
   private raf = 0;
   private token = 0;
   private img: HTMLImageElement | null = null;
+  /** Latest webcam pose to show instead of the idle, or null. */
+  mirror: MirrorPose | null = null;
+  private applier: MirrorApplier | null = null;
 
   constructor(private canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -67,6 +72,10 @@ export class LivePreview {
       const dt = Math.min(this.clock.getDelta(), 0.1);
       c.beginFrame(dt);
       applyIdle(c, this.clock.elapsedTime, 1);
+      if (this.mirror) {
+        if (!this.applier) void canonicalRig().then((r) => (this.applier = new MirrorApplier(r)));
+        else this.applier.apply(c.rig, this.mirror, 1);
+      }
       c.update(dt);
       this.renderer.render(this.scene, this.camera);
       this.raf = requestAnimationFrame(loop);

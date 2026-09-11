@@ -11,6 +11,9 @@ import { listLibrary, invalidateLibrary, ROLES, type LibraryClip } from "./libra
 import { getSettings, onSettingsChanged, setSettings, type ClickThroughMode, type Settings } from "./settings-store";
 import { listPersonalities, loadUserPersonalities, saveUserPersonalities, slugFor, type Personality } from "./personality";
 import { emit } from "@tauri-apps/api/event";
+import { Capture } from "./capture";
+import { PoseRecorder, exportClipGlb } from "./mocap";
+import { canonicalRig } from "./retarget";
 import { defaultPersona, type LineEvent } from "./chat";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -84,6 +87,19 @@ const els = {
   chatModelsStatus: $<HTMLParagraphElement>("chat-models-status"),
   sttModels: $<HTMLDataListElement>("stt-models"),
   tabs: $<HTMLElement>("tabs"),
+  cam: $<HTMLVideoElement>("cam"),
+  camOverlay: $<HTMLCanvasElement>("cam-overlay"),
+  camEmpty: $<HTMLDivElement>("cam-empty"),
+  camStart: $<HTMLButtonElement>("cam-start"),
+  camMirror: $<HTMLInputElement>("cam-mirror"),
+  camStatus: $<HTMLSpanElement>("cam-status"),
+  camRecord: $<HTMLButtonElement>("cam-record"),
+  camRecStatus: $<HTMLSpanElement>("cam-rec-status"),
+  camName: $<HTMLInputElement>("cam-name"),
+  camRole: $<HTMLSelectElement>("cam-role"),
+  camLoop: $<HTMLInputElement>("cam-loop"),
+  camSave: $<HTMLButtonElement>("cam-save"),
+  camSaveStatus: $<HTMLParagraphElement>("cam-save-status"),
   personalityEdit: $<HTMLButtonElement>("personality-edit"),
   pedit: $<HTMLDivElement>("pedit"),
   peName: $<HTMLInputElement>("pe-name"),
@@ -500,7 +516,7 @@ function wireTabs() {
     for (const b of buttons) b.classList.toggle("active", b.dataset.tab === name);
     for (const p of pages) p.hidden = p.dataset.page !== name;
     // One WebGL preview, shown on the Character page and beside the animation list.
-    const home = document.getElementById(name === "library" ? "preview-lib" : "preview-char");
+    const home = document.getElementById(name === "library" ? "preview-lib" : name === "capture" ? "preview-cap" : "preview-char");
     if (home && els.live.parentElement !== home) home.appendChild(els.live);
     try {
       localStorage.setItem("settings-tab", name);
@@ -635,6 +651,117 @@ function wireTalk() {
   void refreshKeyStatus();
 }
 
+// ---------- webcam capture ----------
+let capture: Capture | null = null;
+const recorder = new PoseRecorder();
+let recording = false;
+let lastRecorded: { seconds: number } | null = null;
+let poseSeq = 0;
+
+function showTab(name: string) {
+  els.tabs.querySelector<HTMLButtonElement>(`button[data-tab="${name}"]`)?.click();
+}
+
+async function startCamera() {
+  if (!capture) {
+    capture = new Capture(els.cam, els.camOverlay);
+    capture.onStatus = (t) => (els.camStatus.textContent = t);
+    capture.onPose = (pose, t) => {
+      getLive().mirror = pose;
+      if (recording) {
+        recorder.push(pose, t);
+        els.camRecStatus.textContent = `Recording… ${recorder.seconds.toFixed(1)} s`;
+      }
+      // The buddy gets every other frame; plenty for a mirror, gentle on the event bus.
+      if (els.camMirror.checked && poseSeq++ % 2 === 0) void emit("pose", pose).catch(() => {});
+    };
+  }
+  try {
+    await capture.start();
+    els.camEmpty.hidden = true;
+    els.camStart.textContent = "Stop camera";
+    els.camRecord.disabled = false;
+  } catch (err) {
+    els.camStatus.textContent = `Camera failed: ${String(err).slice(0, 120)}`;
+  }
+}
+
+function stopCamera() {
+  capture?.stop();
+  if (recording) toggleRecording();
+  getLive().mirror = null;
+  els.camEmpty.hidden = false;
+  els.camStart.textContent = "Start camera";
+  els.camRecord.disabled = true;
+  if (els.camMirror.checked) {
+    els.camMirror.checked = false;
+    void emit("mirror", { on: false }).catch(() => {});
+  }
+}
+
+function toggleRecording() {
+  recording = !recording;
+  if (recording) {
+    recorder.begin();
+    els.camRecord.textContent = "■ Stop";
+    els.camRecStatus.textContent = "Recording… 0.0 s";
+    els.camSave.disabled = true;
+  } else {
+    els.camRecord.textContent = "● Record";
+    lastRecorded = { seconds: recorder.seconds };
+    els.camRecStatus.textContent = recorder.count > 5 ? `${recorder.seconds.toFixed(1)} s captured (${recorder.count} frames).` : "Too short; try again.";
+    els.camSave.disabled = recorder.count <= 5;
+  }
+}
+
+async function saveRecording() {
+  if (!lastRecorded || recorder.count <= 5) return;
+  const name = (els.camName.value.trim() || `capture-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}`).replace(/[^A-Za-z0-9_-]+/g, "_");
+  els.camSave.disabled = true;
+  els.camSaveStatus.textContent = "Building the clip…";
+  try {
+    const canon = await canonicalRig();
+    const clip = recorder.toClip(canon, name, els.camLoop.checked);
+    if (!clip) throw new Error("not enough frames");
+    const glb = await exportClipGlb(canon, clip);
+    const saved = await invoke<string>("save_user_clip", new Uint8Array(glb), { headers: { "x-clip-name": name } });
+    invalidateLibrary();
+    const role = els.camRole.value;
+    if (role !== "off") await commit({ animRoles: { ...(settings.animRoles ?? {}), [saved]: role } });
+    await renderLibrary();
+    els.camSaveStatus.textContent = `Saved "${saved}" (${lastRecorded.seconds.toFixed(1)} s)${role !== "off" ? ` as ${role}` : ""}. It is on the Animations tab now.`;
+    els.camName.value = "";
+  } catch (err) {
+    els.camSaveStatus.textContent = `Could not save: ${String(err).slice(0, 120)}`;
+    els.camSave.disabled = false;
+  }
+}
+
+function wireCapture() {
+  els.camStart.addEventListener("click", () => (capture?.running ? stopCamera() : void startCamera()));
+  els.camMirror.addEventListener("change", () => void emit("mirror", { on: els.camMirror.checked }).catch(() => {}));
+  els.camRecord.addEventListener("click", toggleRecording);
+  els.camSave.addEventListener("click", () => void saveRecording());
+  // Right-click > Copy me: open here with the camera on and mirroring.
+  void listen("capture", async () => {
+    showTab("capture");
+    await startCamera();
+    if (capture?.running && !els.camMirror.checked) {
+      els.camMirror.checked = true;
+      void emit("mirror", { on: true }).catch(() => {});
+    }
+  });
+  // Hiding the window (its close button hides it) stops the camera too.
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && capture?.running) stopCamera();
+  });
+  // Leaving the tab stops the camera; a webcam light should never stay on unnoticed.
+  els.tabs.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-tab]");
+    if (b && b.dataset.tab !== "capture" && capture?.running) stopCamera();
+  });
+}
+
 const LINE_EVENTS: Array<[LineEvent, string]> = [
   ["greet", "On start"],
   ["poked", "When poked"],
@@ -764,6 +891,7 @@ const playButtons = new Map<string, HTMLButtonElement>();
 
 async function main() {
   wireTabs();
+  wireCapture();
   startMeter();
   wireTalk();
   getLive().onPreviewChange = (name) => {

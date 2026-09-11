@@ -457,6 +457,70 @@ details.adv summary {
   text-overflow: ellipsis;
 }
 
+/* Capture */
+.cap-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.cap-main {
+  flex: 1;
+  min-width: 0;
+}
+.cap-side {
+  flex: none;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cap-side .preview {
+  width: 240px;
+  height: 320px;
+}
+.cap-cam {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.cap-cam video,
+.cap-cam canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform: scaleX(-1);
+}
+.cap-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.cap-empty[hidden] {
+  display: none;
+}
+.cap-controls {
+  margin-top: 10px;
+}
+@media (max-width: 860px) {
+  .cap-layout {
+    flex-direction: column;
+  }
+  .cap-side {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
 /* Animation library */
 .dropzone {
   border: 1px dashed var(--border);

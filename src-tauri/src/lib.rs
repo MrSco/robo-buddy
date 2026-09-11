@@ -35,13 +35,14 @@ fn context_menu(app: tauri::AppHandle) -> Result<(), String> {
         (s.paused, s.chat_enabled)
     };
     let talk_item = MenuItem::with_id(&app, "talk", "Talk to him...", chat, None::<&str>).map_err(|e| e.to_string())?;
+    let capture_item = MenuItem::with_id(&app, "capture", "Copy me (webcam)...", true, None::<&str>).map_err(|e| e.to_string())?;
     let settings_item = MenuItem::with_id(&app, "settings", "Settings...", true, None::<&str>).map_err(|e| e.to_string())?;
     let bring_item = MenuItem::with_id(&app, "bring", "Bring buddy here", true, None::<&str>).map_err(|e| e.to_string())?;
     let pause_item = CheckMenuItem::with_id(&app, "pause_ctx", "Pause reactions", true, paused, None::<&str>).map_err(|e| e.to_string())?;
     let quit = MenuItem::with_id(&app, "quit", "Quit Robo Buddy", true, None::<&str>).map_err(|e| e.to_string())?;
     let sep = PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?;
     let sep2 = PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?;
-    let menu = Menu::with_items(&app, &[&talk_item, &sep, &settings_item, &bring_item, &pause_item, &sep2, &quit]).map_err(|e| e.to_string())?;
+    let menu = Menu::with_items(&app, &[&talk_item, &capture_item, &sep, &settings_item, &bring_item, &pause_item, &sep2, &quit]).map_err(|e| e.to_string())?;
     menu.popup(win.as_ref().window()).map_err(|e| e.to_string())
 }
 
@@ -83,7 +84,13 @@ pub fn run() {
                 .menu(&menu)
                 .show_menu_on_left_click(true)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
-                    "bring" => input::bring_here(app.clone()),
+                    "capture" => {
+                show_settings(app);
+                if let Some(win) = app.get_webview_window("settings") {
+                    let _ = win.emit("capture", ());
+                }
+            }
+            "bring" => input::bring_here(app.clone()),
                     "settings" => show_settings(app),
                     "pause" => {
                         let checked = pause_item.is_checked().unwrap_or(false);
@@ -151,6 +158,7 @@ pub fn run() {
             packs::stage_dropped,
             packs::finalize_import,
             packs::delete_user_clip,
+            packs::save_user_clip,
             open_settings,
             context_menu,
             chat::set_chat_key,

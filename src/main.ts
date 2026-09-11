@@ -9,6 +9,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Bubble } from "./bubble";
 import { ChatClient, TalkBox, Voice, defaultPersona, loadOrGeneratePhrases, type LineEvent, type Lines } from "./chat";
 import { invalidatePersonalities, resolvePersonality, type ResolvedPersonality } from "./personality";
+import type { MirrorPose } from "./mocap";
 import { Sounds } from "./sound";
 import { cursor, IN_TAURI, onKeys, onSurfaces, startInput } from "./input";
 import { listPacks, resolvePack, validateManifest, type Manifest, type PackRef } from "./packs";
@@ -69,6 +70,10 @@ let typingRate = 0;
 let typingAmount = 0;
 let lastShortcutAt = -Infinity;
 let keyEvents = 0;
+// Webcam mirroring (M7): the settings window streams poses while "Mirror on the buddy" is on.
+let mirrorOn = false;
+let mirrorPose: MirrorPose | null = null;
+let lastPoseAt = -Infinity;
 let landStrength = 0;
 let yaw = 0;
 let pitch = 0;
@@ -169,6 +174,14 @@ async function boot() {
     // Other always-on-top windows opened later sit above him in the topmost band; take the
     // top of it back every couple of seconds (no focus change, so nothing is interrupted).
     await listen("talk", () => openTalk());
+    await listen<{ on: boolean }>("mirror", (e) => {
+      mirrorOn = e.payload.on;
+      if (mirrorOn) activity();
+    });
+    await listen<MirrorPose>("pose", (e) => {
+      mirrorPose = e.payload;
+      lastPoseAt = clock.elapsedTime;
+    });
     await onSurfaces((list) => {
       if (physics) physics.surfaces = list;
     });
@@ -587,6 +600,7 @@ function resolveState(t: number, act: ReturnType<Behavior["update"]>): { state: 
   // otherwise the falling clip would flicker off and on across every bounce.
   if (physics?.mode === "rest") airborneSince = -1;
   if (pokeUntil > t) return { state: "poked", clip: pokeClip };
+  if (mirrorOn && t - lastPoseAt < 1) return { state: "mirror", clip: behavior.stateClip("idle") };
   if (landUntil > t) return { state: "land", clip: landClip };
   if (asleep) return { state: "sleep", clip: null };
   if (danceAmount > 0.5) return { state: "dance", clip: danceClip };
@@ -743,6 +757,7 @@ function frame() {
       spin: physics?.spin ?? 0,
       talking: voice.speaking,
       flail: flailNow,
+      mirror: currentState === "mirror" ? mirrorPose : null,
     };
     renderer.frame(input);
   }

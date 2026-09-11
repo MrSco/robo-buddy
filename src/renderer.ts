@@ -1,9 +1,10 @@
 import type { Music } from "./audio";
+import type { MirrorPose } from "./mocap";
 import type { ClipChoice } from "./behavior";
 import type { Manifest, PackRef } from "./packs";
 
 /** Behaviour states resolved by main.ts each frame. Packs may provide a clip per state. */
-export type StateName = "idle" | "dance" | "poked" | "dragged" | "fall" | "sleep" | "fidget" | "walk" | "land" | "down" | "typing";
+export type StateName = "idle" | "dance" | "poked" | "dragged" | "fall" | "sleep" | "fidget" | "walk" | "land" | "down" | "typing" | "mirror";
 
 export type GrabPart = "head" | "torso" | "leftArm" | "rightArm" | "leftLeg" | "rightLeg";
 
@@ -48,6 +49,8 @@ export interface FrameInput {
   talking: boolean;
   /** Airborne with no falling clip in the pack: use the procedural arm flail. */
   flail: boolean;
+  /** Webcam pose to copy this frame (M7), or null. */
+  mirror: MirrorPose | null;
 }
 
 export interface Renderer {

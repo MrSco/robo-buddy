@@ -237,6 +237,32 @@ pub fn finalize_import(app: AppHandle, staged: String, kind: String, name: Optio
     Ok(serde_json::json!({ "kind": "model", "id": pack.id, "name": pack.name }))
 }
 
+/// Write a recorded clip (raw GLB bytes in the request body, name in the x-clip-name header).
+#[tauri::command]
+pub fn save_user_clip(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let name = request
+        .headers()
+        .get("x-clip-name")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("capture")
+        .to_string();
+    let bytes = match request.body() {
+        tauri::ipc::InvokeBody::Raw(b) => b.clone(),
+        _ => return Err("expected a binary body".into()),
+    };
+    let dir = clips_dir(&app).ok_or("no data dir")?;
+    let safe: String = name.trim().chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect();
+    let safe = if safe.is_empty() { "capture".to_string() } else { safe };
+    let mut path = dir.join(format!("{safe}.glb"));
+    let mut n = 2;
+    while path.exists() {
+        path = dir.join(format!("{safe}-{n}.glb"));
+        n += 1;
+    }
+    fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or(safe))
+}
+
 #[tauri::command]
 pub fn delete_user_clip(app: AppHandle, file: String) -> Result<(), String> {
     let dir = clips_dir(&app).ok_or("no data dir")?;
