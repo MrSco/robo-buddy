@@ -52,7 +52,13 @@ html, body {
 /* Long replies wrap instead of running off the window. */
 .bubble.long {
   white-space: normal;
-  max-width: min(260px, calc(100vw - 16px));
+  max-width: min(300px, calc(100vw - 16px));
+  font-weight: 500;
+}
+.bubble.xl {
+  max-width: calc(100vw - 16px);
+  font-size: 12px;
+  line-height: 1.3;
   font-weight: 500;
 }
 

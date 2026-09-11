@@ -56,7 +56,15 @@ export function cleanReply(raw: string): string {
     .replace(/\s*\n\s*/g, " ")
     .replace(/\s{2,}/g, " ")
     .trim();
-  return t || raw.trim();
+  t = t || raw.trim();
+  // A bubble can hold a couple of sentences; past that, keep whole sentences up to the cap.
+  const CAP = 300;
+  if (t.length > CAP) {
+    const head = t.slice(0, CAP);
+    const cut = Math.max(head.lastIndexOf(". "), head.lastIndexOf("! "), head.lastIndexOf("? "));
+    t = cut > 80 ? head.slice(0, cut + 1) : head.replace(/\s+\S*$/, "") + "…";
+  }
+  return t;
 }
 
 export class ChatClient {
@@ -76,7 +84,7 @@ export class ChatClient {
     const messages = [system, ...this.history.slice(-10)];
     const raw = await invoke<string>("chat_complete", {
       messages,
-      maxTokens: Math.round(this.tuning.maxWords * 3 + 40),
+      maxTokens: Math.round(this.tuning.maxWords * 2 + 30),
       temperature: this.tuning.temperature,
     });
     const reply = cleanReply(raw);

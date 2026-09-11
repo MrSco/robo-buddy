@@ -27,11 +27,17 @@ export class Bubble {
     this.lastLine = line;
     this.el.textContent = line;
     this.el.classList.toggle("long", line.length > 28);
+    this.el.classList.toggle("xl", line.length > 120);
     this.el.hidden = false;
     this.el.classList.remove("pop");
     void this.el.offsetWidth; // restart the pop animation
     this.el.classList.add("pop");
     this.hideAt = now + seconds;
+  }
+
+  /** Height in CSS px while showing, else 0; the camera reserves this much above the head. */
+  visibleHeight(): number {
+    return this.el.hidden ? 0 : this.el.offsetHeight;
   }
 
   hide() {

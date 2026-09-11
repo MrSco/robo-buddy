@@ -37,6 +37,8 @@ export class Renderer3D implements Renderer {
   private fitX = 0;
   /** CSS pixels reserved under the soles (the taskbar band the window overlaps). */
   groundPx = 0;
+  /** CSS pixels a showing speech bubble needs above the head; the fit zooms out to make room. */
+  bubblePx = 0;
   /** Dev: frames where both arms were straight out sideways, and when it last happened. */
   tposeFrames = 0;
   tposeLast = "";
@@ -170,7 +172,9 @@ export class Renderer3D implements Renderer {
     const groundUnits = (this.groundPx * (2 * Math.max(this.fitDist, 0.05) * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)))) / this.cssH;
     const y0 = Math.min(floor - h * 0.01, lowest - h * 0.03) - groundUnits;
     void minY;
-    const y1 = Math.max(maxY + h * 0.1, y0 + h * 1.3);
+    const unitsPerPx = (2 * Math.max(this.fitDist, 0.05) * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / this.cssH;
+    const bubbleUnits = this.bubblePx > 0 ? (this.bubblePx + 16) * unitsPerPx : 0;
+    const y1 = Math.max(maxY + h * 0.1 + bubbleUnits, y0 + h * 1.3);
     const halfV = (y1 - y0) / 2;
     const cx = (minX + maxX) / 2;
     const halfH = (maxX - minX) / 2 + h * 0.05;

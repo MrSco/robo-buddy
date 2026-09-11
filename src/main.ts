@@ -751,7 +751,10 @@ function frame() {
   // Standing on the taskbar: sink the window by the camera's margin so the soles meet its edge.
   // Standing on the taskbar: the window covers the taskbar band and the soles sit on its top edge.
   if (physics) physics.floorOverlap = settings.standOnTaskbar && renderer === renderer3d ? physics.taskbarHeight : 0;
-  if (renderer3d) renderer3d.groundPx = physics ? physics.groundOverlap / scaleFactor : 0;
+  if (renderer3d) {
+    renderer3d.groundPx = physics ? physics.groundOverlap / scaleFactor : 0;
+    renderer3d.bubblePx = bubble.visibleHeight();
+  }
   updateHead();
   updateLook(dt);
 
