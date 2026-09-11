@@ -409,6 +409,11 @@ details.adv summary {
   object-fit: contain;
   display: block;
 }
+/* The rule above outranks the browser's [hidden] rule; the live preview swaps the two via `hidden`. */
+.preview img[hidden],
+.preview canvas[hidden] {
+  display: none;
+}
 .pick-controls {
   flex: 1;
   min-width: 260px;
