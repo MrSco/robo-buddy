@@ -3,13 +3,23 @@ import type { Manifest, PackRef } from "./packs";
 type SoundEvent = keyof NonNullable<Manifest["sounds"]>;
 
 /** Effects every character gets unless its pack ships its own for that event. */
-const DEFAULT_SOUNDS: Partial<Record<SoundEvent, string>> = { poked: "/sounds/boing.wav", land: "/sounds/thud.wav" };
+const DEFAULT_SOUNDS: Partial<Record<SoundEvent, string>> = {
+  poked: "/sounds/boing.wav",
+  land: "/sounds/thud.wav",
+  bounce: "/sounds/bounce.wav",
+  bump: "/sounds/bump.wav",
+  grab: "/sounds/grab.wav",
+  throw: "/sounds/throw.wav",
+};
 
 /** Preloaded per-pack sound effects, with the app's defaults behind them. */
 export class Sounds {
   private clips = new Map<SoundEvent, HTMLAudioElement>();
   enabled = true;
   volume = 0.6;
+  /** Dev: the last few events played, newest last, for the status line. */
+  last = "-";
+  private history: string[] = [];
 
   load(pack: PackRef, manifest: Manifest) {
     this.clips.clear();
@@ -26,6 +36,9 @@ export class Sounds {
     if (!this.enabled) return;
     const a = this.clips.get(event);
     if (!a) return;
+    this.history.push(event);
+    if (this.history.length > 4) this.history.shift();
+    this.last = this.history.join(">");
     try {
       a.currentTime = 0;
       a.volume = this.volume;

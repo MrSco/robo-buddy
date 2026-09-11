@@ -32,6 +32,10 @@ export class WindowPhysics {
   onLand?: (speed: number) => void;
   /** Set by the caller: he hit his head on the top of the screen pulling himself onto a window. */
   onBump?: () => void;
+  /** Set by the caller: he hit the side or top of the screen at this speed (px/s). */
+  onBounce?: (speed: number, side: "left" | "right" | "top") => void;
+  /** Set by the caller: he was let go at this speed (px/s); slow drops do not count. */
+  onThrow?: (speed: number) => void;
   /**
    * Physical px from the window's top edge down to the top of his head when he stands straight
    * (measured by the renderer). 0 until measured; a fifth of the window is assumed then.
@@ -153,6 +157,8 @@ export class WindowPhysics {
     }
     // A fast sideways throw sets him tumbling; the renderer integrates and damps it.
     this.spin = this.opts.throwable ? THREE_CLAMP(-this.vx / 900, -6, 6) : 0;
+    const flung = Math.hypot(this.vx, this.vy);
+    if (this.opts.throwable && flung > 900) this.onThrow?.(flung);
     this.mode = this.opts.gravity ? "falling" : "rest";
     // Pick the monitor he was released over right now; the physics would otherwise clamp
     // him back into the old monitor's bounds while the async lookup was still in flight.
@@ -490,14 +496,17 @@ export class WindowPhysics {
       this.ceilingFree = Math.max(0, this.ceilingFree - dt);
       if (this.ceilingFree <= 0 && this.y + this.crownNow < this.area.top) {
         this.y = this.area.top - this.crownNow;
+        if (this.vy < -250) this.onBounce?.(-this.vy, "top");
         this.vy = Math.abs(this.vy) * BOUNCE;
       }
       if (this.x < left) {
         this.x = left;
+        if (this.vx < -250) this.onBounce?.(-this.vx, "left");
         this.vx = Math.abs(this.vx) * BOUNCE;
         this.spin = -this.spin * 0.8;
       } else if (this.x > right) {
         this.x = right;
+        if (this.vx > 250) this.onBounce?.(this.vx, "right");
         this.vx = -Math.abs(this.vx) * BOUNCE;
         this.spin = -this.spin * 0.8;
       }

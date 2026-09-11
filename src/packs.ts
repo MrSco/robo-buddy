@@ -46,7 +46,7 @@ export interface Manifest {
   /** Optional speech-bubble lines per event; one is picked at random. */
   lines?: Partial<Record<"greet" | "poked" | "sleep" | "wake" | "land" | "bump" | "dance", string[]>>;
   /** Optional sound files per event, relative to the pack. */
-  sounds?: Partial<Record<"poked" | "land" | "wake" | "greet", string>>;
+  sounds?: Partial<Record<"poked" | "land" | "wake" | "greet" | "bounce" | "bump" | "grab" | "throw", string>>;
   reactions: {
     music?: { enabled: boolean; threshold?: number };
     mouse?: { enabled: boolean; lookAtCursor?: boolean; pokeState?: string };
