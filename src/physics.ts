@@ -176,6 +176,9 @@ export class WindowPhysics {
       this.x = cursor.x - this.grabDx;
       this.y = cursor.y - this.grabDy;
       this.area = this.areaAt(this.x + this.w / 2, this.y + this.h / 2);
+      // Never below the floor while held: grabbing a foot near the taskbar would otherwise
+      // hang the rest of him off the bottom of the screen.
+      if (this.y > this.floor) this.y = this.floor;
       this.samples.push({ t: performance.now(), x: this.x, y: this.y });
       if (this.samples.length > 12) this.samples.shift();
     } else if (this.mode === "falling") {
