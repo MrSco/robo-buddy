@@ -155,6 +155,7 @@ async function previewPack(id: string) {
   const m = await manifestFor(pack);
   try {
     await getLive().show(pack, m);
+    if (m.renderer === "3d") status(`Rig: ${getLive().rigReport}`);
   } catch (err) {
     status(`Preview failed: ${err}`);
   }

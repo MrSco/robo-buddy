@@ -438,13 +438,73 @@ export class Renderer3D implements Renderer {
   }
 
   /** Dev: raw RGBA at the centre of the drawing buffer plus the GL error state. */
+  /**
+   * Dev: sampled skinned vertices whose distance to the bone they follow most has grown the
+   * most since the bind pose. Rigid skinning keeps that distance; growth means the vertex is
+   * being pulled between bones that have parted, which is what a spike is.
+   */
+  private spikeBase = new WeakMap<THREE.SkinnedMesh, Array<{ i: number; bone: number; d0: number }>>();
+  private spikeReport(): string {
+    const c = this.character;
+    if (!c) return "";
+    const v = new THREE.Vector3();
+    const bp = new THREE.Vector3();
+    const bind = new THREE.Matrix4();
+    const worst: Array<{ name: string; d: number }> = [];
+    c.root.traverse((o) => {
+      const m = o as THREE.SkinnedMesh;
+      if (!m.isSkinnedMesh || !m.skeleton) return;
+      const pos = m.geometry.getAttribute("position");
+      const si = m.geometry.getAttribute("skinIndex");
+      const sw = m.geometry.getAttribute("skinWeight");
+      if (!pos || !si || !sw) return;
+      let base = this.spikeBase.get(m);
+      if (!base) {
+        base = [];
+        for (let i = 0; i < pos.count; i += 40) {
+          let best = 0;
+          let bw = -1;
+          for (let k = 0; k < 4; k++) {
+            const w = sw.getComponent(i, k);
+            if (w > bw) {
+              bw = w;
+              best = si.getComponent(i, k);
+            }
+          }
+          if (!m.skeleton.bones[best]) continue;
+          // Bind-pose distance: raw geometry in world against the bone's bind placement.
+          v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+          bind.copy(m.skeleton.boneInverses[best]).invert().premultiply(m.matrixWorld);
+          bp.setFromMatrixPosition(bind);
+          base.push({ i, bone: best, d0: v.distanceTo(bp) });
+        }
+        this.spikeBase.set(m, base);
+      }
+      for (const e of base) {
+        m.getVertexPosition(e.i, v);
+        v.applyMatrix4(m.matrixWorld);
+        m.skeleton.bones[e.bone].getWorldPosition(bp);
+        const d = (v.distanceTo(bp) - e.d0) / Math.max(1e-3, c.height);
+        if (worst.length < 3 || d > worst[worst.length - 1].d) {
+          worst.push({ name: m.skeleton.bones[e.bone].name, d });
+          worst.sort((a, b) => b.d - a.d);
+          if (worst.length > 3) worst.pop();
+        }
+      }
+    });
+    return worst.map((w) => `${w.name}:${w.d.toFixed(2)}`).join(",");
+  }
+  private probeCalls = 0;
+  private lastSpike = "";
+
   debugProbe(): string {
+    if (this.probeCalls++ % 10 === 0) this.lastSpike = this.spikeReport();
     const px = new Uint8Array(4);
     this.gl.readPixels(Math.floor(this.canvas.width / 2), Math.floor(this.canvas.height * 0.55), 1, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, px);
     const c = this.character;
     const v = (o: THREE.Object3D | undefined) => (o ? o.getWorldPosition(this.tmp).toArray().map((n) => n.toFixed(2)).join("/") : "-");
     const geo = c ? `hips=${v(c.bone("hips"))} head=${v(c.bone("head"))} base=${this.baseCenter.toArray().map((n) => n.toFixed(2)).join("/")} size=${this.baseSize.toArray().map((n) => n.toFixed(2)).join("/")} fit=${this.fitDist.toFixed(2)}/${this.fitY.toFixed(2)} rootScale=${c.root.scale.x.toFixed(3)}` : "";
-    return `${Array.from(px).join(",")} err=${this.gl.getError()} lost=${this.gl.isContextLost()} inst=${this.id} renders=${this.renders} same=${this.gl === this.renderer.getContext()} tpose=${this.tposeFrames}:${this.tposeLast} ${geo}`;
+    return `${Array.from(px).join(",")} err=${this.gl.getError()} lost=${this.gl.isContextLost()} inst=${this.id} renders=${this.renders} same=${this.gl === this.renderer.getContext()} tpose=${this.tposeFrames}:${this.tposeLast} ${geo} spike=${this.lastSpike}`;
   }
 
   /** Screen-space positions of the bones that matter for grabbing. */

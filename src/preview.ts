@@ -18,6 +18,8 @@ export class LivePreview {
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
   private character: Character | null = null;
+  /** Rig report of the character last shown (3D only). */
+  rigReport = "";
   private clock = new THREE.Clock();
   private raf = 0;
   private token = 0;
@@ -80,6 +82,7 @@ export class LivePreview {
       return;
     }
     this.character = c;
+    this.rigReport = c.rigReport;
     this.scene.add(c.root);
     this.frame(c);
     const idle = manifest.states.idle?.clip;

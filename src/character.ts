@@ -31,6 +31,10 @@ export interface Character {
    * Equals the rest pose when no clip is playing, otherwise the clip's output for this frame.
    */
   rest: Map<THREE.Object3D, THREE.Quaternion>;
+  /** Required humanoid bones the model lacks (empty when fully rigged), for the rig report. */
+  missingBones: BoneName[];
+  /** How many humanoid bones were recognised, and by which naming scheme. */
+  rigReport: string;
   /** Bones written by the currently playing clip; procedural idle leaves these alone. */
   animatedBones: Set<THREE.Object3D>;
   /** Height in metres after unit normalisation. */
@@ -225,6 +229,18 @@ function restoreBindPose(root: THREE.Object3D) {
   }
 }
 
+/** Which naming scheme most of the recognised bones came from, for the rig report. */
+function rigScheme(bones: Map<BoneName, THREE.Object3D>): string {
+  const names = [...bones.values()].map((b) => b.name.toLowerCase());
+  const n = names.length || 1;
+  const count = (re: RegExp) => names.filter((x) => re.test(x)).length;
+  if (count(/^mixamorig/) > n / 2) return "Mixamo";
+  if (count(/^bip_/) > n / 2) return "Valve biped";
+  if (count(/^(upperarm|lowerarm|thigh|calf|spine_0|clavicle)_[lr]/) > n / 2) return "Unreal";
+  if (count(/^(hips|spine|neck|head|left|right)/) > n / 2) return "Mixamo-style names";
+  return "generic names";
+}
+
 export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<Character> {
   const model = await loadModel(pack.base + manifest.model);
   const { root, vrm } = model;
@@ -248,6 +264,8 @@ export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<
   }
   const missing = missingBones(bones);
   if (missing.length) console.warn(`${manifest.name}: no humanoid bones for ${missing.join(", ")}; clips will not fully apply`);
+  const scheme = vrm ? "VRM" : rigScheme(bones);
+  const rigReport = bones.size ? `${bones.size} humanoid bones recognised (${scheme})${missing.length ? `; missing ${missing.join(", ")}: those parts will not animate` : ""}` : "no humanoid skeleton found: the model will not animate";
 
   root.traverse((o) => {
     if ((o as THREE.SkinnedMesh).isSkinnedMesh) o.frustumCulled = false;
@@ -322,6 +340,8 @@ export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<
     vrm,
     rig,
     rest,
+    missingBones: missing,
+    rigReport,
     animatedBones,
     height,
     bone: (name) => bones.get(name),
