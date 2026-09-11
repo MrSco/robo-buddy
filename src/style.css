@@ -49,6 +49,74 @@ html, body {
 .bubble.pop {
   animation: pop 0.18s ease-out;
 }
+/* Long replies wrap instead of running off the window. */
+.bubble.long {
+  white-space: normal;
+  max-width: min(260px, calc(100vw - 16px));
+  font-weight: 500;
+}
+
+/* Talk strip at his feet. */
+.talk {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 5px 6px 5px 4px;
+  background: rgba(22, 24, 30, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  font: 13px "Segoe UI", system-ui, sans-serif;
+  color: #fff;
+  pointer-events: auto;
+  z-index: 5;
+}
+.talk[hidden] {
+  display: none;
+}
+.talk input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: #fff;
+  font: inherit;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.talk input::placeholder {
+  color: #9a9daa;
+}
+.talk button {
+  background: transparent;
+  border: 0;
+  color: #cfd3dc;
+  cursor: pointer;
+  font-size: 15px;
+  padding: 2px 5px;
+  border-radius: 8px;
+}
+.talk button:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+.talk button.rec {
+  color: #ff5c5c;
+  animation: blink 1s infinite;
+}
+.talk.busy input {
+  opacity: 0.6;
+}
+@keyframes blink {
+  50% {
+    opacity: 0.4;
+  }
+}
 @keyframes pop {
   from {
     transform: translateY(6px) scale(0.85);

@@ -41,6 +41,21 @@ pub struct Settings {
     pub anim_roles: HashMap<String, String>,
     /// Hide the buddy while a fullscreen app has focus.
     pub hide_when_fullscreen: bool,
+    /// Talk (M6): off by default; nothing leaves the machine until enabled.
+    pub chat_enabled: bool,
+    /// Preset name for the settings UI: groq, gemini, openai, ollama, custom.
+    pub chat_provider: String,
+    /// OpenAI-compatible base URL, e.g. https://api.groq.com/openai/v1
+    pub chat_endpoint: String,
+    pub chat_model: String,
+    /// Whisper-style model for /audio/transcriptions; empty = no microphone.
+    pub chat_stt_model: String,
+    /// Speak replies with the Windows voice.
+    pub chat_voice: bool,
+    /// Generate fresh speech-bubble lines per character.
+    pub chat_generate_lines: bool,
+    /// Requests per day, 0 = unlimited.
+    pub chat_daily_cap: u32,
 }
 
 impl Default for Settings {
@@ -64,6 +79,14 @@ impl Default for Settings {
             idle_sets: HashMap::new(),
             anim_roles: HashMap::new(),
             hide_when_fullscreen: true,
+            chat_enabled: false,
+            chat_provider: "groq".into(),
+            chat_endpoint: "https://api.groq.com/openai/v1".into(),
+            chat_model: "llama-3.3-70b-versatile".into(),
+            chat_stt_model: "whisper-large-v3-turbo".into(),
+            chat_voice: true,
+            chat_generate_lines: true,
+            chat_daily_cap: 300,
         }
     }
 }

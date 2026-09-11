@@ -41,6 +41,8 @@ export interface Manifest {
   fidgets?: Array<string | string[]>;
   /** Dance clips the user can choose from; "procedural" is the built-in groove. */
   dances?: Array<string | { clip: string; beatsPerLoop?: number; label?: string }>;
+  /** Who he is when talking (M6); a default persona is built from the name when absent. */
+  persona?: string;
   /** Optional speech-bubble lines per event; one is picked at random. */
   lines?: Partial<Record<"greet" | "poked" | "sleep" | "wake" | "land" | "dance", string[]>>;
   /** Optional sound files per event, relative to the pack. */

@@ -22,6 +22,7 @@ export class Bubble {
     if (lines.length > 1 && line === this.lastLine) line = lines[(lines.indexOf(line) + 1) % lines.length];
     this.lastLine = line;
     this.el.textContent = line;
+    this.el.classList.toggle("long", line.length > 28);
     this.el.hidden = false;
     this.el.classList.remove("pop");
     void this.el.offsetWidth; // restart the pop animation

@@ -44,6 +44,8 @@ export interface FrameInput {
   accelY: number;
   /** Tumble rate in rad/s while airborne. */
   spin: number;
+  /** He is speaking a reply out loud: small head nods. */
+  talking: boolean;
 }
 
 export interface Renderer {

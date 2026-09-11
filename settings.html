@@ -84,6 +84,56 @@
         <label class="check"><input id="autostart" type="checkbox" /> Start with Windows</label>
         <label class="check"><input id="fullscreen" type="checkbox" /> Hide while a fullscreen app is active</label>
       </section>
+
+      <section class="s-talk">
+        <h2>Talk</h2>
+        <label class="check"><input id="chat-enabled" type="checkbox" /> Let him talk (double-click him, or right-click &rarr; Talk)</label>
+        <div class="indent talk-fields" id="talk-fields">
+          <label class="field inline">
+            <span>Provider</span>
+            <select id="chat-provider">
+              <option value="groq">Groq (free tier)</option>
+              <option value="gemini">Google Gemini (free tier)</option>
+              <option value="openai">OpenAI</option>
+              <option value="ollama">Ollama (local, no key)</option>
+              <option value="custom">Custom OpenAI-compatible</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Endpoint</span>
+            <input id="chat-endpoint" type="text" spellcheck="false" />
+          </label>
+          <div class="row">
+            <label class="field grow">
+              <span>Chat model</span>
+              <input id="chat-model" type="text" spellcheck="false" />
+            </label>
+            <label class="field grow">
+              <span>Speech model (blank = no mic)</span>
+              <input id="chat-stt" type="text" spellcheck="false" />
+            </label>
+          </div>
+          <label class="field">
+            <span>API key &mdash; <span id="chat-keyhint"></span></span>
+            <div class="row">
+              <input id="chat-key" type="password" placeholder="paste a key, then Save" class="grow" autocomplete="off" />
+              <button id="chat-savekey" type="button">Save key</button>
+            </div>
+          </label>
+          <p class="hint" id="chat-keystatus"></p>
+          <label class="check"><input id="chat-voice" type="checkbox" /> Speak replies out loud (Windows voice)</label>
+          <label class="check"><input id="chat-lines" type="checkbox" /> Generate fresh speech-bubble lines in his voice</label>
+          <div class="row">
+            <label class="field inline grow">
+              <span>Daily request cap</span>
+              <input id="chat-cap" type="number" min="0" step="10" />
+            </label>
+            <button id="chat-test" type="button">Test</button>
+          </div>
+          <p class="hint" id="chat-teststatus"></p>
+          <p class="hint">Nothing leaves this PC until this is on. The key is kept in Windows Credential Manager, not in the settings file. The microphone sends a short recording to the same endpoint for transcription.</p>
+        </div>
+      </section>
       </div>
 
       <section class="s-library">

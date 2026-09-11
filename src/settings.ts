@@ -44,6 +44,21 @@ const els = {
   libsource: $<HTMLSelectElement>("libsource"),
   library: $<HTMLDivElement>("library"),
   status: $<HTMLParagraphElement>("status"),
+  chatEnabled: $<HTMLInputElement>("chat-enabled"),
+  talkFields: $<HTMLDivElement>("talk-fields"),
+  chatProvider: $<HTMLSelectElement>("chat-provider"),
+  chatEndpoint: $<HTMLInputElement>("chat-endpoint"),
+  chatModel: $<HTMLInputElement>("chat-model"),
+  chatStt: $<HTMLInputElement>("chat-stt"),
+  chatKey: $<HTMLInputElement>("chat-key"),
+  chatKeyHint: $<HTMLSpanElement>("chat-keyhint"),
+  chatSaveKey: $<HTMLButtonElement>("chat-savekey"),
+  chatKeyStatus: $<HTMLParagraphElement>("chat-keystatus"),
+  chatVoice: $<HTMLInputElement>("chat-voice"),
+  chatLines: $<HTMLInputElement>("chat-lines"),
+  chatCap: $<HTMLInputElement>("chat-cap"),
+  chatTest: $<HTMLButtonElement>("chat-test"),
+  chatTestStatus: $<HTMLParagraphElement>("chat-teststatus"),
 };
 
 let settings: Settings;
@@ -271,6 +286,16 @@ function render() {
   els.sensitivity.value = String(sliderFromThreshold(settings.musicThreshold));
   els.sensOut.value = `${Math.round(sliderFromThreshold(settings.musicThreshold) * 100)}%`;
   els.tempo.checked = settings.requireTempo;
+  els.chatEnabled.checked = settings.chatEnabled;
+  els.talkFields.classList.toggle("off", !settings.chatEnabled);
+  els.chatProvider.value = settings.chatProvider;
+  els.chatEndpoint.value = settings.chatEndpoint;
+  els.chatModel.value = settings.chatModel;
+  els.chatStt.value = settings.chatSttModel;
+  els.chatVoice.checked = settings.chatVoice;
+  els.chatLines.checked = settings.chatGenerateLines;
+  els.chatCap.value = String(settings.chatDailyCap);
+  els.chatKeyHint.textContent = PROVIDERS[settings.chatProvider]?.keyHint ?? "for your endpoint";
   els.clickthrough.value = settings.clickThrough;
   els.autostart.checked = settings.autostart;
   els.sounds.checked = settings.soundsEnabled;
@@ -319,11 +344,87 @@ function startMeter() {
   });
 }
 
+/** Provider presets: any OpenAI-compatible endpoint works; these fill in the usual values. */
+const PROVIDERS: Record<string, { endpoint: string; model: string; stt: string; keyHint: string }> = {
+  groq: { endpoint: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile", stt: "whisper-large-v3-turbo", keyHint: "free at console.groq.com/keys" },
+  gemini: { endpoint: "https://generativelanguage.googleapis.com/v1beta/openai", model: "gemini-2.0-flash", stt: "", keyHint: "free at aistudio.google.com/apikey" },
+  openai: { endpoint: "https://api.openai.com/v1", model: "gpt-4o-mini", stt: "whisper-1", keyHint: "platform.openai.com/api-keys" },
+  ollama: { endpoint: "http://localhost:11434/v1", model: "llama3.2", stt: "", keyHint: "not needed" },
+  custom: { endpoint: "", model: "", stt: "", keyHint: "for your endpoint" },
+};
+
+async function refreshKeyStatus() {
+  try {
+    const has = await invoke<boolean>("has_chat_key");
+    const used = await invoke<number>("chat_usage");
+    els.chatKeyStatus.textContent = (has ? "A key is saved." : "No key saved.") + (used ? ` ${used} requests today.` : "");
+  } catch {
+    els.chatKeyStatus.textContent = "";
+  }
+}
+
+function wireTalk() {
+  els.chatEnabled.addEventListener("change", () => {
+    els.talkFields.classList.toggle("off", !els.chatEnabled.checked);
+    void commit({ chatEnabled: els.chatEnabled.checked });
+  });
+  els.chatProvider.addEventListener("change", () => {
+    const p = PROVIDERS[els.chatProvider.value];
+    if (p && els.chatProvider.value !== "custom") {
+      els.chatEndpoint.value = p.endpoint;
+      els.chatModel.value = p.model;
+      els.chatStt.value = p.stt;
+    }
+    els.chatKeyHint.textContent = p?.keyHint ?? "";
+    void commit({ chatProvider: els.chatProvider.value, chatEndpoint: els.chatEndpoint.value.trim(), chatModel: els.chatModel.value.trim(), chatSttModel: els.chatStt.value.trim() });
+  });
+  els.chatEndpoint.addEventListener("change", () => void commit({ chatEndpoint: els.chatEndpoint.value.trim() }));
+  els.chatModel.addEventListener("change", () => void commit({ chatModel: els.chatModel.value.trim() }));
+  els.chatStt.addEventListener("change", () => void commit({ chatSttModel: els.chatStt.value.trim() }));
+  els.chatVoice.addEventListener("change", () => void commit({ chatVoice: els.chatVoice.checked }));
+  els.chatLines.addEventListener("change", () => void commit({ chatGenerateLines: els.chatLines.checked }));
+  els.chatCap.addEventListener("change", () => void commit({ chatDailyCap: Math.max(0, Math.round(Number(els.chatCap.value) || 0)) }));
+  els.chatSaveKey.addEventListener("click", async () => {
+    try {
+      await invoke("set_chat_key", { key: els.chatKey.value });
+      els.chatKey.value = "";
+      await refreshKeyStatus();
+      els.chatKeyStatus.textContent = "Key saved. " + els.chatKeyStatus.textContent;
+    } catch (err) {
+      els.chatKeyStatus.textContent = `Could not save the key: ${err}`;
+    }
+  });
+  els.chatKey.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") els.chatSaveKey.click();
+  });
+  els.chatTest.addEventListener("click", async () => {
+    els.chatTestStatus.textContent = "Asking…";
+    els.chatTest.disabled = true;
+    try {
+      const reply = await invoke<string>("chat_complete", {
+        messages: [
+          { role: "system", content: "You are a desktop buddy. Reply with one short, friendly sentence." },
+          { role: "user", content: "Say hi and tell me you can hear me." },
+        ],
+        maxTokens: 60,
+      });
+      els.chatTestStatus.textContent = `He says: ${reply}`;
+    } catch (err) {
+      els.chatTestStatus.textContent = `Failed: ${err}`;
+    } finally {
+      els.chatTest.disabled = false;
+      void refreshKeyStatus();
+    }
+  });
+  void refreshKeyStatus();
+}
+
 /** Play buttons by clip name, so the one previewing can show a stop glyph. */
 const playButtons = new Map<string, HTMLButtonElement>();
 
 async function main() {
   startMeter();
+  wireTalk();
   getLive().onPreviewChange = (name) => {
     for (const [clip, btn] of playButtons) btn.textContent = clip === name ? "■" : "▶";
   };

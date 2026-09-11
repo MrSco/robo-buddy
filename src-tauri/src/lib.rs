@@ -1,11 +1,12 @@
 use tauri::{
     menu::{CheckMenuItem, ContextMenu, Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
-    Manager, WindowEvent,
+    Emitter, Manager, WindowEvent,
 };
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 mod audio;
+mod chat;
 mod input;
 mod packs;
 mod settings;
@@ -27,12 +28,19 @@ fn open_settings(app: tauri::AppHandle) {
 #[tauri::command]
 fn context_menu(app: tauri::AppHandle) -> Result<(), String> {
     let Some(win) = app.get_webview_window("buddy") else { return Err("no buddy window".into()) };
-    let paused = app.state::<settings::SettingsState>().0.lock().unwrap().paused;
+    let (paused, chat) = {
+        let state = app.state::<settings::SettingsState>();
+        let s = state.0.lock().unwrap();
+        (s.paused, s.chat_enabled)
+    };
+    let talk_item = MenuItem::with_id(&app, "talk", "Talk to him...", chat, None::<&str>).map_err(|e| e.to_string())?;
     let settings_item = MenuItem::with_id(&app, "settings", "Settings...", true, None::<&str>).map_err(|e| e.to_string())?;
     let bring_item = MenuItem::with_id(&app, "bring", "Bring buddy here", true, None::<&str>).map_err(|e| e.to_string())?;
     let pause_item = CheckMenuItem::with_id(&app, "pause_ctx", "Pause reactions", true, paused, None::<&str>).map_err(|e| e.to_string())?;
     let quit = MenuItem::with_id(&app, "quit", "Quit Robo Buddy", true, None::<&str>).map_err(|e| e.to_string())?;
-    let menu = Menu::with_items(&app, &[&settings_item, &bring_item, &pause_item, &PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?, &quit]).map_err(|e| e.to_string())?;
+    let sep = PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?;
+    let sep2 = PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?;
+    let menu = Menu::with_items(&app, &[&talk_item, &sep, &settings_item, &bring_item, &pause_item, &sep2, &quit]).map_err(|e| e.to_string())?;
     menu.popup(win.as_ref().window()).map_err(|e| e.to_string())
 }
 
@@ -101,6 +109,11 @@ pub fn run() {
             Ok(())
         })
         .on_menu_event(|app, event| match event.id.as_ref() {
+            "talk" => {
+                if let Some(win) = app.get_webview_window("buddy") {
+                    let _ = win.emit("talk", ());
+                }
+            }
             "bring" => input::bring_here(app.clone()),
             "settings" => show_settings(app),
             "pause_ctx" => {
@@ -136,6 +149,14 @@ pub fn run() {
             packs::delete_user_clip,
             open_settings,
             context_menu,
+            chat::set_chat_key,
+            chat::has_chat_key,
+            chat::chat_complete,
+            chat::transcribe,
+            chat::chat_usage,
+            chat::load_phrases,
+            chat::save_phrases,
+            chat::clear_phrases,
         ])
         .run(context)
         .expect("error while running Robo Buddy");

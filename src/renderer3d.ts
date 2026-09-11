@@ -43,6 +43,7 @@ export class Renderer3D implements Renderer {
   private tumble = 0;
   private tumbleVel = 0;
   private downAmount = 0;
+  private talkAmount = 0;
   /** Which side he lies on while knocked down (+1 / -1), chosen when he goes down. */
   private lieSide = 0;
 
@@ -332,6 +333,9 @@ export class Renderer3D implements Renderer {
 
     const awake = 1 - input.sleepAmount;
     const lookScale = awake * (1 - Math.min(1, Math.abs(this.facing) / 1.2)) * (1 - this.downAmount);
+    // Talking: quick little nods, like someone chatting.
+    this.talkAmount += ((input.talking ? 1 : 0) - this.talkAmount) * Math.min(1, input.dt * 6);
+    if (this.talkAmount > 0.001) nod += (Math.sin(input.t * 9) * 0.05 + Math.sin(input.t * 2.3) * 0.03) * this.talkAmount;
     applyLookAt(c, input.yaw * lookScale, (input.pitch + pokePitch + nod) * lookScale, roll * awake);
     // Secondary motion while held, airborne or down: limbs lag behind the window's acceleration.
     // After look-at, which resets the head and neck each frame, so the head spring survives.

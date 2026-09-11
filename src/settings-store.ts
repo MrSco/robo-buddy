@@ -28,6 +28,15 @@ export interface Settings {
   /** Per library clip name: role override ("idle", "fidget", "dance", "poke", "held", "fall", "walk", "off"). */
   animRoles: Record<string, string>;
   hideWhenFullscreen: boolean;
+  /** Talk (M6). */
+  chatEnabled: boolean;
+  chatProvider: string;
+  chatEndpoint: string;
+  chatModel: string;
+  chatSttModel: string;
+  chatVoice: boolean;
+  chatGenerateLines: boolean;
+  chatDailyCap: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -49,6 +58,14 @@ export const DEFAULT_SETTINGS: Settings = {
   idleSets: {},
   animRoles: {},
   hideWhenFullscreen: true,
+  chatEnabled: false,
+  chatProvider: "groq",
+  chatEndpoint: "https://api.groq.com/openai/v1",
+  chatModel: "llama-3.3-70b-versatile",
+  chatSttModel: "whisper-large-v3-turbo",
+  chatVoice: true,
+  chatGenerateLines: true,
+  chatDailyCap: 300,
 };
 
 export async function getSettings(): Promise<Settings> {

@@ -314,7 +314,7 @@ is commodity and took one session. We keep our codebase and borrow patterns from
 - WebView2 memory trimming while asleep / hidden.
 - A "Getting Up" clip for the knocked-down recovery instead of Jump Land.
 
-## M6 — Talk to him (proposed, not started)
+## M6 — Talk to him (built Sep 11 2026)
 Goal: dynamic phrases and a real conversation, free by default, bring-your-own-key optional.
 - Input: a text box that opens under the bubble on double-click or a hotkey; push-to-talk via Windows' built-in
   offline speech recognition (WinRT `Windows.Media.SpeechRecognition` from Rust, no cloud, no key) as the mic path.
@@ -327,3 +327,25 @@ Goal: dynamic phrases and a real conversation, free by default, bring-your-own-k
   and cached in `%APPDATA%`, so the bubble stops repeating the same ten strings; falls back to the manifest lines offline.
 - Guardrails: nothing leaves the machine unless an endpoint is configured; the key is stored in Windows Credential
   Manager, not in settings.json; a per-day request cap in settings.
+- As built: `src-tauri/src/chat.rs` (reqwest to `{endpoint}/chat/completions` and `/audio/transcriptions`, `keyring`
+  for the key, daily cap in `chat_usage.json`, phrase cache in `phrases/<pack>.json`); `src/chat.ts` (ChatClient with the
+  last 10 turns, TalkBox strip at his feet with mic via MediaRecorder, Voice via speechSynthesis, phrase generation);
+  Settings > Talk with presets for Groq, Gemini, OpenAI, Ollama and custom. Double-click him or right-click > Talk to him.
+  Mic transcription goes to the same endpoint (Groq's Whisper); Gemini and Ollama have no speech model, so the mic hides.
+- Lesson: the cursor poll only emits on change, so a click shorter than one poll interval is invisible to it. Presses end on
+  the WebView's own pointerup; the poll is trusted for "released" only after it has seen the button down.
+- Verified against a local mock OpenAI server (chat, phrase generation, the settings Test button); the mic path and real
+  providers were not exercised here (no key on this machine).
+
+## M7 — Webcam motion capture (proposed)
+Goal: drive the model live from the user's webcam, and record what they do as a clip for the library (a dance, an idle).
+- Tracking in the settings window (it already has a camera-free 3D preview): MediaPipe Pose Landmarker (tasks-vision,
+  WASM + the lite model bundled locally, no cloud) on a `getUserMedia` stream. 33 world landmarks at 30 fps on CPU/GPU.
+- Preview: the webcam frame with the wire skeleton drawn over it, next to the live 3D preview mirroring the pose. Started
+  from Settings > Capture or right-click > "Copy me" on the buddy (which mirrors the pose live on the desktop until stopped).
+- Landmarks to bones: build a canonical-rig pose per frame from limb directions (shoulder->elbow->wrist, hip->knee->ankle,
+  hips->shoulders for the spine, ear/nose for the head), smoothed with the One Euro filter, hips height from the ankles.
+  The same `retarget.ts` delta method then fits it to any character, so a recording works on every model.
+- Recording: 30 fps quaternion tracks on the canonical rig, trimmed, looped by cross-fading the ends, exported as a GLB
+  into the user clips folder and tagged with a role (dance/idle/fidget) like any imported clip.
+- Stretch: two-hand gestures as pokes, mirroring the user's head turn when idle.

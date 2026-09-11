@@ -48,6 +48,10 @@ main {
     grid-column: 1;
     grid-row: 2;
   }
+  .cols > .s-talk {
+    grid-column: 1;
+    grid-row: 3;
+  }
   .library {
     max-height: 320px;
   }
@@ -134,6 +138,32 @@ button:hover {
 }
 .indent {
   margin-left: 25px;
+}
+.talk-fields {
+  margin-top: 6px;
+}
+.talk-fields.off {
+  opacity: 0.5;
+  pointer-events: none;
+}
+.field input[type="text"],
+.field input[type="password"],
+.field input[type="number"] {
+  background: #2a2d34;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 10px;
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+.field input[type="number"] {
+  width: 90px;
+}
+.grow {
+  flex: 1;
+  min-width: 0;
 }
 .meter {
   display: flex;

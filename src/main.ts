@@ -7,6 +7,7 @@ import { Behavior, type ClipChoice } from "./behavior";
 import { applyLibrary, invalidateLibrary, listLibrary } from "./library";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Bubble } from "./bubble";
+import { ChatClient, TalkBox, Voice, defaultPersona, loadOrGeneratePhrases, type LineEvent, type Lines } from "./chat";
 import { Sounds } from "./sound";
 import { cursor, IN_TAURI, startInput } from "./input";
 import { listPacks, resolvePack, validateManifest, type Manifest, type PackRef } from "./packs";
@@ -28,6 +29,12 @@ let renderer3d: Renderer3D | null = null;
 let renderer2d: Renderer2D | null = null;
 let manifest: Manifest | null = null;
 let pack: PackRef | null = null;
+// Talk (M6): the input strip, the conversation, the voice, and generated bubble lines.
+const talk = new TalkBox();
+const voice = new Voice();
+const chat = new ChatClient(() => manifest?.persona ?? defaultPersona(manifest?.name ?? "Buddy"));
+let extraLines: Lines = {};
+let nextChatter = Infinity;
 
 let cssW = BASE_W;
 let cssH = BASE_H;
@@ -153,6 +160,7 @@ async function boot() {
       if (hiddenByFullscreen || settings.paused) return;
       getCurrentWindow().setAlwaysOnTop(true).catch(() => {});
     }, 2000);
+    await listen("talk", () => openTalk());
     // Hide behind fullscreen apps (games, videos) and come back afterwards.
     await listen<{ active: boolean }>("fullscreen", async (e) => {
       fullscreenActive = e.payload.active;
@@ -175,6 +183,11 @@ async function boot() {
     applySettings(s);
     // A new dance choice takes effect now, not at the next song.
     if (s.danceMode !== prev.danceMode && danceAmount > 0.2) danceClip = behavior.chooseDance();
+    if (s.chatEnabled !== prev.chatEnabled || s.chatGenerateLines !== prev.chatGenerateLines || s.chatEndpoint !== prev.chatEndpoint || s.chatModel !== prev.chatModel) {
+      if (pack) void refreshPhrases(pack.id);
+      if (!s.chatEnabled && talk.open) talk.hide();
+    }
+    voice.enabled = s.chatVoice;
   });
 }
 
@@ -219,6 +232,8 @@ async function loadPack(id: string) {
     behavior.setPack(m, (n) => renderer?.clipDuration(n) ?? 0, clock.elapsedTime);
     activity();
     speak("greet", 3);
+    chat.reset();
+    void refreshPhrases(ref.id);
     sounds.play("greet");
   } catch (err) {
     console.error(`failed to load pack "${id}"`, err);
@@ -315,7 +330,63 @@ function applySettings(s: Settings) {
 
 function speak(event: NonNullable<Manifest["lines"]> extends Partial<Record<infer K, string[]>> ? K : never, seconds = 2.5) {
   if (!settings.bubblesEnabled || !manifest) return;
-  bubble.say(manifest.lines?.[event], seconds, clock.elapsedTime);
+  bubble.say(linesFor(event), seconds, clock.elapsedTime);
+}
+
+/** The pack's own lines plus any generated ones for that event. */
+function linesFor(event: LineEvent): string[] {
+  return [...(manifest?.lines?.[event as keyof NonNullable<Manifest["lines"]>] ?? []), ...(extraLines[event] ?? [])];
+}
+
+/** Generated bubble lines for the current pack, when talking is on (cached a week per pack). */
+async function refreshPhrases(packId: string, force = false) {
+  extraLines = {};
+  nextChatter = Infinity;
+  if (!IN_TAURI || !settings.chatEnabled || !settings.chatGenerateLines) return;
+  try {
+    const persona = manifest?.persona ?? defaultPersona(manifest?.name ?? "Buddy");
+    const lines = await loadOrGeneratePhrases(packId, persona, force);
+    if (lines && pack?.id === packId) {
+      extraLines = lines;
+      nextChatter = clock.elapsedTime + 90 + Math.random() * 120;
+    }
+  } catch (err) {
+    console.warn("phrases:", err);
+  }
+}
+
+/** One line about what he is doing, so replies can refer to it. */
+function chatContext(): string {
+  const doing = asleep ? "you were asleep" : currentState === "dance" ? `you are dancing to music at ${Math.round(music?.bpm ?? 0)} bpm` : currentState === "dragged" ? "the user is holding you" : currentState === "walk" ? "you are strolling along the taskbar" : "you are standing on the taskbar";
+  return `Right now ${doing}; local time ${new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}. Character pack: ${manifest?.name ?? "buddy"}.`;
+}
+
+talk.onSend = async (text) => {
+  activity();
+  behavior.interrupt(clock.elapsedTime);
+  bubble.say(["…"], 40, clock.elapsedTime);
+  try {
+    const reply = await chat.ask(text, chatContext());
+    const words = reply.split(/\s+/).length;
+    bubble.say([reply], Math.min(24, 3 + words * 0.45), clock.elapsedTime);
+    if (settings.chatVoice) voice.say(reply);
+  } catch (err) {
+    bubble.say([`Can't talk right now: ${String(err).slice(0, 90)}`], 6, clock.elapsedTime);
+  }
+};
+talk.onStatus = (text) => bubble.say([text], 4, clock.elapsedTime);
+talk.onOpenChange = (open) => {
+  ignoringCursor = null; // re-evaluate click-through now that the strip is (in)visible
+  if (open && IN_TAURI) getCurrentWindow().setFocus().catch(() => {});
+  if (!open) voice.stop();
+};
+function openTalk() {
+  if (!settings.chatEnabled) {
+    bubble.say(["Turn on Talk in Settings first."], 3, clock.elapsedTime);
+    return;
+  }
+  talk.micEnabled = !!settings.chatSttModel;
+  talk.toggle();
 }
 
 /** Any interaction: resets the sleep timer and wakes him up. */
@@ -331,33 +402,44 @@ function activity() {
 // ---------- input ----------
 // A press is not a grab until the cursor moves or is held; a quick release is a poke.
 // This keeps the current animation running through a plain click instead of snapping to "held".
-let press: { t: number; x: number; y: number } | null = null;
+// The global cursor poll only reports changes, so a quick click can come and go between two
+// polls; the WebView's own pointerup is the reliable end of a press, and the poll is only
+// trusted for "released" once it has actually seen the button down.
+let press: { t: number; x: number; y: number; seenDown: boolean } | null = null;
 const GRAB_MOVE = 6;
 const GRAB_HOLD = 0.22;
 
 function onGrab(e: PointerEvent) {
   if (e.button !== 0 || !physics || settings.clickThrough === "locked") return;
   grabPart = renderer?.partAt(e.clientX, e.clientY) ?? null;
-  press = { t: clock.elapsedTime, x: cursor.x, y: cursor.y };
-  // The button is down right now; the global poll may not have reported it yet, and without
-  // this the next frame would read "released" and turn every drag into a poke.
-  cursor.buttons |= 1;
+  press = { t: clock.elapsedTime, x: cursor.x, y: cursor.y, seenDown: false };
   activity();
+}
+
+/** A press that ended without becoming a grab: a poke. */
+function endPress(t: number) {
+  if (!press) return;
+  press = null;
+  sincePoke = 0;
+  pokePending = true;
+  behavior.interrupt(t);
+  if (!settings.paused) {
+    speak("poked");
+    sounds.play("poked");
+  }
+}
+
+function onPointerUp(e: PointerEvent) {
+  if (e.button !== 0) return;
+  endPress(clock.elapsedTime);
 }
 
 function updatePress(t: number) {
   if (!press || !physics) return;
   const moved = Math.hypot(cursor.x - press.x, cursor.y - press.y);
-  const released = !(cursor.buttons & 1);
-  if (released) {
-    press = null;
-    sincePoke = 0;
-    pokePending = true;
-    behavior.interrupt(t);
-    if (!settings.paused) {
-      speak("poked");
-      sounds.play("poked");
-    }
+  if (cursor.buttons & 1) press.seenDown = true;
+  if (press.seenDown && !(cursor.buttons & 1)) {
+    endPress(t);
     return;
   }
   if (moved > GRAB_MOVE || t - press.t > GRAB_HOLD) {
@@ -369,12 +451,15 @@ function updatePress(t: number) {
 }
 stage3d.addEventListener("pointerdown", onGrab);
 stage2d.addEventListener("pointerdown", onGrab);
-// Double-click the buddy to open settings.
-function onOpenSettings() {
-  if (IN_TAURI) invoke("open_settings").catch(() => {});
+window.addEventListener("pointerup", onPointerUp);
+window.addEventListener("pointercancel", onPointerUp);
+// Double-click the buddy to talk to him (or to open settings while talking is off).
+function onDoubleClick() {
+  if (settings.chatEnabled) openTalk();
+  else if (IN_TAURI) invoke("open_settings").catch(() => {});
 }
-stage3d.addEventListener("dblclick", onOpenSettings);
-stage2d.addEventListener("dblclick", onOpenSettings);
+stage3d.addEventListener("dblclick", onDoubleClick);
+stage2d.addEventListener("dblclick", onDoubleClick);
 document.addEventListener("contextmenu", (e) => {
   e.preventDefault();
   if (IN_TAURI && settings.clickThrough !== "locked") invoke("context_menu").catch(() => {});
@@ -421,6 +506,7 @@ function updateClickThrough() {
   if (!IN_TAURI || !physics || !renderer) return;
   let shouldIgnore: boolean;
   if (settings.clickThrough === "locked") shouldIgnore = true;
+  else if (talk.open) shouldIgnore = false;
   else if (physics.mode === "held") shouldIgnore = false;
   else if (settings.clickThrough === "window") shouldIgnore = false;
   else {
@@ -506,6 +592,11 @@ function frame() {
       speak("dance");
     } else if (danceAmount < 0.1) dancedThisSession = false;
   }
+  // Idle chatter from the generated lines, now and then, when nothing else is going on.
+  if (t > nextChatter) {
+    nextChatter = t + 240 + Math.random() * 300;
+    if (!asleep && !paused && settings.bubblesEnabled && physics?.mode === "rest" && !talk.open && extraLines.idle?.length) bubble.say(extraLines.idle, 4, t);
+  }
   const sleepAfter = settings.sleepAfterMin * 60;
   if (!asleep && sleepAfter > 0 && !paused && t - lastActivity > sleepAfter) {
     asleep = true;
@@ -573,6 +664,7 @@ function frame() {
       accelX: physics ? THREE.MathUtils.clamp(physics.accelX / (cssH * scaleFactor * 12), -1.5, 1.5) : 0,
       accelY: physics ? THREE.MathUtils.clamp(physics.accelY / (cssH * scaleFactor * 12), -1.5, 1.5) : 0,
       spin: physics?.spin ?? 0,
+      talking: voice.speaking,
     };
     renderer.frame(input);
   }

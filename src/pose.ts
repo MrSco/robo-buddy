@@ -144,17 +144,19 @@ export function applyHeldByLeg(c: Character, side: "left" | "right", t: number, 
   const freeFoot = c.bone(L ? "rightFoot" : "leftFoot");
   aimBone(heldUpper, heldLower, DOWN, amount);
   aimBone(heldLower, heldFoot, DOWN, amount);
-  // Free leg: thigh slightly forward and out, knee bent back.
-  tmpDir.set(L ? 0.35 : -0.35, -0.85, 0.35).normalize();
+  // Free leg falls under gravity: once flipped it hangs down past the torso, thigh out and
+  // a little forward, knee bent so the shin dangles. (Posed upright here, so "down" is up.)
+  const sway = Math.sin(t * 1.4) * 0.08;
+  tmpDir.set((L ? 0.45 : -0.45) + sway, 0.62, 0.5).normalize();
   aimBone(freeUpper, freeLower, tmpDir, amount);
-  tmpDir.set(L ? 0.2 : -0.2, -0.5, -0.85).normalize();
+  tmpDir.set((L ? 0.15 : -0.15) + sway, 0.92, 0.25).normalize();
   aimBone(freeLower, freeFoot, tmpDir, amount);
   // Arms reach past the head with a lazy sway; after the flip they hang toward the floor.
-  const sway = Math.sin(t * 1.9) * 0.1;
-  tmpDir.set(0.25 + sway, 1, 0).normalize();
+  const armSway = Math.sin(t * 1.9) * 0.1;
+  tmpDir.set(0.25 + armSway, 1, 0).normalize();
   aimBone(c.bone("leftUpperArm"), c.bone("leftLowerArm"), tmpDir, amount);
   aimBone(c.bone("leftLowerArm"), c.bone("leftHand"), tmpDir, amount);
-  tmpDir.set(-0.25 + sway, 1, 0).normalize();
+  tmpDir.set(-0.25 + armSway, 1, 0).normalize();
   aimBone(c.bone("rightUpperArm"), c.bone("rightLowerArm"), tmpDir, amount);
   aimBone(c.bone("rightLowerArm"), c.bone("rightHand"), tmpDir, amount);
 }
