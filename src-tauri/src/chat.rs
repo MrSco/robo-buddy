@@ -288,6 +288,42 @@ pub fn save_phrases(app: AppHandle, pack: String, json: String) -> Result<(), St
     fs::write(path, json).map_err(|e| e.to_string())
 }
 
+// ---------- a small diagnostic log the user can send back ----------
+
+#[tauri::command]
+pub fn append_log(app: AppHandle, line: String) {
+    let Some(dir) = app.path().app_data_dir().ok() else { return };
+    let _ = fs::create_dir_all(&dir);
+    let path = dir.join("buddy.log");
+    if fs::metadata(&path).map(|m| m.len() > 200_000).unwrap_or(false) {
+        let _ = fs::remove_file(&path);
+    }
+    use std::io::Write;
+    if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(&path) {
+        let secs = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+        let _ = writeln!(f, "{secs} {line}");
+    }
+}
+
+// ---------- user personality profiles ----------
+
+fn personalities_path(app: &AppHandle) -> Option<PathBuf> {
+    let dir = app.path().app_data_dir().ok()?;
+    let _ = fs::create_dir_all(&dir);
+    Some(dir.join("personalities.json"))
+}
+
+#[tauri::command]
+pub fn load_user_personalities(app: AppHandle) -> Option<String> {
+    fs::read_to_string(personalities_path(&app)?).ok()
+}
+
+#[tauri::command]
+pub fn save_user_personalities(app: AppHandle, json: String) -> Result<(), String> {
+    let path = personalities_path(&app).ok_or("no data dir")?;
+    fs::write(path, json).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn clear_phrases(app: AppHandle, pack: String) {
     if let Some(p) = phrases_path(&app, &pack) {

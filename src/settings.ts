@@ -9,7 +9,9 @@ import { listen } from "@tauri-apps/api/event";
 import type { AudioFeatures } from "./audio";
 import { listLibrary, invalidateLibrary, ROLES, type LibraryClip } from "./library";
 import { getSettings, onSettingsChanged, setSettings, type ClickThroughMode, type Settings } from "./settings-store";
-import { listPersonalities } from "./personality";
+import { listPersonalities, loadUserPersonalities, saveUserPersonalities, slugFor, type Personality } from "./personality";
+import { emit } from "@tauri-apps/api/event";
+import type { LineEvent } from "./chat";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -68,6 +70,19 @@ const els = {
   piperFields: $<HTMLDivElement>("piper-fields"),
   piperExe: $<HTMLInputElement>("piper-exe"),
   piperVoice: $<HTMLInputElement>("piper-voice"),
+  personalityEdit: $<HTMLButtonElement>("personality-edit"),
+  pedit: $<HTMLDivElement>("pedit"),
+  peName: $<HTMLInputElement>("pe-name"),
+  peTemp: $<HTMLInputElement>("pe-temp"),
+  peWords: $<HTMLInputElement>("pe-words"),
+  peDesc: $<HTMLInputElement>("pe-desc"),
+  pePersona: $<HTMLTextAreaElement>("pe-persona"),
+  peLines: $<HTMLDivElement>("pe-lines"),
+  peSave: $<HTMLButtonElement>("pe-save"),
+  peSaveAs: $<HTMLButtonElement>("pe-saveas"),
+  peDelete: $<HTMLButtonElement>("pe-delete"),
+  peClose: $<HTMLButtonElement>("pe-close"),
+  peStatus: $<HTMLSpanElement>("pe-status"),
 };
 
 let settings: Settings;
@@ -414,18 +429,8 @@ function wireTalk() {
     els.personalityHint.textContent = els.personality.selectedOptions[0]?.dataset.desc ?? "";
     void commit({ personality: els.personality.value });
   });
-  void listPersonalities().then((profiles) => {
-    els.personality.innerHTML = "";
-    for (const p of profiles) {
-      const o = document.createElement("option");
-      o.value = p.id;
-      o.textContent = p.name;
-      o.dataset.desc = p.description ?? "";
-      els.personality.appendChild(o);
-    }
-    els.personality.value = settings?.personality ?? "pack";
-    els.personalityHint.textContent = els.personality.selectedOptions[0]?.dataset.desc ?? "";
-  });
+  void fillPersonalities();
+  wirePersonalityEditor();
   els.chatSaveKey.addEventListener("click", async () => {
     try {
       await invoke("set_chat_key", { key: els.chatKey.value });
@@ -459,6 +464,121 @@ function wireTalk() {
     }
   });
   void refreshKeyStatus();
+}
+
+const LINE_EVENTS: Array<[LineEvent, string]> = [
+  ["greet", "On start"],
+  ["poked", "When poked"],
+  ["idle", "Idle remarks"],
+  ["dance", "Music starts"],
+  ["land", "After a landing"],
+  ["sleep", "Falling asleep"],
+  ["wake", "Waking up"],
+];
+
+let profiles: Personality[] = [];
+
+async function fillPersonalities() {
+  profiles = await listPersonalities();
+  els.personality.innerHTML = "";
+  for (const p of profiles) {
+    const o = document.createElement("option");
+    o.value = p.id;
+    o.textContent = p.user ? `${p.name} (yours)` : p.name;
+    o.dataset.desc = p.description ?? "";
+    els.personality.appendChild(o);
+  }
+  els.personality.value = settings?.personality ?? "pack";
+  if (!els.personality.value) els.personality.value = "pack";
+  els.personalityHint.textContent = els.personality.selectedOptions[0]?.dataset.desc ?? "";
+}
+
+/** Read the editor into a profile object. */
+function editorToProfile(id: string): Personality {
+  const lines: Partial<Record<LineEvent, string[]>> = {};
+  for (const [key] of LINE_EVENTS) {
+    const ta = document.getElementById(`pe-line-${key}`) as HTMLTextAreaElement | null;
+    const arr = (ta?.value ?? "").split("\n").map((s) => s.trim()).filter(Boolean);
+    if (arr.length) lines[key] = arr;
+  }
+  return {
+    id,
+    name: els.peName.value.trim() || "Untitled",
+    description: els.peDesc.value.trim() || undefined,
+    persona: els.pePersona.value.trim() || undefined,
+    lines: Object.keys(lines).length ? lines : undefined,
+    llm: { temperature: Number(els.peTemp.value) || 0.9, maxWords: Number(els.peWords.value) || 35 },
+  };
+}
+
+function showEditor(p: Personality) {
+  els.pedit.hidden = false;
+  els.peName.value = p.name;
+  els.peDesc.value = p.description ?? "";
+  els.pePersona.value = p.persona ?? (p.id === "pack" ? "(the character pack's own persona, or the built-in default when it has none)" : "");
+  els.peTemp.value = String(p.llm?.temperature ?? 0.9);
+  els.peWords.value = String(p.llm?.maxWords ?? 35);
+  els.peLines.innerHTML = "";
+  for (const [key, label] of LINE_EVENTS) {
+    const l = document.createElement("label");
+    const span = document.createElement("span");
+    span.textContent = label;
+    const ta = document.createElement("textarea");
+    ta.id = `pe-line-${key}`;
+    ta.value = (p.lines?.[key] ?? []).join("\n");
+    l.append(span, ta);
+    els.peLines.appendChild(l);
+  }
+  const editable = !!p.user;
+  els.peSave.disabled = !editable;
+  els.peDelete.disabled = !editable;
+  els.peStatus.textContent = editable ? "" : p.id === "pack" ? "Built in. Save as new to make your own." : "Built in and read-only. Save as new to make an editable copy.";
+}
+
+function wirePersonalityEditor() {
+  els.personalityEdit.addEventListener("click", () => {
+    if (!els.pedit.hidden) {
+      els.pedit.hidden = true;
+      return;
+    }
+    const p = profiles.find((x) => x.id === els.personality.value);
+    if (p) showEditor(p);
+  });
+  els.peClose.addEventListener("click", () => (els.pedit.hidden = true));
+  const persist = async (list: Personality[], select?: string) => {
+    await saveUserPersonalities(list);
+    await fillPersonalities();
+    if (select) {
+      els.personality.value = select;
+      els.personalityHint.textContent = els.personality.selectedOptions[0]?.dataset.desc ?? "";
+      await commit({ personality: select });
+    }
+    await emit("personalities-changed").catch(() => {});
+  };
+  els.peSaveAs.addEventListener("click", async () => {
+    const users = await loadUserPersonalities();
+    const id = slugFor(els.peName.value.trim() || "profile", profiles.map((p) => p.id));
+    const p = editorToProfile(id);
+    await persist([...users, p], id);
+    showEditor({ ...p, user: true });
+    els.peStatus.textContent = `Saved as "${p.name}" and selected.`;
+  });
+  els.peSave.addEventListener("click", async () => {
+    const id = els.personality.value;
+    const users = await loadUserPersonalities();
+    if (!users.some((u) => u.id === id)) return;
+    const p = editorToProfile(id);
+    await persist(users.map((u) => (u.id === id ? p : u)), id);
+    showEditor({ ...p, user: true });
+    els.peStatus.textContent = "Saved.";
+  });
+  els.peDelete.addEventListener("click", async () => {
+    const id = els.personality.value;
+    const users = await loadUserPersonalities();
+    if (!users.some((u) => u.id === id)) return;
+    await persist(users.filter((u) => u.id !== id), "pack");
+    els.pedit.hidden = true;
+  });
 }
 
 /** Play buttons by clip name, so the one previewing can show a stop glyph. */

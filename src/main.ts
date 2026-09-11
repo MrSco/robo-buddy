@@ -8,7 +8,7 @@ import { applyLibrary, invalidateLibrary, listLibrary } from "./library";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Bubble } from "./bubble";
 import { ChatClient, TalkBox, Voice, defaultPersona, loadOrGeneratePhrases, type LineEvent, type Lines } from "./chat";
-import { resolvePersonality, type ResolvedPersonality } from "./personality";
+import { invalidatePersonalities, resolvePersonality, type ResolvedPersonality } from "./personality";
 import { Sounds } from "./sound";
 import { cursor, IN_TAURI, startInput } from "./input";
 import { listPacks, resolvePack, validateManifest, type Manifest, type PackRef } from "./packs";
@@ -61,6 +61,8 @@ let loading = false;
 let danceAmount = 0;
 let sincePoke = Infinity;
 let sinceLand = Infinity;
+/** When the current airborne stretch began; short hops keep the idle base instead of the flail. */
+let airborneSince = -1;
 let landStrength = 0;
 let yaw = 0;
 let pitch = 0;
@@ -161,6 +163,11 @@ async function boot() {
     // Other always-on-top windows opened later sit above him in the topmost band; take the
     // top of it back every couple of seconds (no focus change, so nothing is interrupted).
     await listen("talk", () => openTalk());
+    await listen("personalities-changed", () => {
+      invalidatePersonalities();
+      chat.reset();
+      if (pack) void refreshPhrases(pack.id);
+    });
     // Hide behind fullscreen apps (games, videos) and come back afterwards.
     await listen<{ active: boolean }>("fullscreen", async (e) => {
       fullscreenActive = e.payload.active;
@@ -357,7 +364,10 @@ async function refreshPhrases(packId: string, force = false) {
   if (!IN_TAURI || !settings.chatEnabled || !settings.chatGenerateLines) return;
   try {
     const persona = personality?.persona ?? manifest?.persona ?? defaultPersona(manifest?.name ?? "Buddy");
-    const lines = await loadOrGeneratePhrases(`${packId}__${personality?.id ?? "pack"}`, persona, force);
+    // Cache per pack, profile and persona text, so an edited persona regenerates its lines.
+    let hash = 0;
+    for (let i = 0; i < persona.length; i++) hash = (hash * 31 + persona.charCodeAt(i)) | 0;
+    const lines = await loadOrGeneratePhrases(`${packId}__${personality?.id ?? "pack"}__${(hash >>> 0).toString(36)}`, persona, force);
     if (lines && pack?.id === packId) {
       extraLines = lines;
       nextChatter = clock.elapsedTime + 90 + Math.random() * 120;
@@ -544,7 +554,13 @@ function resolveState(t: number, act: ReturnType<Behavior["update"]>): { state: 
   // base and the renderer dangles everything from the grab point.
   if (physics?.mode === "held") return { state: "dragged", clip: behavior.stateClip("dragged") ?? behavior.stateClip("idle") };
   if (downUntil > t) return { state: "down", clip: null };
-  if (physics?.airborne) return { state: "fall", clip: behavior.stateClip("fall") };
+  if (physics?.airborne) {
+    if (airborneSince < 0) airborneSince = t;
+    return { state: "fall", clip: t - airborneSince > 0.25 ? behavior.stateClip("fall") : null };
+  }
+  // A bounce touches the floor for a frame; only a settled rest ends the airborne stretch,
+  // otherwise the falling clip would flicker off and on across every bounce.
+  if (physics?.mode === "rest") airborneSince = -1;
   if (pokeUntil > t) return { state: "poked", clip: pokeClip };
   if (landUntil > t) return { state: "land", clip: landClip };
   if (asleep) return { state: "sleep", clip: null };
@@ -564,6 +580,7 @@ function walkRate(speedPx: number): number {
 
 // ---------- loop ----------
 let lastTitle = 0;
+let loggedTpose = 0;
 function debugTitle(t: number) {
   // The title is never visible (no decorations, no taskbar entry), so it doubles as a
   // status line in every build; release builds have no other way to be inspected.
@@ -574,9 +591,13 @@ function debugTitle(t: number) {
   const cp = cursorInCanvas();
   const alpha = cp && renderer ? renderer.alphaAt(cp.x, cp.y) : -1;
   const probe = renderer3d ? renderer3d.debugProbe() : "2d";
+  if (renderer3d && renderer3d.tposeFrames !== loggedTpose) {
+    loggedTpose = renderer3d.tposeFrames;
+    invoke("append_log", { line: `tpose #${loggedTpose} ${renderer3d.tposeLast} mode=${p.mode} act=${lastAct} sinceLand=${sinceLand.toFixed(2)}` }).catch(() => {});
+  }
   const title =
     `Robo Buddy | ${p.mode} y=${p.y.toFixed(0)} air=${p.airborne} yaw=${yaw.toFixed(2)} cur=${cursor.x},${cursor.y},${cursor.buttons}` +
-    ` | pack=${pack?.id} state=${currentState} grab=${grabPart ?? '-'} talk=${talk.open} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
+    ` | pack=${pack?.id} state=${currentState} grab=${grabPart ?? '-'} talk=${talk.open} talking=${voice.speaking} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
     (m ? ` | lvl=${m.level.toFixed(2)} gate=${m.gateLevel.toFixed(2)}/${m.threshold.toFixed(2)} bpm=${m.bpm.toFixed(0)} dance=${m.dancing} amt=${danceAmount.toFixed(2)} beats=${m.beats.toFixed(1)}` : "");
   getCurrentWindow().setTitle(title).catch(() => {});
 }

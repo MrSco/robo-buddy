@@ -347,6 +347,14 @@ Goal: dynamic phrases and a real conversation, free by default, bring-your-own-k
   settings use two balanced CSS columns; gentle drops no longer chain a land clip and a hop fidget (jump fidget removed,
   12 s calm after landing, land clip only for hard landings). A T-pose detector counts frames in the status title.
 
+- Follow-ups (Sep 11, later): the topmost thread stands down while a menu (class #32768) or one of our own windows is in
+  front, so the right-click menu is not covered; soft drops settle without bouncing (bounce only above 700 px/s), the falling
+  clip waits a quarter second and survives bounces, the land clip needs a hard landing; personality profiles can be viewed and
+  edited in Settings > Talk (built-ins read-only, "Save as new" makes a user copy in `%APPDATA%/.../personalities.json`,
+  the buddy reloads on a `personalities-changed` event, generated lines are cached per persona text); Piper installed under
+  `%APPDATA%/com.rocco.robobuddy/piper/` with the user's own `voices/rocco.onnx` (22 kHz, en-us); T-pose sightings are
+  appended to `%APPDATA%/.../buddy.log` with state, clip and time so the user can send them back.
+
 ## M7 — Webcam motion capture (proposed)
 Goal: drive the model live from the user's webcam, and record what they do as a clip for the library (a dance, an idle).
 - Tracking in the settings window (it already has a camera-free 3D preview): MediaPipe Pose Landmarker (tasks-vision,

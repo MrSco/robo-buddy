@@ -159,6 +159,9 @@ pub fn run() {
             chat::load_phrases,
             chat::save_phrases,
             chat::clear_phrases,
+            chat::load_user_personalities,
+            chat::save_user_personalities,
+            chat::append_log,
         ])
         .run(context)
         .expect("error while running Robo Buddy");

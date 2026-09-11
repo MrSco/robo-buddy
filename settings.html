@@ -94,7 +94,28 @@
             <span>Personality</span>
             <select id="personality"></select>
           </label>
-          <p class="hint" id="personality-hint"></p>
+          <div class="row">
+            <p class="hint grow" id="personality-hint"></p>
+            <button id="personality-edit" type="button">View / edit…</button>
+          </div>
+          <div class="pedit" id="pedit" hidden>
+            <div class="row">
+              <label class="field grow"><span>Name</span><input id="pe-name" type="text" /></label>
+              <label class="field"><span>Temperature</span><input id="pe-temp" type="number" min="0" max="2" step="0.1" /></label>
+              <label class="field"><span>Max words</span><input id="pe-words" type="number" min="10" max="120" step="5" /></label>
+            </div>
+            <label class="field"><span>Description</span><input id="pe-desc" type="text" /></label>
+            <label class="field"><span>Persona (system prompt; {name} becomes the character's name)</span><textarea id="pe-persona" rows="5" spellcheck="true"></textarea></label>
+            <p class="hint">Lines he can say, one per line. Leave a box empty to say nothing for that event.</p>
+            <div class="pe-lines" id="pe-lines"></div>
+            <div class="row">
+              <button id="pe-save" type="button">Save</button>
+              <button id="pe-saveas" type="button">Save as new</button>
+              <button id="pe-delete" type="button">Delete</button>
+              <button id="pe-close" type="button">Close</button>
+              <span class="hint grow" id="pe-status"></span>
+            </div>
+          </div>
           <div class="row">
             <label class="field grow">
               <span>Provider</span>

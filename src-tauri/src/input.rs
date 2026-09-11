@@ -165,7 +165,7 @@ pub fn start_topmost_thread(app: AppHandle) {
         {
             use tauri::Manager;
             if let Some(win) = app.get_webview_window("buddy") {
-                if win.is_visible().unwrap_or(false) {
+                if win.is_visible().unwrap_or(false) && !own_popup_in_front() {
                     if let Ok(hwnd) = win.hwnd() {
                         use windows::Win32::Foundation::HWND;
                         use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE};
@@ -180,6 +180,28 @@ pub fn start_topmost_thread(app: AppHandle) {
         #[cfg(not(windows))]
         let _ = &app;
     });
+}
+
+/// True while a menu (the buddy's right-click menu, the tray menu) or one of our own windows
+/// is in front; re-asserting topmost then would cover the menu the user just opened.
+#[cfg(windows)]
+fn own_popup_in_front() -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{GetClassNameW, GetForegroundWindow, GetWindowThreadProcessId};
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.0.is_null() {
+            return false;
+        }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == std::process::id() {
+            return true;
+        }
+        let mut buf = [0u16; 64];
+        let n = GetClassNameW(hwnd, &mut buf) as usize;
+        let class = String::from_utf16_lossy(&buf[..n]);
+        class == "#32768"
+    }
 }
 
 pub fn start_fullscreen_thread(app: AppHandle) {
