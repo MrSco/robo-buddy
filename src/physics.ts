@@ -236,7 +236,7 @@ export class WindowPhysics {
         // Whatever spin he had ends at the first contact; the renderer springs him upright.
         this.spin = 0;
         // Slow arrivals settle at once; only a real fall bounces (and squashes more than once).
-        if (Math.abs(this.vy) > 700) {
+        if (Math.abs(this.vy) > 1100) {
           this.onLand?.(Math.abs(this.vy));
           this.vy = -this.vy * BOUNCE;
         } else {

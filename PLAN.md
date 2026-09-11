@@ -364,6 +364,11 @@ Goal: dynamic phrases and a real conversation, free by default, bring-your-own-k
   personality editor shows the pack's real persona and lines, read-only fields and disabled Save/Delete for built-ins,
   "Copy to a new profile" to fork.
 
+- Follow-ups (Sep 11, night): the Animations tab shows the live preview beside a card grid of clips (the one WebGL canvas
+  moves between the Character and Animations pages); soft drops: the falling clip waits 0.35 s, the arm flail is only for packs
+  without a falling clip, bounces need 1100 px/s, the land line needs strength 0.55 and the land clip 0.7; the user's other
+  Piper voices (bluey, friday, glados, hal, jarvis, tars) live in the managed voices folder (not bundled: 63 MB each).
+
 ## M7 — Webcam motion capture (proposed)
 Goal: drive the model live from the user's webcam, and record what they do as a clip for the library (a dance, an idle).
 - Tracking in the settings window (it already has a camera-free 3D preview): MediaPipe Pose Landmarker (tasks-vision,

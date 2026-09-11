@@ -63,6 +63,7 @@ let sincePoke = Infinity;
 let sinceLand = Infinity;
 /** When the current airborne stretch began; short hops keep the idle base instead of the flail. */
 let airborneSince = -1;
+let flailNow = false;
 let landStrength = 0;
 let yaw = 0;
 let pitch = 0;
@@ -111,7 +112,7 @@ async function boot() {
   p.onLand = (speed) => {
     sinceLand = 0;
     landStrength = Math.min(1, speed / 2500);
-    if (landStrength > 0.4) {
+    if (landStrength > 0.55) {
       speak("land");
       sounds.play("land");
     }
@@ -120,7 +121,7 @@ async function boot() {
     const now = clock.elapsedTime;
     // No fidgets for a while after a landing; a drop followed by a random hop reads as glitchy.
     behavior.rest(now, 12);
-    if (landStrength > 0.5 && renderer?.kind === "3d" && downUntil < now && landUntil < now) {
+    if (landStrength > 0.7 && renderer?.kind === "3d" && downUntil < now && landUntil < now) {
       const tumbled = Math.abs(renderer3d?.tumbleAngle ?? 0) > 0.25 || landStrength > 0.7;
       downUntil = tumbled ? now + 1.1 + Math.random() * 0.6 : -1;
       landClip = behavior.stateClip("land");
@@ -556,7 +557,12 @@ function resolveState(t: number, act: ReturnType<Behavior["update"]>): { state: 
   if (downUntil > t) return { state: "down", clip: null };
   if (physics?.airborne) {
     if (airborneSince < 0) airborneSince = t;
-    return { state: "fall", clip: t - airborneSince > 0.25 ? behavior.stateClip("fall") : null };
+    const long = t - airborneSince > 0.35;
+    const fallClip = long ? behavior.stateClip("fall") : null;
+    // The arm flail is only for packs with no falling clip at all; on a short hop or a bounce
+    // the previous pose plus the limb springs is all that should move.
+    flailNow = long && !fallClip;
+    return { state: "fall", clip: fallClip };
   }
   // A bounce touches the floor for a frame; only a settled rest ends the airborne stretch,
   // otherwise the falling clip would flicker off and on across every bounce.
@@ -711,6 +717,7 @@ function frame() {
       accelY: physics ? THREE.MathUtils.clamp(physics.accelY / (cssH * scaleFactor * 12), -1.5, 1.5) : 0,
       spin: physics?.spin ?? 0,
       talking: voice.speaking,
+      flail: flailNow,
     };
     renderer.frame(input);
   }

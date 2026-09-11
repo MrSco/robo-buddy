@@ -431,20 +431,70 @@ details.adv summary {
 .libfilter input {
   flex: 1;
 }
+.lib-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.lib-side {
+  flex: none;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lib-side .hint {
+  margin: 0;
+}
+.lib-main {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 720px) {
+  .lib-layout {
+    flex-direction: column;
+  }
+  .lib-side {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .lib-side .preview {
+    width: 150px;
+    height: 200px;
+  }
+}
+/* Clip cards fill whatever width the page has instead of one skinny column. */
 .library {
-  max-height: calc(100vh - 250px);
+  max-height: calc(100vh - 120px);
   overflow-y: auto;
   margin-top: 8px;
   display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 4px 8px;
-  align-items: center;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 6px 8px;
+  align-content: start;
   font-size: 12px;
+  padding-right: 4px;
+}
+.library .clip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px 5px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 0;
+}
+.library .clip.previewing {
+  border-color: var(--accent);
 }
 .library .name {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 .library .src {
   color: var(--muted);

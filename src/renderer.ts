@@ -46,6 +46,8 @@ export interface FrameInput {
   spin: number;
   /** He is speaking a reply out loud: small head nods. */
   talking: boolean;
+  /** Airborne with no falling clip in the pack: use the procedural arm flail. */
+  flail: boolean;
 }
 
 export interface Renderer {

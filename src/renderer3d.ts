@@ -249,7 +249,7 @@ export class Renderer3D implements Renderer {
     const calm = input.state === "dragged" || input.airborne || input.state === "land" || down;
 
     // Procedural base pose for whatever the clip does not cover.
-    if (input.airborne && !clipDriven && !down) applyFlail(c, input.t);
+    if (input.airborne && !clipDriven && !down && input.flail) applyFlail(c, input.t);
     else applyIdle(c, input.t, calm ? 1 : 1 - input.danceAmount * 0.7);
 
     // Held: the body hangs from whatever part the cursor has. A pack that names its own held

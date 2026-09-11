@@ -20,7 +20,7 @@
       <main>
         <section class="page" data-page="character">
           <div class="pick">
-            <div class="preview"><canvas id="live"></canvas></div>
+            <div class="preview" id="preview-char"><canvas id="live"></canvas></div>
             <div class="pick-controls">
               <div id="gallery" class="gallery"></div>
               <select id="character" hidden></select>
@@ -201,13 +201,20 @@
         </section>
 
         <section class="page" data-page="library" hidden>
-          <p class="hint">Every clip works on every 3D character. Drop FBX or GLB animations here (or onto the buddy) to add your own, then pick where each one is used.</p>
-          <div id="dropzone" class="dropzone">Drop animation or model files here</div>
-          <div class="row libfilter">
-            <input id="libsearch" type="search" placeholder="Search clips" />
-            <select id="libsource"><option value="">All sources</option><option value="user">Mine</option><option value="mixamo">Mixamo</option><option value="ual">Quaternius</option></select>
+          <div class="lib-layout">
+            <div class="lib-side">
+              <div class="preview" id="preview-lib"></div>
+              <p class="hint">Previews play on the character you have selected. Every clip works on every 3D character.</p>
+              <div id="dropzone" class="dropzone">Drop FBX or GLB animations here (or onto the buddy) to add your own</div>
+            </div>
+            <div class="lib-main">
+              <div class="row libfilter">
+                <input id="libsearch" type="search" placeholder="Search clips" />
+                <select id="libsource"><option value="">All sources</option><option value="user">Mine</option><option value="mixamo">Mixamo</option><option value="ual">Quaternius</option></select>
+              </div>
+              <div id="library" class="library"></div>
+            </div>
           </div>
-          <div id="library" class="library"></div>
         </section>
 
         <section class="page" data-page="window" hidden>

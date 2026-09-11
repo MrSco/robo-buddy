@@ -199,7 +199,11 @@ async function renderLibrary() {
     play.title = "Preview on the selected character (click again to stop)";
     play.addEventListener("click", () => void getLive().playClip(c.name, c.url));
     playButtons.set(c.name, play);
-    els.library.append(name, role, play);
+    const card = document.createElement("div");
+    card.className = "clip";
+    card.dataset.clip = c.name;
+    card.append(name, role, play);
+    els.library.appendChild(card);
   }
 }
 
@@ -491,6 +495,9 @@ function wireTabs() {
   const show = (name: string) => {
     for (const b of buttons) b.classList.toggle("active", b.dataset.tab === name);
     for (const p of pages) p.hidden = p.dataset.page !== name;
+    // One WebGL preview, shown on the Character page and beside the animation list.
+    const home = document.getElementById(name === "library" ? "preview-lib" : "preview-char");
+    if (home && els.live.parentElement !== home) home.appendChild(els.live);
     try {
       localStorage.setItem("settings-tab", name);
     } catch {
@@ -756,7 +763,10 @@ async function main() {
   startMeter();
   wireTalk();
   getLive().onPreviewChange = (name) => {
-    for (const [clip, btn] of playButtons) btn.textContent = clip === name ? "■" : "▶";
+    for (const [clip, btn] of playButtons) {
+      btn.textContent = clip === name ? "■" : "▶";
+      btn.closest(".clip")?.classList.toggle("previewing", clip === name);
+    }
   };
   settings = await getSettings();
   try {
