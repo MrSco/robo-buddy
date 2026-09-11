@@ -10,7 +10,8 @@
     <main>
       <h1>Robo Buddy</h1>
 
-      <section>
+      <div class="cols">
+      <section class="s-character">
         <h2>Character</h2>
         <div class="pick">
           <div class="preview"><canvas id="live"></canvas></div>
@@ -30,7 +31,7 @@
         </label>
       </section>
 
-      <section>
+      <section class="s-reactions">
         <h2>Reactions</h2>
         <label class="check"><input id="paused" type="checkbox" /> Pause all reactions</label>
         <label class="check"><input id="mouse" type="checkbox" /> Watch the mouse</label>
@@ -70,7 +71,7 @@
         </label>
       </section>
 
-      <section>
+      <section class="s-window">
         <h2>Window</h2>
         <label class="field">
           <span>Clicking</span>
@@ -83,8 +84,9 @@
         <label class="check"><input id="autostart" type="checkbox" /> Start with Windows</label>
         <label class="check"><input id="fullscreen" type="checkbox" /> Hide while a fullscreen app is active</label>
       </section>
+      </div>
 
-      <section>
+      <section class="s-library">
         <h2>Animation library</h2>
         <p class="hint">Every clip works on every 3D character. Drop FBX or GLB animations here (or onto the buddy) to add your own, then pick where each one is used.</p>
         <div id="dropzone" class="dropzone">Drop animation or model files here</div>

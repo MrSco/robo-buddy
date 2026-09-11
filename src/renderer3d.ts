@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { loadCharacter, type BoneName, type Character } from "./character";
 import { applyDance } from "./dance";
 import type { Manifest, PackRef } from "./packs";
-import { applyFlail, applyHeldByArm, applyHeldByLeg, applyIdle, applyLimp, applyLookAt, applySleep } from "./pose";
+import { applyDangle, applyFlail, applyHeldByArm, applyHeldByLeg, applyIdle, applyLimp, applyLookAt, applySleep } from "./pose";
 import { LimbSprings } from "./secondary";
 import type { FrameInput, GrabPart, Renderer, StateName } from "./renderer";
 
@@ -185,6 +185,10 @@ export class Renderer3D implements Renderer {
     return this.character?.clipDuration(name) ?? 0;
   }
 
+  private idleClipName() {
+    return this.character?.manifest.states.idle?.clip ?? "";
+  }
+
   /** Switch clips whenever main.ts resolves a different one (or none) for this frame. */
   private syncClip(input: FrameInput) {
     const c = this.character!;
@@ -220,6 +224,9 @@ export class Renderer3D implements Renderer {
 
     const root = c.root;
     root.position.y = 0;
+    // Hold poses aim limbs at world directions, so they must be computed in the unrotated
+    // frame: last frame's flip/tumble/swing would otherwise fold the body over itself.
+    root.rotation.z = 0;
     const clipDriven = input.clip !== null && !limbHold;
     // No music moves while he is in the air, in the user's hand or on the floor.
     const calm = input.state === "dragged" || input.airborne || input.state === "land" || down;
@@ -228,8 +235,11 @@ export class Renderer3D implements Renderer {
     if (input.airborne && !clipDriven && !down) applyFlail(c, input.t);
     else applyIdle(c, input.t, calm ? 1 : 1 - input.danceAmount * 0.7);
 
-    // Held by a limb: pose that limb toward the cursor and let the body hang from it.
-    this.heldAmount += ((limbHold ? 1 : 0) - this.heldAmount) * Math.min(1, input.dt * 10);
+    // Held: the body hangs from whatever part the cursor has. A pack that names its own held
+    // clip keeps it for head and torso holds; otherwise everything dangles procedurally.
+    const packHeldClip = !!grab && !limbHold && input.clip !== null && input.clip.name !== this.idleClipName();
+    const wantHold = !!grab && !packHeldClip;
+    this.heldAmount += ((wantHold ? 1 : 0) - this.heldAmount) * Math.min(1, input.dt * 10);
     const upsideDown = grab?.part === "leftLeg" || grab?.part === "rightLeg";
     this.flipAmount += ((upsideDown ? 1 : 0) - this.flipAmount) * Math.min(1, input.dt * 6);
     if (this.heldAmount > 0.001 && this.lastGrab) {
@@ -237,6 +247,8 @@ export class Renderer3D implements Renderer {
         applyHeldByArm(c, this.lastGrab === "leftArm" ? "left" : "right", input.t, this.heldAmount);
       } else if (this.lastGrab === "leftLeg" || this.lastGrab === "rightLeg") {
         applyHeldByLeg(c, this.lastGrab === "leftLeg" ? "left" : "right", input.t, this.heldAmount);
+      } else {
+        applyDangle(c, input.t, this.heldAmount);
       }
     }
 

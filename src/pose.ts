@@ -162,6 +162,30 @@ export function applyHeldByLeg(c: Character, side: "left" | "right", t: number, 
 const limpUp = new THREE.Vector3();
 
 /**
+ * Held by the head or the torso: everything below the grab point hangs. Arms straight down
+ * with a lazy sway, legs down and slightly apart with the knees trailing back, head level.
+ */
+export function applyDangle(c: Character, t: number, amount: number) {
+  if (amount <= 0.001) return;
+  c.root.updateMatrixWorld(true);
+  const sway = Math.sin(t * 1.6) * 0.08;
+  tmpDir.set(-0.12 + sway, -1, -0.05).normalize();
+  aimBone(c.bone("leftUpperArm"), c.bone("leftLowerArm"), tmpDir, amount);
+  aimBone(c.bone("leftLowerArm"), c.bone("leftHand"), tmpDir, amount);
+  tmpDir.set(0.12 + sway, -1, -0.05).normalize();
+  aimBone(c.bone("rightUpperArm"), c.bone("rightLowerArm"), tmpDir, amount);
+  aimBone(c.bone("rightLowerArm"), c.bone("rightHand"), tmpDir, amount);
+  tmpDir.set(-0.08, -1, 0.05).normalize();
+  aimBone(c.bone("leftUpperLeg"), c.bone("leftLowerLeg"), tmpDir, amount);
+  tmpDir.set(-0.06, -1, -0.22).normalize();
+  aimBone(c.bone("leftLowerLeg"), c.bone("leftFoot"), tmpDir, amount);
+  tmpDir.set(0.08, -1, 0.05).normalize();
+  aimBone(c.bone("rightUpperLeg"), c.bone("rightLowerLeg"), tmpDir, amount);
+  tmpDir.set(0.06, -1, -0.22).normalize();
+  aimBone(c.bone("rightLowerLeg"), c.bone("rightFoot"), tmpDir, amount);
+}
+
+/**
  * Knocked out on the floor: arms flop toward the ground, the head lolls. Applied over a
  * frozen clip pose, after look-at, blended by `amount`.
  */

@@ -27,10 +27,6 @@
       "loop": true,
       "speed": 110
     },
-    "dragged": {
-      "clip": "Hanging_Idle",
-      "loop": true
-    },
     "fall": {
       "clip": "Falling_Idle",
       "loop": true

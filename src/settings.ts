@@ -145,8 +145,9 @@ async function renderLibrary() {
     const play = document.createElement("button");
     play.type = "button";
     play.textContent = "▶";
-    play.title = "Preview on the selected character";
+    play.title = "Preview on the selected character (click again to stop)";
     play.addEventListener("click", () => void getLive().playClip(c.name, c.url));
+    playButtons.set(c.name, play);
     els.library.append(name, role, play);
   }
 }
@@ -318,8 +319,14 @@ function startMeter() {
   });
 }
 
+/** Play buttons by clip name, so the one previewing can show a stop glyph. */
+const playButtons = new Map<string, HTMLButtonElement>();
+
 async function main() {
   startMeter();
+  getLive().onPreviewChange = (name) => {
+    for (const [clip, btn] of playButtons) btn.textContent = clip === name ? "■" : "▶";
+  };
   settings = await getSettings();
   try {
     settings.autostart = await isEnabled();

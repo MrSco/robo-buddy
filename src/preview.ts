@@ -74,10 +74,33 @@ export class LivePreview {
     loop();
   }
 
-  /** Play a library clip on the character currently shown (3D only). */
+  /** Name of the library clip being previewed, or null while the idle plays. */
+  previewing: string | null = null;
+  onPreviewChange?: (name: string | null) => void;
+  private revertTimer = 0;
+
+  /** Back to the pack's idle clip. */
+  stopPreview() {
+    clearTimeout(this.revertTimer);
+    const c = this.character;
+    this.previewing = null;
+    this.onPreviewChange?.(null);
+    if (!c) return;
+    const idle = c.manifest.states.idle?.clip;
+    if (idle && c.hasClip(idle)) c.play(idle, { loop: true });
+  }
+
+  /**
+   * Play a library clip on the character currently shown (3D only). One-shots play once,
+   * loops play for a few seconds, then the idle comes back; a second click stops it early.
+   */
   async playClip(name: string, url: string) {
     const c = this.character;
     if (!c) return;
+    if (this.previewing === name) {
+      this.stopPreview();
+      return;
+    }
     if (!c.hasClip(name)) {
       const { loadModel } = await import("./character");
       const { buildRig, canonicalRig, hasOwnSkeleton } = await import("./retarget");
@@ -87,7 +110,15 @@ export class LivePreview {
       const source = hasOwnSkeleton(extra.root) ? buildRig(extra.root) : await canonicalRig();
       c.addClip(name, first, source);
     }
+    if (c !== this.character) return;
+    clearTimeout(this.revertTimer);
     c.play(name, { loop: true });
+    this.previewing = name;
+    this.onPreviewChange?.(name);
+    const seconds = Math.min(12, Math.max(2.5, c.clipDuration(name) * 2));
+    this.revertTimer = window.setTimeout(() => {
+      if (this.previewing === name) this.stopPreview();
+    }, seconds * 1000);
   }
 
   /** Render one posed frame of a character (idle clip advanced a little) and return a PNG. */

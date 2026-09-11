@@ -297,6 +297,13 @@ is commodity and took one session. We keep our codebase and borrow patterns from
   the camera, with the feet at a fixed margin; zooms out within a frame or two, back in gently. Clips with root motion toward
   the camera no longer crop him. He re-asserts always-on-top every 2 s so newer topmost windows (the Claude app, players) do
   not bury him.
+- Holds are procedural ragdoll dangles now: head/torso hang everything below the grab point, arm and leg holds as before.
+  The bundled packs no longer name a hanging clip (a pack or a library "held" role can still add one, which is then used for
+  head/torso holds). The root rotation is reset before posing each frame; hold poses aim at world directions and last frame's
+  flip was folding him over.
+- Settings: two columns when wider than 800 px (character + window left, reactions right, library full width), one column
+  below that; default window 940x780. Library previews revert to the idle after one play (loops: a few seconds); the play
+  button turns into a stop button while previewing.
 - Step 2 (deferred until played with): a real Rapier ragdoll with joint limits while airborne, blended back to the idle on landing.
 
 ## What is left (Sep 10 2026)

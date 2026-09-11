@@ -21,6 +21,36 @@ body {
 }
 main {
   padding: 14px 20px 12px;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+/* Two columns when there is room: character and window on the left, reactions on the right;
+   the animation library runs full width underneath. Narrow windows stack everything. */
+.cols {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 12px;
+  align-items: start;
+}
+@media (min-width: 800px) {
+  .cols {
+    grid-template-columns: 1fr 1fr;
+  }
+  .cols > .s-character {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .cols > .s-reactions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .cols > .s-window {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .library {
+    max-height: 320px;
+  }
 }
 h1 {
   font-size: 18px;
