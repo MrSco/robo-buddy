@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { loadCharacter, refreshSkins, type BoneName, type Character } from "./character";
+import { loadCharacter, refreshSkins, rodReport, type BoneName, type Character } from "./character";
 import { applyDance } from "./dance";
 import type { Manifest, PackRef } from "./packs";
 import { applyCrouch, applyDangle, applyFlail, applyHeldByArm, applyHeldByLeg, applyIdle, applyLimp, applyLookAt, applySleep } from "./pose";
@@ -504,7 +504,7 @@ export class Renderer3D implements Renderer {
     const c = this.character;
     const v = (o: THREE.Object3D | undefined) => (o ? o.getWorldPosition(this.tmp).toArray().map((n) => n.toFixed(2)).join("/") : "-");
     const geo = c ? `hips=${v(c.bone("hips"))} head=${v(c.bone("head"))} base=${this.baseCenter.toArray().map((n) => n.toFixed(2)).join("/")} size=${this.baseSize.toArray().map((n) => n.toFixed(2)).join("/")} fit=${this.fitDist.toFixed(2)}/${this.fitY.toFixed(2)} rootScale=${c.root.scale.x.toFixed(3)}` : "";
-    return `${Array.from(px).join(",")} err=${this.gl.getError()} lost=${this.gl.isContextLost()} inst=${this.id} renders=${this.renders} same=${this.gl === this.renderer.getContext()} tpose=${this.tposeFrames}:${this.tposeLast} ${geo} spike=${this.lastSpike}`;
+    return `${Array.from(px).join(",")} err=${this.gl.getError()} lost=${this.gl.isContextLost()} inst=${this.id} renders=${this.renders} same=${this.gl === this.renderer.getContext()} tpose=${this.tposeFrames}:${this.tposeLast} ${geo} spike=${this.lastSpike} rods=[${rodReport}]`;
   }
 
   /** Screen-space positions of the bones that matter for grabbing. */

@@ -42,6 +42,7 @@ export class LivePreview {
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
     this.lighting = 1;
+    this.resize();
   }
 
   private hemi: THREE.HemisphereLight;

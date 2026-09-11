@@ -241,10 +241,86 @@ function rigScheme(bones: Map<BoneName, THREE.Object3D>): string {
   return "generic names";
 }
 
+/**
+ * Rods and cables skinned half to each of two bones that are not close relatives (hydraulic
+ * pistons from the pelvis to the chest on a Source Filmmaker endoskeleton, say) skew into
+ * spikes whenever those bones move apart, because the file relied on constraint helpers a
+ * GLB does not carry. Each such vertex is given wholly to the nearer of its two bones, so a
+ * rod stays straight and at worst slides off its far socket. Returns how many were changed.
+ */
+export let rodReport = "";
+function reweightSpanningRods(root: THREE.Object3D): number {
+  root.updateMatrixWorld(true);
+  let changed = 0;
+  const notes: string[] = [];
+  const v = new THREE.Vector3();
+  const pa = new THREE.Vector3();
+  const pb = new THREE.Vector3();
+  const near = (a: THREE.Object3D, b: THREE.Object3D) => {
+    if (a === b || a.parent === b.parent) return true;
+    for (let p = a.parent, i = 0; p && i < 2; p = p.parent, i++) if (p === b) return true;
+    for (let p = b.parent, i = 0; p && i < 2; p = p.parent, i++) if (p === a) return true;
+    return false;
+  };
+  root.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh || !m.skeleton) return;
+    const pos = m.geometry.getAttribute("position");
+    const si = m.geometry.getAttribute("skinIndex");
+    const sw = m.geometry.getAttribute("skinWeight") as THREE.BufferAttribute | undefined;
+    if (!pos || !si || !sw) return;
+    const bones = m.skeleton.bones;
+    const bind = new THREE.Matrix4();
+    const bindPos = bones.map((_, i) => {
+      bind.copy(m.skeleton.boneInverses[i]).invert().premultiply(m.matrixWorld);
+      return new THREE.Vector3().setFromMatrixPosition(bind);
+    });
+    let touched = false;
+    for (let i = 0; i < pos.count; i++) {
+      // The two strongest influences, when both are real.
+      let a = -1, b = -1, wa = 0, wb = 0;
+      for (let k = 0; k < 4; k++) {
+        const w = sw.getComponent(i, k);
+        const jn = si.getComponent(i, k);
+        if (w > wa) { b = a; wb = wa; a = jn; wa = w; } else if (w > wb) { b = jn; wb = w; }
+      }
+      if (a < 0 || b < 0 || wb < 0.25 || !bones[a] || !bones[b] || near(bones[a], bones[b])) continue;
+      v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+      pa.copy(bindPos[a]);
+      pb.copy(bindPos[b]);
+      const keep = v.distanceTo(pa) <= v.distanceTo(pb) ? a : b;
+      if (notes.length < 3) {
+        const before = [0, 1, 2, 3].map((k) => `${si.getComponent(i, k)}:${sw.getComponent(i, k).toFixed(2)}`).join(" ");
+        notes.push(`v${i} ${before} -> keep ${keep}(${bones[keep].name}) v=${v.x.toFixed(2)}/${v.y.toFixed(2)}/${v.z.toFixed(2)} a=${pa.y.toFixed(2)} b=${pb.y.toFixed(2)} sw=${sw.constructor.name}/${sw.array.constructor.name}/${sw.normalized}`);
+      }
+      // Only the first slot naming the kept bone gets the weight: exporters sometimes list a
+      // bone twice in one vertex, and two full weights would double the transform.
+      let given = false;
+      for (let k = 0; k < 4; k++) {
+        const hit = !given && si.getComponent(i, k) === keep;
+        sw.setComponent(i, k, hit ? 1 : 0);
+        if (hit) given = true;
+      }
+      if (notes.length <= 3 && notes.length > 0 && notes[notes.length - 1].startsWith(`v${i} `)) notes[notes.length - 1] += ` after=${[0, 1, 2, 3].map((k) => sw.getComponent(i, k).toFixed(2)).join(",")}`;
+      // If the kept bone was not in a slot (cannot happen: it came from one), nothing changes.
+      changed++;
+      touched = true;
+    }
+    if (touched) sw.needsUpdate = true;
+  });
+  rodReport = `${changed} rod vertices`;
+  void notes;
+  return changed;
+}
+
 export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<Character> {
   const model = await loadModel(pack.base + manifest.model);
   const { root, vrm } = model;
-  if (!vrm) restoreBindPose(root);
+  if (!vrm) {
+    restoreBindPose(root);
+    const rods = reweightSpanningRods(root);
+    if (rods) console.info(`${manifest.name}: ${rods} rod vertices re-weighted to a single bone`);
+  }
 
   if (vrm) {
     VRMUtils.removeUnnecessaryVertices(root);

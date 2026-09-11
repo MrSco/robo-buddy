@@ -15,6 +15,8 @@ pub struct Settings {
     pub character: String,
     /// Window scale, 1.0 = 320x440 logical pixels.
     pub size: f64,
+    /// Light and reflection strength on 3D characters, 1.0 = as designed.
+    pub lighting: f64,
     pub music_enabled: bool,
     pub mouse_enabled: bool,
     pub physics_enabled: bool,
@@ -82,6 +84,7 @@ impl Default for Settings {
         Self {
             character: "rocco".into(),
             size: 1.0,
+            lighting: 1.0,
             music_enabled: true,
             mouse_enabled: true,
             physics_enabled: true,
