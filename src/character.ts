@@ -275,16 +275,43 @@ function reweightSpanningRods(root: THREE.Object3D): number {
       bind.copy(m.skeleton.boneInverses[i]).invert().premultiply(m.matrixWorld);
       return new THREE.Vector3().setFromMatrixPosition(bind);
     });
-    let touched = false;
-    for (let i = 0; i < pos.count; i++) {
-      // The two strongest influences, when both are real.
+    // First pass: per pair of bones, how uniform the secondary weight is across the vertices
+    // they share. Skin fades from one bone to the next; a rod or piston is a flat blend (the
+    // same 0.5/0.5 or 0.67/0.33 on every vertex), whatever the bones' relation.
+    const pairStats = new Map<string, { n: number; sum: number; sq: number }>();
+    const top2 = (i: number): [number, number, number] => {
       let a = -1, b = -1, wa = 0, wb = 0;
       for (let k = 0; k < 4; k++) {
         const w = sw.getComponent(i, k);
         const jn = si.getComponent(i, k);
         if (w > wa) { b = a; wb = wa; a = jn; wa = w; } else if (w > wb) { b = jn; wb = w; }
       }
-      if (a < 0 || b < 0 || wb < 0.25 || !bones[a] || !bones[b] || near(bones[a], bones[b])) continue;
+      return [a, b, wb];
+    };
+    for (let i = 0; i < pos.count; i++) {
+      const [a, b, wb] = top2(i);
+      if (a < 0 || b < 0 || wb < 0.15) continue;
+      const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+      const st = pairStats.get(key) ?? { n: 0, sum: 0, sq: 0 };
+      st.n++;
+      st.sum += wb;
+      st.sq += wb * wb;
+      pairStats.set(key, st);
+    }
+    const rigidPair = (a: number, b: number) => {
+      const st = pairStats.get(a < b ? `${a}:${b}` : `${b}:${a}`);
+      if (!st || st.n < 40) return false;
+      const mean = st.sum / st.n;
+      const sd = Math.sqrt(Math.max(0, st.sq / st.n - mean * mean));
+      return mean >= 0.2 && sd < 0.045;
+    };
+    let touched = false;
+    for (let i = 0; i < pos.count; i++) {
+      // The two strongest influences, when both are real.
+      const [a, b, wb] = top2(i);
+      if (a < 0 || b < 0 || !bones[a] || !bones[b]) continue;
+      const unrelated = wb >= 0.25 && !near(bones[a], bones[b]);
+      if (!unrelated && !(wb >= 0.15 && rigidPair(a, b))) continue;
       v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
       pa.copy(bindPos[a]);
       pb.copy(bindPos[b]);
