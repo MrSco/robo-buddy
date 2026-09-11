@@ -20,6 +20,9 @@ pub struct WorkArea {
     pub top: i32,
     pub right: i32,
     pub bottom: i32,
+    /// Bottom of the whole monitor; `bottom` excludes the taskbar, so the difference is its height.
+    #[serde(rename = "monitorBottom")]
+    pub monitor_bottom: i32,
 }
 
 #[cfg(windows)]
@@ -60,12 +63,12 @@ pub fn work_area(x: i32, y: i32) -> WorkArea {
             let mut info = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
             if GetMonitorInfoW(hmon, &mut info).as_bool() {
                 let r = info.rcWork;
-                return WorkArea { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+                return WorkArea { left: r.left, top: r.top, right: r.right, bottom: r.bottom, monitor_bottom: info.rcMonitor.bottom };
             }
         }
     }
     let _ = (x, y);
-    WorkArea { left: 0, top: 0, right: 1920, bottom: 1040 }
+    WorkArea { left: 0, top: 0, right: 1920, bottom: 1040, monitor_bottom: 1080 }
 }
 
 pub fn start_cursor_thread(app: AppHandle) {
@@ -96,7 +99,7 @@ pub fn work_areas() -> Vec<WorkArea> {
             let mut info = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
             if GetMonitorInfoW(hmon, &mut info).as_bool() {
                 let r = info.rcWork;
-                out.push(WorkArea { left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+                out.push(WorkArea { left: r.left, top: r.top, right: r.right, bottom: r.bottom, monitor_bottom: info.rcMonitor.bottom });
             }
             BOOL(1)
         }
@@ -153,6 +156,32 @@ fn foreground_is_fullscreen() -> bool {
 }
 
 /// Poll the foreground window and emit `fullscreen` {active} when it changes.
+/// Keep the buddy at the top of the topmost band. Tauri's set_always_on_top is a no-op when the
+/// flag is already set, so other always-on-top windows opened later would sit above him.
+pub fn start_topmost_thread(app: AppHandle) {
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_secs(2));
+        #[cfg(windows)]
+        {
+            use tauri::Manager;
+            if let Some(win) = app.get_webview_window("buddy") {
+                if win.is_visible().unwrap_or(false) {
+                    if let Ok(hwnd) = win.hwnd() {
+                        use windows::Win32::Foundation::HWND;
+                        use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE};
+                        // SAFETY: a valid window handle; flags only reorder, never move or activate.
+                        unsafe {
+                            let _ = SetWindowPos(HWND(hwnd.0 as *mut core::ffi::c_void), Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                        }
+                    }
+                }
+            }
+        }
+        #[cfg(not(windows))]
+        let _ = &app;
+    });
+}
+
 pub fn start_fullscreen_thread(app: AppHandle) {
     thread::spawn(move || {
         let mut last: Option<bool> = None;

@@ -3,9 +3,10 @@
  *  - ChatClient: a short conversation through the Rust `chat_complete` command (any
  *    OpenAI-compatible endpoint; the key never reaches this side).
  *  - TalkBox: the little input strip at his feet, with a microphone that records a clip and
- *    sends it for transcription.
- *  - Voice: speaks replies with the Windows voices through the WebView's speechSynthesis.
- * Plus phrase generation: fresh speech-bubble lines in the character's voice, cached per pack.
+ *    sends it for transcription, a history panel, and an idle timeout.
+ *  - Voice: speaks replies with the Windows voices (speechSynthesis) or a local Piper voice.
+ * Plus phrase generation: fresh speech-bubble lines in the character's voice, cached per pack
+ * and personality.
  */
 import { invoke } from "@tauri-apps/api/core";
 
@@ -17,7 +18,7 @@ export interface ChatMessage {
 export type LineEvent = "greet" | "poked" | "sleep" | "wake" | "land" | "dance" | "idle";
 export type Lines = Partial<Record<LineEvent, string[]>>;
 
-/** What he is, unless the pack says otherwise. */
+/** What he is, unless the pack or a personality says otherwise. */
 export function defaultPersona(name: string): string {
   return (
     `You are ${name}, a small 3D character living on the user's Windows desktop, standing on the taskbar. ` +
@@ -28,8 +29,14 @@ export function defaultPersona(name: string): string {
   );
 }
 
+export interface ChatTuning {
+  temperature: number;
+  maxWords: number;
+}
+
 export class ChatClient {
   private history: ChatMessage[] = [];
+  tuning: ChatTuning = { temperature: 0.9, maxWords: 35 };
 
   constructor(private persona: () => string) {}
 
@@ -42,7 +49,11 @@ export class ChatClient {
     const system: ChatMessage = { role: "system", content: `${this.persona()}\n${context}` };
     this.history.push({ role: "user", content: text });
     const messages = [system, ...this.history.slice(-10)];
-    const reply = await invoke<string>("chat_complete", { messages, maxTokens: 120 });
+    const reply = await invoke<string>("chat_complete", {
+      messages,
+      maxTokens: Math.round(this.tuning.maxWords * 3 + 40),
+      temperature: this.tuning.temperature,
+    });
     this.history.push({ role: "assistant", content: reply });
     return reply;
   }
@@ -62,12 +73,13 @@ const PHRASE_TTL_MS = 7 * 24 * 3600 * 1000;
 
 /**
  * Speech-bubble lines in the character's voice, from the cache when fresh, otherwise
- * generated once and cached for a week. Returns null when nothing usable came back.
+ * generated once and cached for a week. `cacheKey` separates packs and personalities.
+ * Returns null when nothing usable came back.
  */
-export async function loadOrGeneratePhrases(packId: string, persona: string, force = false): Promise<Lines | null> {
+export async function loadOrGeneratePhrases(cacheKey: string, persona: string, force = false): Promise<Lines | null> {
   if (!force) {
     try {
-      const cached = await invoke<string | null>("load_phrases", { pack: packId });
+      const cached = await invoke<string | null>("load_phrases", { pack: cacheKey });
       if (cached) {
         const parsed = JSON.parse(cached) as { at: number; lines: Lines };
         if (parsed?.lines && Date.now() - parsed.at < PHRASE_TTL_MS) return parsed.lines;
@@ -86,6 +98,7 @@ export async function loadOrGeneratePhrases(packId: string, persona: string, for
       { role: "user", content: prompt },
     ],
     maxTokens: 900,
+    temperature: 1.0,
   });
   const start = reply.indexOf("{");
   const end = reply.lastIndexOf("}");
@@ -105,41 +118,111 @@ export async function loadOrGeneratePhrases(packId: string, persona: string, for
     }
   }
   if (!Object.keys(lines).length) return null;
-  await invoke("save_phrases", { pack: packId, json: JSON.stringify({ at: Date.now(), lines }) }).catch(() => {});
+  await invoke("save_phrases", { pack: cacheKey, json: JSON.stringify({ at: Date.now(), lines }) }).catch(() => {});
   return lines;
 }
 
-/** Windows voices through the WebView. */
+/** Spoken replies: the Windows voices through the WebView, or a local Piper voice. */
 export class Voice {
   speaking = false;
   enabled = true;
+  engine: "windows" | "piper" = "windows";
+  /** performance.now() when speech last ended, for holding the music gate a moment after. */
+  endedAt = -Infinity;
+  onError?: (msg: string) => void;
+  private audio: HTMLAudioElement | null = null;
+  private url: string | null = null;
+  private seq = 0;
+
+  /** True while speaking or within `graceMs` after speech ended. */
+  busy(graceMs = 1500) {
+    return this.speaking || performance.now() - this.endedAt < graceMs;
+  }
 
   say(text: string) {
-    if (!this.enabled || !("speechSynthesis" in window)) return;
+    if (!this.enabled) return;
+    if (this.engine === "piper") void this.sayPiper(text);
+    else this.sayWindows(text);
+  }
+
+  private sayWindows(text: string) {
+    if (!("speechSynthesis" in window)) return;
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1.05;
     u.pitch = 1;
     u.onstart = () => (this.speaking = true);
-    u.onend = u.onerror = () => (this.speaking = false);
+    u.onend = u.onerror = () => this.ended();
     speechSynthesis.speak(u);
   }
 
-  stop() {
-    if ("speechSynthesis" in window) speechSynthesis.cancel();
+  private async sayPiper(text: string) {
+    const my = ++this.seq;
+    this.stopAudio();
+    let bytes: ArrayBuffer;
+    try {
+      bytes = await invoke<ArrayBuffer>("speak_piper", { text });
+    } catch (err) {
+      this.onError?.(String(err).slice(0, 90));
+      return;
+    }
+    if (my !== this.seq) return;
+    this.url = URL.createObjectURL(new Blob([bytes], { type: "audio/wav" }));
+    const a = new Audio(this.url);
+    this.audio = a;
+    a.onplay = () => (this.speaking = true);
+    a.onended = a.onerror = a.onpause = () => {
+      if (this.audio === a) this.ended();
+    };
+    a.play().catch((err) => this.onError?.(String(err).slice(0, 90)));
+  }
+
+  private ended() {
     this.speaking = false;
+    this.endedAt = performance.now();
+  }
+
+  private stopAudio() {
+    if (this.audio) {
+      const a = this.audio;
+      this.audio = null;
+      a.pause();
+    }
+    if (this.url) {
+      URL.revokeObjectURL(this.url);
+      this.url = null;
+    }
+  }
+
+  stop() {
+    this.seq++;
+    if ("speechSynthesis" in window) speechSynthesis.cancel();
+    this.stopAudio();
+    if (this.speaking) this.ended();
   }
 }
 
-/** The input strip at his feet: type, or hold the mic button to talk. */
+export interface TalkEntry {
+  who: "you" | "him";
+  text: string;
+}
+
+const TALK_IDLE_MS = 45_000;
+const LOG_MAX = 30;
+
+/** The input strip at his feet: type, or click the mic and talk. */
 export class TalkBox {
   readonly el: HTMLDivElement;
   private input: HTMLInputElement;
   private mic: HTMLButtonElement;
   private send: HTMLButtonElement;
+  private logBtn: HTMLButtonElement;
+  private logEl: HTMLDivElement;
   private recorder: MediaRecorder | null = null;
   private chunks: BlobPart[] = [];
   private stream: MediaStream | null = null;
+  private idleTimer = 0;
+  private log: TalkEntry[] = [];
   open = false;
   busy = false;
   /** Set by main: handles one utterance; resolves when the reply has been shown. */
@@ -164,30 +247,58 @@ export class TalkBox {
     this.send.type = "button";
     this.send.textContent = "➤";
     this.send.title = "Send";
+    this.logBtn = document.createElement("button");
+    this.logBtn.type = "button";
+    this.logBtn.textContent = "☰";
+    this.logBtn.title = "Show what we said (this session)";
     const close = document.createElement("button");
     close.type = "button";
     close.textContent = "✕";
     close.title = "Close";
-    this.el.append(this.mic, this.input, this.send, close);
-    document.body.appendChild(this.el);
+    this.el.append(this.mic, this.input, this.send, this.logBtn, close);
+    this.logEl = document.createElement("div");
+    this.logEl.className = "talk-log";
+    this.logEl.hidden = true;
+    document.body.append(this.logEl, this.el);
 
     this.send.addEventListener("click", () => void this.submit());
     close.addEventListener("click", () => this.hide());
     this.mic.addEventListener("click", () => void this.toggleRecording());
+    this.logBtn.addEventListener("click", () => this.toggleLog());
+    this.input.addEventListener("input", () => this.touch());
     this.input.addEventListener("keydown", (e) => {
+      this.touch();
       if (e.key === "Enter") {
         e.preventDefault();
         void this.submit();
       } else if (e.key === "Escape") {
         e.preventDefault();
         this.hide();
+      } else if (e.key === "ArrowUp" && !this.input.value) {
+        e.preventDefault();
+        this.toggleLog(true);
       }
       e.stopPropagation();
     });
-    // Keep the buddy's grab handling from seeing presses on the strip.
-    for (const ev of ["pointerdown", "pointerup", "dblclick", "contextmenu"] as const) {
-      this.el.addEventListener(ev, (e) => e.stopPropagation());
+    // Keep the buddy's grab handling from seeing presses on the strip or the log.
+    for (const target of [this.el, this.logEl]) {
+      for (const ev of ["pointerdown", "pointerup", "dblclick", "contextmenu"] as const) {
+        target.addEventListener(ev, (e) => {
+          this.touch();
+          e.stopPropagation();
+        });
+      }
     }
+  }
+
+  /** Any interaction: push the idle timeout back. */
+  touch() {
+    clearTimeout(this.idleTimer);
+    if (!this.open) return;
+    this.idleTimer = window.setTimeout(() => {
+      if (this.busy || this.recorder) this.touch();
+      else this.hide();
+    }, TALK_IDLE_MS);
   }
 
   show() {
@@ -195,12 +306,15 @@ export class TalkBox {
     this.open = true;
     this.mic.hidden = !this.micEnabled;
     this.onOpenChange?.(true);
+    this.touch();
     setTimeout(() => this.input.focus(), 30);
   }
 
   hide() {
+    clearTimeout(this.idleTimer);
     if (this.recorder) this.stopRecording(true);
     this.el.hidden = true;
+    this.logEl.hidden = true;
     this.open = false;
     this.onOpenChange?.(false);
   }
@@ -210,16 +324,49 @@ export class TalkBox {
     else this.show();
   }
 
+  /** Remember a line for the history panel (memory only, this session). */
+  remember(entry: TalkEntry) {
+    this.log.push(entry);
+    if (this.log.length > LOG_MAX) this.log.shift();
+    if (!this.logEl.hidden) this.renderLog();
+  }
+
+  private toggleLog(show?: boolean) {
+    const want = show ?? this.logEl.hidden;
+    this.logEl.hidden = !want;
+    if (want) this.renderLog();
+  }
+
+  private renderLog() {
+    this.logEl.innerHTML = "";
+    if (!this.log.length) {
+      const p = document.createElement("p");
+      p.className = "empty";
+      p.textContent = "Nothing said yet.";
+      this.logEl.appendChild(p);
+      return;
+    }
+    for (const e of this.log) {
+      const p = document.createElement("p");
+      p.className = e.who;
+      p.textContent = e.text;
+      this.logEl.appendChild(p);
+    }
+    this.logEl.scrollTop = this.logEl.scrollHeight;
+  }
+
   /** Put text in the box (from transcription) and send it. */
   private async submit(text = this.input.value) {
     const line = text.trim();
     if (!line || this.busy || !this.onSend) return;
     this.input.value = "";
     this.setBusy(true);
+    this.remember({ who: "you", text: line });
     try {
       await this.onSend(line);
     } finally {
       this.setBusy(false);
+      this.touch();
       if (this.open) this.input.focus();
     }
   }
@@ -232,6 +379,7 @@ export class TalkBox {
   }
 
   private async toggleRecording() {
+    this.touch();
     if (this.recorder) {
       this.stopRecording(false);
       return;
@@ -292,6 +440,7 @@ export class TalkBox {
       this.onStatus?.(String(err).slice(0, 80));
     } finally {
       this.input.placeholder = "Say something… (Esc closes)";
+      this.touch();
     }
   }
 }

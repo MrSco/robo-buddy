@@ -8,6 +8,7 @@ import { applyLibrary, invalidateLibrary, listLibrary } from "./library";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Bubble } from "./bubble";
 import { ChatClient, TalkBox, Voice, defaultPersona, loadOrGeneratePhrases, type LineEvent, type Lines } from "./chat";
+import { resolvePersonality, type ResolvedPersonality } from "./personality";
 import { Sounds } from "./sound";
 import { cursor, IN_TAURI, startInput } from "./input";
 import { listPacks, resolvePack, validateManifest, type Manifest, type PackRef } from "./packs";
@@ -32,7 +33,8 @@ let pack: PackRef | null = null;
 // Talk (M6): the input strip, the conversation, the voice, and generated bubble lines.
 const talk = new TalkBox();
 const voice = new Voice();
-const chat = new ChatClient(() => manifest?.persona ?? defaultPersona(manifest?.name ?? "Buddy"));
+let personality: ResolvedPersonality | null = null;
+const chat = new ChatClient(() => personality?.persona ?? manifest?.persona ?? defaultPersona(manifest?.name ?? "Buddy"));
 let extraLines: Lines = {};
 let nextChatter = Infinity;
 
@@ -114,7 +116,9 @@ async function boot() {
     // A hard landing plays the pack's landing clip (Jump Land by default) before idling.
     // If he came in tumbling (or really hard) he first lies limp for a moment, then gets up.
     const now = clock.elapsedTime;
-    if (landStrength > 0.35 && renderer?.kind === "3d" && downUntil < now && landUntil < now) {
+    // No fidgets for a while after a landing; a drop followed by a random hop reads as glitchy.
+    behavior.rest(now, 12);
+    if (landStrength > 0.5 && renderer?.kind === "3d" && downUntil < now && landUntil < now) {
       const tumbled = Math.abs(renderer3d?.tumbleAngle ?? 0) > 0.25 || landStrength > 0.7;
       downUntil = tumbled ? now + 1.1 + Math.random() * 0.6 : -1;
       landClip = behavior.stateClip("land");
@@ -156,10 +160,6 @@ async function boot() {
     });
     // Other always-on-top windows opened later sit above him in the topmost band; take the
     // top of it back every couple of seconds (no focus change, so nothing is interrupted).
-    setInterval(() => {
-      if (hiddenByFullscreen || settings.paused) return;
-      getCurrentWindow().setAlwaysOnTop(true).catch(() => {});
-    }, 2000);
     await listen("talk", () => openTalk());
     // Hide behind fullscreen apps (games, videos) and come back afterwards.
     await listen<{ active: boolean }>("fullscreen", async (e) => {
@@ -183,11 +183,11 @@ async function boot() {
     applySettings(s);
     // A new dance choice takes effect now, not at the next song.
     if (s.danceMode !== prev.danceMode && danceAmount > 0.2) danceClip = behavior.chooseDance();
-    if (s.chatEnabled !== prev.chatEnabled || s.chatGenerateLines !== prev.chatGenerateLines || s.chatEndpoint !== prev.chatEndpoint || s.chatModel !== prev.chatModel) {
+    if (s.chatEnabled !== prev.chatEnabled || s.chatGenerateLines !== prev.chatGenerateLines || s.chatEndpoint !== prev.chatEndpoint || s.chatModel !== prev.chatModel || s.personality !== prev.personality) {
+      if (s.personality !== prev.personality) chat.reset();
       if (pack) void refreshPhrases(pack.id);
       if (!s.chatEnabled && talk.open) talk.hide();
     }
-    voice.enabled = s.chatVoice;
   });
 }
 
@@ -320,6 +320,8 @@ function applySettings(s: Settings) {
   }
   if (music) music.threshold = s.musicThreshold;
   sounds.enabled = s.soundsEnabled;
+  voice.enabled = s.chatVoice;
+  voice.engine = s.ttsEngine === "piper" ? "piper" : "windows";
   behavior.opts = { wander: s.wanderEnabled, danceMode: s.danceMode };
   const set = pack ? s.idleSets?.[pack.id] : undefined;
   behavior.enabled = set ? new Set(set) : null;
@@ -333,19 +335,29 @@ function speak(event: NonNullable<Manifest["lines"]> extends Partial<Record<infe
   bubble.say(linesFor(event), seconds, clock.elapsedTime);
 }
 
-/** The pack's own lines plus any generated ones for that event. */
+/** The personality's bucket (or the pack's own lines) plus any generated ones for that event. */
 function linesFor(event: LineEvent): string[] {
-  return [...(manifest?.lines?.[event as keyof NonNullable<Manifest["lines"]>] ?? []), ...(extraLines[event] ?? [])];
+  const base = personality && personality.id !== "pack" ? personality.lines[event] ?? [] : manifest?.lines?.[event as keyof NonNullable<Manifest["lines"]>] ?? [];
+  return [...base, ...(extraLines[event] ?? [])];
+}
+
+/** Persona, line bucket and model settings for the current character under the chosen profile. */
+async function applyPersonality() {
+  const name = manifest?.name ?? "Buddy";
+  personality = await resolvePersonality(settings.personality, name, manifest?.persona, (manifest?.lines ?? {}) as Lines);
+  chat.tuning = { temperature: personality.temperature, maxWords: personality.maxWords };
 }
 
 /** Generated bubble lines for the current pack, when talking is on (cached a week per pack). */
 async function refreshPhrases(packId: string, force = false) {
   extraLines = {};
   nextChatter = Infinity;
+  await applyPersonality();
+  if (pack?.id !== packId) return;
   if (!IN_TAURI || !settings.chatEnabled || !settings.chatGenerateLines) return;
   try {
-    const persona = manifest?.persona ?? defaultPersona(manifest?.name ?? "Buddy");
-    const lines = await loadOrGeneratePhrases(packId, persona, force);
+    const persona = personality?.persona ?? manifest?.persona ?? defaultPersona(manifest?.name ?? "Buddy");
+    const lines = await loadOrGeneratePhrases(`${packId}__${personality?.id ?? "pack"}`, persona, force);
     if (lines && pack?.id === packId) {
       extraLines = lines;
       nextChatter = clock.elapsedTime + 90 + Math.random() * 120;
@@ -364,22 +376,29 @@ function chatContext(): string {
 talk.onSend = async (text) => {
   activity();
   behavior.interrupt(clock.elapsedTime);
-  bubble.say(["…"], 40, clock.elapsedTime);
+  // Replies outrank quips: a "This slaps" cannot wipe an answer, and while the strip is open
+  // the answer stays until the next one (or the strip closes).
+  bubble.say(["…"], 40, clock.elapsedTime, 2);
   try {
     const reply = await chat.ask(text, chatContext());
     const words = reply.split(/\s+/).length;
-    bubble.say([reply], Math.min(24, 3 + words * 0.45), clock.elapsedTime);
+    talk.remember({ who: "him", text: reply });
+    bubble.say([reply], talk.open ? 600 : Math.min(24, 3 + words * 0.45), clock.elapsedTime, 2);
     if (settings.chatVoice) voice.say(reply);
   } catch (err) {
-    bubble.say([`Can't talk right now: ${String(err).slice(0, 90)}`], 6, clock.elapsedTime);
+    bubble.say([`Can't talk right now: ${String(err).slice(0, 90)}`], 6, clock.elapsedTime, 1);
   }
 };
-talk.onStatus = (text) => bubble.say([text], 4, clock.elapsedTime);
+talk.onStatus = (text) => bubble.say([text], 4, clock.elapsedTime, 1);
 talk.onOpenChange = (open) => {
   ignoringCursor = null; // re-evaluate click-through now that the strip is (in)visible
   if (open && IN_TAURI) getCurrentWindow().setFocus().catch(() => {});
-  if (!open) voice.stop();
+  if (!open) {
+    voice.stop();
+    bubble.hideIf(2);
+  }
 };
+voice.onError = (msg) => bubble.say([`Voice: ${msg}`], 4, clock.elapsedTime, 1);
 function openTalk() {
   if (!settings.chatEnabled) {
     bubble.say(["Turn on Talk in Settings first."], 3, clock.elapsedTime);
@@ -557,7 +576,7 @@ function debugTitle(t: number) {
   const probe = renderer3d ? renderer3d.debugProbe() : "2d";
   const title =
     `Robo Buddy | ${p.mode} y=${p.y.toFixed(0)} air=${p.airborne} yaw=${yaw.toFixed(2)} cur=${cursor.x},${cursor.y},${cursor.buttons}` +
-    ` | pack=${pack?.id} state=${currentState} grab=${grabPart ?? '-'} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
+    ` | pack=${pack?.id} state=${currentState} grab=${grabPart ?? '-'} talk=${talk.open} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
     (m ? ` | lvl=${m.level.toFixed(2)} gate=${m.gateLevel.toFixed(2)}/${m.threshold.toFixed(2)} bpm=${m.bpm.toFixed(0)} dance=${m.dancing} amt=${danceAmount.toFixed(2)} beats=${m.beats.toFixed(1)}` : "");
   getCurrentWindow().setTitle(title).catch(() => {});
 }
@@ -571,6 +590,8 @@ function frame() {
   const paused = settings.paused;
   if (music) {
     music.requireTempo = settings.requireTempo;
+    // His own voice through the speakers must not start (or stop) a dance.
+    music.hold = voice.busy(1500);
     music.update(dt, t);
     const musicOn = settings.musicEnabled && !paused && (manifest?.reactions.music?.enabled ?? true);
     const target = musicOn && music.dancing && !physics?.airborne && physics?.mode !== "held" ? 1 : 0;
@@ -580,7 +601,9 @@ function frame() {
   sinceLand += dt;
   updatePress(t);
   // Standing on the taskbar: sink the window by the camera's margin so the soles meet its edge.
-  if (physics) physics.floorOverlap = settings.standOnTaskbar && renderer === renderer3d ? Math.round((renderer3d?.bottomMarginPx ?? 0) * scaleFactor) : 0;
+  // Standing on the taskbar: the window covers the taskbar band and the soles sit on its top edge.
+  if (physics) physics.floorOverlap = settings.standOnTaskbar && renderer === renderer3d ? physics.taskbarHeight : 0;
+  if (renderer3d) renderer3d.groundPx = physics ? physics.floorOverlap / scaleFactor : 0;
   updateHead();
   updateLook(dt);
 

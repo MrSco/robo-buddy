@@ -157,6 +157,11 @@ export class WindowPhysics {
     return this.area.bottom - this.h + this.floorOverlap;
   }
 
+  /** Height of a bottom taskbar on the current monitor (0 when it is elsewhere), physical px. */
+  get taskbarHeight() {
+    return Math.max(0, (this.area.monitorBottom ?? this.area.bottom) - this.area.bottom);
+  }
+
   get workArea() {
     return this.area;
   }

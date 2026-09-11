@@ -33,28 +33,25 @@ main {
   align-items: start;
 }
 @media (min-width: 800px) {
+  /* Two balanced columns: the browser fills them to equal height, sections never split. */
   .cols {
-    grid-template-columns: 1fr 1fr;
+    display: block;
+    columns: 2;
+    column-gap: 12px;
   }
-  .cols > .s-character {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .cols > .s-reactions {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-  }
-  .cols > .s-window {
-    grid-column: 1;
-    grid-row: 2;
-  }
-  .cols > .s-talk {
-    grid-column: 1;
-    grid-row: 3;
+  .cols > section {
+    display: inline-block;
+    width: 100%;
+    box-sizing: border-box;
+    break-inside: avoid;
+    margin-bottom: 9px;
   }
   .library {
     max-height: 320px;
   }
+}
+.row.gone {
+  display: none;
 }
 h1 {
   font-size: 18px;

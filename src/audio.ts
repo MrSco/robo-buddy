@@ -38,6 +38,8 @@ export class Music {
    * beat, which kept resetting the "loud for long enough" timer and he never started.
    */
   gateLevel = 0;
+  /** While our own voice plays through the speakers, neither start nor stop dancing on it. */
+  hold = false;
   /** When true, dancing also needs a stable tempo estimate. Filters game audio and speech. */
   requireTempo = false;
   private stableSince = -1;
@@ -91,7 +93,10 @@ export class Music {
     // second, stops only after it sits well under it for two seconds (or on silence).
     this.gateLevel += (r.level - this.gateLevel) * (1 - Math.exp(-dt * 1.5));
     const gate = this.dancing ? this.threshold * 0.8 : this.threshold;
-    if (this.gateLevel > gate && !r.silent && tempoOk) {
+    if (this.hold) {
+      this.aboveSince = -1;
+      this.belowSince = -1;
+    } else if (this.gateLevel > gate && !r.silent && tempoOk) {
       if (this.aboveSince < 0) this.aboveSince = now;
       this.belowSince = -1;
       if (!this.dancing && now - this.aboveSince > 0.5) this.dancing = true;

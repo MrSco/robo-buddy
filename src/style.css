@@ -112,6 +112,45 @@ html, body {
 .talk.busy input {
   opacity: 0.6;
 }
+/* What we said this session, above the strip. */
+.talk-log {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 50px;
+  max-height: 45%;
+  overflow-y: auto;
+  padding: 8px 10px;
+  background: rgba(22, 24, 30, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  font: 12px/1.35 "Segoe UI", system-ui, sans-serif;
+  color: #e8e9ee;
+  pointer-events: auto;
+  z-index: 5;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.talk-log[hidden] {
+  display: none;
+}
+.talk-log p {
+  margin: 0 0 6px;
+}
+.talk-log p.you {
+  color: #9fc4ff;
+}
+.talk-log p.you::before {
+  content: "you: ";
+  color: #6f8fbf;
+}
+.talk-log p.him::before {
+  content: "him: ";
+  color: #9a9daa;
+}
+.talk-log p.empty {
+  color: #9a9daa;
+}
 @keyframes blink {
   50% {
     opacity: 0.4;

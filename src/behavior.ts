@@ -102,6 +102,11 @@ export class Behavior {
     this.nextEvent = t + 5 + Math.random() * 8;
   }
 
+  /** Nothing scheduled for at least `seconds`; used after a landing so he does not fidget at once. */
+  rest(t: number, seconds: number) {
+    this.nextEvent = Math.max(this.nextEvent, t + seconds);
+  }
+
   update(s: Status): Activity {
     const m = this.manifest;
     if (!m) return this.activity;

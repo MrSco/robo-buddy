@@ -337,6 +337,16 @@ Goal: dynamic phrases and a real conversation, free by default, bring-your-own-k
 - Verified against a local mock OpenAI server (chat, phrase generation, the settings Test button); the mic path and real
   providers were not exercised here (no key on this machine).
 
+- Follow-ups (Sep 11): the window covers the whole taskbar band and the camera reserves that band under the soles, so he
+  stands on the taskbar's top edge with nothing clipped; topmost is re-asserted from a Rust thread with SetWindowPos (Tauri's
+  set_always_on_top is a no-op when the flag is already set); the music gate holds while his own voice plays; replies outrank
+  quips in the bubble and persist while the strip is open; the strip has a session history panel (memory only, 30 lines) and
+  closes after 45 s idle; a separate speech endpoint (a local Vibe server is OpenAI-compatible at /v1/audio/transcriptions);
+  Piper as a local voice (piper.exe + .onnx, WAV returned over IPC); personality profiles (`public/personalities/index.json`:
+  persona, line bucket, temperature, reply length) selectable in Settings > Talk, with generated lines cached per pack+profile;
+  settings use two balanced CSS columns; gentle drops no longer chain a land clip and a hop fidget (jump fidget removed,
+  12 s calm after landing, land clip only for hard landings). A T-pose detector counts frames in the status title.
+
 ## M7 — Webcam motion capture (proposed)
 Goal: drive the model live from the user's webcam, and record what they do as a clip for the library (a dance, an idle).
 - Tracking in the settings window (it already has a camera-free 3D preview): MediaPipe Pose Landmarker (tasks-vision,

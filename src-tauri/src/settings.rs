@@ -58,6 +58,14 @@ pub struct Settings {
     pub chat_generate_lines: bool,
     /// Requests per day, 0 = unlimited.
     pub chat_daily_cap: u32,
+    /// Separate base URL for /audio/transcriptions (a local Vibe server, say); empty = chat endpoint.
+    pub chat_stt_endpoint: String,
+    /// "windows" (speechSynthesis) or "piper" (local piper.exe with an .onnx voice).
+    pub tts_engine: String,
+    pub piper_exe: String,
+    pub piper_voice: String,
+    /// Personality profile id; "pack" = the character's own persona and lines.
+    pub personality: String,
 }
 
 impl Default for Settings {
@@ -90,6 +98,11 @@ impl Default for Settings {
             chat_voice: true,
             chat_generate_lines: true,
             chat_daily_cap: 300,
+            chat_stt_endpoint: String::new(),
+            tts_engine: "windows".into(),
+            piper_exe: String::new(),
+            piper_voice: String::new(),
+            personality: "pack".into(),
         }
     }
 }

@@ -105,6 +105,7 @@ pub fn run() {
             }
             input::start_cursor_thread(app.handle().clone());
             input::start_fullscreen_thread(app.handle().clone());
+            input::start_topmost_thread(app.handle().clone());
             audio::start_audio_thread(app.handle().clone());
             Ok(())
         })
@@ -153,6 +154,7 @@ pub fn run() {
             chat::has_chat_key,
             chat::chat_complete,
             chat::transcribe,
+            chat::speak_piper,
             chat::chat_usage,
             chat::load_phrases,
             chat::save_phrases,

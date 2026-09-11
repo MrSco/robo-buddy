@@ -120,10 +120,6 @@
       "cross"
     ],
     "roll",
-    [
-      "jumpStart",
-      "jumpLand"
-    ],
     "pickup",
     [
       "spellEnter",

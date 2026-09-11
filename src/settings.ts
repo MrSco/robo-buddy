@@ -9,6 +9,7 @@ import { listen } from "@tauri-apps/api/event";
 import type { AudioFeatures } from "./audio";
 import { listLibrary, invalidateLibrary, ROLES, type LibraryClip } from "./library";
 import { getSettings, onSettingsChanged, setSettings, type ClickThroughMode, type Settings } from "./settings-store";
+import { listPersonalities } from "./personality";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -60,6 +61,13 @@ const els = {
   chatCap: $<HTMLInputElement>("chat-cap"),
   chatTest: $<HTMLButtonElement>("chat-test"),
   chatTestStatus: $<HTMLParagraphElement>("chat-teststatus"),
+  personality: $<HTMLSelectElement>("personality"),
+  personalityHint: $<HTMLParagraphElement>("personality-hint"),
+  chatSttEndpoint: $<HTMLInputElement>("chat-stt-endpoint"),
+  ttsEngine: $<HTMLSelectElement>("tts-engine"),
+  piperFields: $<HTMLDivElement>("piper-fields"),
+  piperExe: $<HTMLInputElement>("piper-exe"),
+  piperVoice: $<HTMLInputElement>("piper-voice"),
 };
 
 let settings: Settings;
@@ -296,6 +304,15 @@ function render() {
   els.chatVoice.checked = settings.chatVoice;
   els.chatLines.checked = settings.chatGenerateLines;
   els.chatCap.value = String(settings.chatDailyCap);
+  els.chatSttEndpoint.value = settings.chatSttEndpoint;
+  els.ttsEngine.value = settings.ttsEngine;
+  els.piperFields.classList.toggle("gone", settings.ttsEngine !== "piper");
+  els.piperExe.value = settings.piperExe;
+  els.piperVoice.value = settings.piperVoice;
+  if (els.personality.options.length) {
+    els.personality.value = settings.personality;
+    els.personalityHint.textContent = els.personality.selectedOptions[0]?.dataset.desc ?? "";
+  }
   els.chatKeyHint.textContent = PROVIDERS[settings.chatProvider]?.keyHint ?? "for your endpoint";
   els.clickthrough.value = settings.clickThrough;
   els.autostart.checked = settings.autostart;
@@ -386,6 +403,29 @@ function wireTalk() {
   els.chatVoice.addEventListener("change", () => void commit({ chatVoice: els.chatVoice.checked }));
   els.chatLines.addEventListener("change", () => void commit({ chatGenerateLines: els.chatLines.checked }));
   els.chatCap.addEventListener("change", () => void commit({ chatDailyCap: Math.max(0, Math.round(Number(els.chatCap.value) || 0)) }));
+  els.chatSttEndpoint.addEventListener("change", () => void commit({ chatSttEndpoint: els.chatSttEndpoint.value.trim() }));
+  els.ttsEngine.addEventListener("change", () => {
+    els.piperFields.classList.toggle("gone", els.ttsEngine.value !== "piper");
+    void commit({ ttsEngine: els.ttsEngine.value });
+  });
+  els.piperExe.addEventListener("change", () => void commit({ piperExe: els.piperExe.value.trim().replace(/^"|"$/g, "") }));
+  els.piperVoice.addEventListener("change", () => void commit({ piperVoice: els.piperVoice.value.trim().replace(/^"|"$/g, "") }));
+  els.personality.addEventListener("change", () => {
+    els.personalityHint.textContent = els.personality.selectedOptions[0]?.dataset.desc ?? "";
+    void commit({ personality: els.personality.value });
+  });
+  void listPersonalities().then((profiles) => {
+    els.personality.innerHTML = "";
+    for (const p of profiles) {
+      const o = document.createElement("option");
+      o.value = p.id;
+      o.textContent = p.name;
+      o.dataset.desc = p.description ?? "";
+      els.personality.appendChild(o);
+    }
+    els.personality.value = settings?.personality ?? "pack";
+    els.personalityHint.textContent = els.personality.selectedOptions[0]?.dataset.desc ?? "";
+  });
   els.chatSaveKey.addEventListener("click", async () => {
     try {
       await invoke("set_chat_key", { key: els.chatKey.value });

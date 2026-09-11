@@ -33,8 +33,11 @@ export class Renderer3D implements Renderer {
   private fitDist = 0;
   private fitY = 0;
   private fitX = 0;
-  /** CSS pixels between the window's bottom edge and the soles, from the last fit. */
-  bottomMarginPx = 0;
+  /** CSS pixels reserved under the soles (the taskbar band the window overlaps). */
+  groundPx = 0;
+  /** Dev: frames where both arms were straight out sideways, and when it last happened. */
+  tposeFrames = 0;
+  tposeLast = "";
   /** Pendulum state while held: angle and angular velocity (radians). */
   private swing = 0;
   private swingVel = 0;
@@ -157,7 +160,9 @@ export class Renderer3D implements Renderer {
     }
     // Standing: two percent of his height under the soles. Tumbling or lying: the lowest
     // joint plus a little, so a shoulder on the floor is still inside the window.
-    const y0 = Math.min(floor - h * 0.02, lowest - h * 0.03);
+    // The soles rest `groundPx` above the window's bottom edge (on the taskbar's top edge).
+    const groundUnits = (this.groundPx * (2 * Math.max(this.fitDist, 0.05) * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)))) / this.cssH;
+    const y0 = Math.min(floor - h * 0.01, lowest - h * 0.03) - groundUnits;
     void minY;
     const y1 = Math.max(maxY + h * 0.1, y0 + h * 1.3);
     const halfV = (y1 - y0) / 2;
@@ -173,7 +178,6 @@ export class Renderer3D implements Renderer {
     const cy = y0 + dist * tanV;
     const k = snap ? 1 : 1 - Math.exp(-dt * (dist > this.fitDist ? 20 : 3));
     this.fitDist += (dist - this.fitDist) * k;
-    this.bottomMarginPx = ((floor - y0) / (2 * this.fitDist * tanV)) * this.cssH;
     const kc = snap ? 1 : 1 - Math.exp(-dt * 6);
     this.fitY += (cy - this.fitY) * kc;
     this.fitX += (cx - this.fitX) * kc;
@@ -358,16 +362,33 @@ export class Renderer3D implements Renderer {
     applyLimp(c, this.downAmount);
     if (!(input.state === "sleep" && clipDriven)) applySleep(c, input.t, input.sleepAmount);
     c.update(input.dt);
+    this.detectTpose(c, input);
     this.fitCamera(input.dt);
     this.renderer.render(this.scene, this.camera);
     this.renders++;
+  }
+
+  /** Dev: the rest pose showing through looks like a T: both upper arms straight out sideways. */
+  private detectTpose(c: Character, input: FrameInput) {
+    if (Math.abs(this.tumble) > 0.3 || this.flipAmount > 0.1) return;
+    const out = (upper: THREE.Object3D | undefined, lower: THREE.Object3D | undefined) => {
+      if (!upper || !lower) return false;
+      upper.getWorldPosition(this.tmp);
+      const b = lower.getWorldPosition(new THREE.Vector3()).sub(this.tmp).normalize();
+      return Math.abs(b.y) < 0.25 && Math.abs(b.x) > 0.9;
+    };
+    c.root.updateMatrixWorld(true);
+    if (out(c.bone("leftUpperArm"), c.bone("leftLowerArm")) && out(c.bone("rightUpperArm"), c.bone("rightLowerArm"))) {
+      this.tposeFrames++;
+      this.tposeLast = `${input.state}/${input.clip?.name ?? "-"}@${input.t.toFixed(1)}`;
+    }
   }
 
   /** Dev: raw RGBA at the centre of the drawing buffer plus the GL error state. */
   debugProbe(): string {
     const px = new Uint8Array(4);
     this.gl.readPixels(Math.floor(this.canvas.width / 2), Math.floor(this.canvas.height * 0.55), 1, 1, this.gl.RGBA, this.gl.UNSIGNED_BYTE, px);
-    return `${Array.from(px).join(",")} err=${this.gl.getError()} lost=${this.gl.isContextLost()} inst=${this.id} renders=${this.renders} same=${this.gl === this.renderer.getContext()}`;
+    return `${Array.from(px).join(",")} err=${this.gl.getError()} lost=${this.gl.isContextLost()} inst=${this.id} renders=${this.renders} same=${this.gl === this.renderer.getContext()} tpose=${this.tposeFrames}:${this.tposeLast}`;
   }
 
   /** Screen-space positions of the bones that matter for grabbing. */

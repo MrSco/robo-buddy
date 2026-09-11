@@ -7,6 +7,8 @@ export class Bubble {
   private el: HTMLDivElement;
   private hideAt = 0;
   private lastLine = "";
+  /** A showing bubble with a higher priority is not replaced by a lower one (replies beat quips). */
+  priority = 0;
 
   constructor() {
     this.el = document.createElement("div");
@@ -16,8 +18,10 @@ export class Bubble {
   }
 
   /** Show one of the lines (never the same one twice in a row) for `seconds`. */
-  say(lines: string[] | undefined, seconds = 2.5, now = performance.now() / 1000) {
+  say(lines: string[] | undefined, seconds = 2.5, now = performance.now() / 1000, priority = 0) {
     if (!lines || lines.length === 0) return;
+    if (!this.el.hidden && now < this.hideAt && this.priority > priority) return;
+    this.priority = priority;
     let line = lines[Math.floor(Math.random() * lines.length)];
     if (lines.length > 1 && line === this.lastLine) line = lines[(lines.indexOf(line) + 1) % lines.length];
     this.lastLine = line;
@@ -33,6 +37,12 @@ export class Bubble {
   hide() {
     this.el.hidden = true;
     this.hideAt = 0;
+    this.priority = 0;
+  }
+
+  /** Hide only if what is showing has this priority (closing the talk strip drops the reply). */
+  hideIf(priority: number) {
+    if (this.priority === priority) this.hide();
   }
 
   /** Reposition each frame; (x, y) is the top of the head in CSS pixels. */

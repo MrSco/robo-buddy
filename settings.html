@@ -91,29 +91,30 @@
         <label class="check"><input id="chat-enabled" type="checkbox" /> Let him talk (double-click him, or right-click &rarr; Talk)</label>
         <div class="indent talk-fields" id="talk-fields">
           <label class="field inline">
-            <span>Provider</span>
-            <select id="chat-provider">
-              <option value="groq">Groq (free tier)</option>
-              <option value="gemini">Google Gemini (free tier)</option>
-              <option value="openai">OpenAI</option>
-              <option value="ollama">Ollama (local, no key)</option>
-              <option value="custom">Custom OpenAI-compatible</option>
-            </select>
+            <span>Personality</span>
+            <select id="personality"></select>
           </label>
-          <label class="field">
-            <span>Endpoint</span>
-            <input id="chat-endpoint" type="text" spellcheck="false" />
-          </label>
+          <p class="hint" id="personality-hint"></p>
           <div class="row">
+            <label class="field grow">
+              <span>Provider</span>
+              <select id="chat-provider">
+                <option value="groq">Groq (free tier)</option>
+                <option value="gemini">Google Gemini (free tier)</option>
+                <option value="openai">OpenAI</option>
+                <option value="ollama">Ollama (local, no key)</option>
+                <option value="custom">Custom OpenAI-compatible</option>
+              </select>
+            </label>
             <label class="field grow">
               <span>Chat model</span>
               <input id="chat-model" type="text" spellcheck="false" />
             </label>
-            <label class="field grow">
-              <span>Speech model (blank = no mic)</span>
-              <input id="chat-stt" type="text" spellcheck="false" />
-            </label>
           </div>
+          <label class="field">
+            <span>Endpoint</span>
+            <input id="chat-endpoint" type="text" spellcheck="false" />
+          </label>
           <label class="field">
             <span>API key &mdash; <span id="chat-keyhint"></span></span>
             <div class="row">
@@ -122,7 +123,36 @@
             </div>
           </label>
           <p class="hint" id="chat-keystatus"></p>
-          <label class="check"><input id="chat-voice" type="checkbox" /> Speak replies out loud (Windows voice)</label>
+          <div class="row">
+            <label class="field grow">
+              <span>Speech model (blank = no mic)</span>
+              <input id="chat-stt" type="text" spellcheck="false" />
+            </label>
+            <label class="field grow">
+              <span>Speech endpoint (blank = same)</span>
+              <input id="chat-stt-endpoint" type="text" spellcheck="false" placeholder="e.g. a local Vibe server" />
+            </label>
+          </div>
+          <div class="row">
+            <label class="field grow">
+              <span>Voice</span>
+              <select id="tts-engine">
+                <option value="windows">Windows voice</option>
+                <option value="piper">Piper (local .onnx voice)</option>
+              </select>
+            </label>
+            <label class="check grow"><input id="chat-voice" type="checkbox" /> Speak replies out loud</label>
+          </div>
+          <div class="row" id="piper-fields">
+            <label class="field grow">
+              <span>piper.exe</span>
+              <input id="piper-exe" type="text" spellcheck="false" placeholder="C:\tools\piper\piper.exe" />
+            </label>
+            <label class="field grow">
+              <span>Voice model (.onnx)</span>
+              <input id="piper-voice" type="text" spellcheck="false" placeholder="C:\voices\rocco.onnx" />
+            </label>
+          </div>
           <label class="check"><input id="chat-lines" type="checkbox" /> Generate fresh speech-bubble lines in his voice</label>
           <div class="row">
             <label class="field inline grow">
@@ -132,7 +162,7 @@
             <button id="chat-test" type="button">Test</button>
           </div>
           <p class="hint" id="chat-teststatus"></p>
-          <p class="hint">Nothing leaves this PC until this is on. The key is kept in Windows Credential Manager, not in the settings file. The microphone sends a short recording to the same endpoint for transcription.</p>
+          <p class="hint">Nothing leaves this PC until this is on. The key is kept in Windows Credential Manager and only goes to the chat endpoint. The microphone sends a short recording to the speech endpoint; a local Whisper server such as Vibe's works there too.</p>
         </div>
       </section>
       </div>

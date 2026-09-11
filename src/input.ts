@@ -14,6 +14,8 @@ export interface WorkArea {
   top: number;
   right: number;
   bottom: number;
+  /** Bottom of the whole monitor; the taskbar sits between `bottom` and this. */
+  monitorBottom?: number;
 }
 
 export const IN_TAURI = "__TAURI_INTERNALS__" in window;

@@ -46,19 +46,27 @@ fn read_key() -> Option<String> {
 
 struct Target {
     endpoint: String,
+    stt_endpoint: String,
     model: String,
     stt_model: String,
     cap: u32,
+    piper_exe: String,
+    piper_voice: String,
 }
 
 fn target(app: &AppHandle) -> Target {
     let state = app.state::<SettingsState>();
     let s = state.0.lock().unwrap();
+    let endpoint = s.chat_endpoint.trim().trim_end_matches('/').to_string();
+    let stt = s.chat_stt_endpoint.trim().trim_end_matches('/').to_string();
     Target {
-        endpoint: s.chat_endpoint.trim().trim_end_matches('/').to_string(),
+        stt_endpoint: if stt.is_empty() { endpoint.clone() } else { stt },
+        endpoint,
         model: s.chat_model.trim().to_string(),
         stt_model: s.chat_stt_model.trim().to_string(),
         cap: s.chat_daily_cap,
+        piper_exe: s.piper_exe.trim().to_string(),
+        piper_voice: s.piper_voice.trim().to_string(),
     }
 }
 
@@ -124,7 +132,7 @@ fn error_text(status: reqwest::StatusCode, body: &str) -> String {
 
 /// One chat completion. `messages` is the full OpenAI-style list including the system prompt.
 #[tauri::command]
-pub async fn chat_complete(app: AppHandle, messages: Vec<ChatMessage>, max_tokens: Option<u32>) -> Result<String, String> {
+pub async fn chat_complete(app: AppHandle, messages: Vec<ChatMessage>, max_tokens: Option<u32>, temperature: Option<f32>) -> Result<String, String> {
     let t = target(&app);
     if t.endpoint.is_empty() || t.model.is_empty() {
         return Err("No chat endpoint or model set (Settings > Talk).".into());
@@ -134,7 +142,7 @@ pub async fn chat_complete(app: AppHandle, messages: Vec<ChatMessage>, max_token
         "model": t.model,
         "messages": messages,
         "max_tokens": max_tokens.unwrap_or(160),
-        "temperature": 0.9,
+        "temperature": temperature.unwrap_or(0.9),
     });
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(45))
@@ -162,8 +170,8 @@ pub async fn chat_complete(app: AppHandle, messages: Vec<ChatMessage>, max_token
 #[tauri::command]
 pub async fn transcribe(app: AppHandle, audio: Vec<u8>, mime: String) -> Result<String, String> {
     let t = target(&app);
-    if t.endpoint.is_empty() {
-        return Err("No chat endpoint set.".into());
+    if t.stt_endpoint.is_empty() {
+        return Err("No speech endpoint set.".into());
     }
     if t.stt_model.is_empty() {
         return Err("This provider has no speech model set; type instead.".into());
@@ -193,9 +201,12 @@ pub async fn transcribe(app: AppHandle, audio: Vec<u8>, mime: String) -> Result<
         .timeout(Duration::from_secs(45))
         .build()
         .map_err(|e| e.to_string())?;
-    let mut req = client.post(format!("{}/audio/transcriptions", t.endpoint)).multipart(form);
-    if let Some(k) = read_key() {
-        req = req.bearer_auth(k);
+    let mut req = client.post(format!("{}/audio/transcriptions", t.stt_endpoint)).multipart(form);
+    // Only send the key where it belongs: a local speech server never sees it.
+    if t.stt_endpoint == t.endpoint {
+        if let Some(k) = read_key() {
+            req = req.bearer_auth(k);
+        }
     }
     let resp = req.send().await.map_err(|e| format!("Request failed: {e}"))?;
     let status = resp.status();
@@ -205,6 +216,56 @@ pub async fn transcribe(app: AppHandle, audio: Vec<u8>, mime: String) -> Result<
     }
     let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
     Ok(v["text"].as_str().unwrap_or("").trim().to_string())
+}
+
+// ---------- local text-to-speech through piper ----------
+
+/// Synthesise `text` with piper.exe and return the WAV bytes (raw IPC response, not JSON).
+#[tauri::command]
+pub async fn speak_piper(app: AppHandle, text: String) -> Result<tauri::ipc::Response, String> {
+    let t = target(&app);
+    if t.piper_exe.is_empty() || t.piper_voice.is_empty() {
+        return Err("Set the piper.exe and voice paths in Settings > Talk.".into());
+    }
+    if !std::path::Path::new(&t.piper_exe).is_file() {
+        return Err(format!("piper.exe not found at {}", t.piper_exe));
+    }
+    if !std::path::Path::new(&t.piper_voice).is_file() {
+        return Err(format!("Voice model not found at {}", t.piper_voice));
+    }
+    let out = std::env::temp_dir().join(format!("robo-buddy-{}.wav", std::process::id()));
+    let out_str = out.to_string_lossy().to_string();
+    let exe = t.piper_exe.clone();
+    let voice = t.piper_voice.clone();
+    let line: String = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<u8>, String> {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+        let mut cmd = Command::new(&exe);
+        cmd.arg("--model").arg(&voice).arg("--output_file").arg(&out_str);
+        cmd.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::piped());
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        }
+        let mut child = cmd.spawn().map_err(|e| format!("Could not start piper: {e}"))?;
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(line.as_bytes());
+            let _ = stdin.write_all(b"\n");
+        }
+        let output = child.wait_with_output().map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            let err = String::from_utf8_lossy(&output.stderr);
+            return Err(format!("piper failed: {}", err.lines().last().unwrap_or("unknown error")));
+        }
+        let bytes = std::fs::read(&out_str).map_err(|e| format!("piper wrote no audio: {e}"))?;
+        let _ = std::fs::remove_file(&out_str);
+        Ok(bytes)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    Ok(tauri::ipc::Response::new(result))
 }
 
 // ---------- generated phrase cache ----------

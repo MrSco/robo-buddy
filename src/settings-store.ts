@@ -39,6 +39,14 @@ export interface Settings {
   chatVoice: boolean;
   chatGenerateLines: boolean;
   chatDailyCap: number;
+  /** Separate base URL for transcriptions (a local Vibe server); blank = chat endpoint. */
+  chatSttEndpoint: string;
+  /** "windows" or "piper". */
+  ttsEngine: string;
+  piperExe: string;
+  piperVoice: string;
+  /** Personality profile id; "pack" = the character's own persona and lines. */
+  personality: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -69,6 +77,11 @@ export const DEFAULT_SETTINGS: Settings = {
   chatVoice: true,
   chatGenerateLines: true,
   chatDailyCap: 300,
+  chatSttEndpoint: "",
+  ttsEngine: "windows",
+  piperExe: "",
+  piperVoice: "",
+  personality: "pack",
 };
 
 export async function getSettings(): Promise<Settings> {
