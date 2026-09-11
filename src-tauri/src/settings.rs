@@ -41,6 +41,8 @@ pub struct Settings {
     pub anim_roles: HashMap<String, String>,
     /// Hide the buddy while a fullscreen app has focus.
     pub hide_when_fullscreen: bool,
+    /// Let the window overlap the taskbar by the camera's bottom margin so the soles sit on its edge.
+    pub stand_on_taskbar: bool,
     /// Talk (M6): off by default; nothing leaves the machine until enabled.
     pub chat_enabled: bool,
     /// Preset name for the settings UI: groq, gemini, openai, ollama, custom.
@@ -79,6 +81,7 @@ impl Default for Settings {
             idle_sets: HashMap::new(),
             anim_roles: HashMap::new(),
             hide_when_fullscreen: true,
+            stand_on_taskbar: true,
             chat_enabled: false,
             chat_provider: "groq".into(),
             chat_endpoint: "https://api.groq.com/openai/v1".into(),

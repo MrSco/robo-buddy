@@ -579,6 +579,8 @@ function frame() {
   sincePoke += dt;
   sinceLand += dt;
   updatePress(t);
+  // Standing on the taskbar: sink the window by the camera's margin so the soles meet its edge.
+  if (physics) physics.floorOverlap = settings.standOnTaskbar && renderer === renderer3d ? Math.round((renderer3d?.bottomMarginPx ?? 0) * scaleFactor) : 0;
   updateHead();
   updateLook(dt);
 

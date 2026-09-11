@@ -33,6 +33,8 @@ export class Renderer3D implements Renderer {
   private fitDist = 0;
   private fitY = 0;
   private fitX = 0;
+  /** CSS pixels between the window's bottom edge and the soles, from the last fit. */
+  bottomMarginPx = 0;
   /** Pendulum state while held: angle and angular velocity (radians). */
   private swing = 0;
   private swingVel = 0;
@@ -171,6 +173,7 @@ export class Renderer3D implements Renderer {
     const cy = y0 + dist * tanV;
     const k = snap ? 1 : 1 - Math.exp(-dt * (dist > this.fitDist ? 20 : 3));
     this.fitDist += (dist - this.fitDist) * k;
+    this.bottomMarginPx = ((floor - y0) / (2 * this.fitDist * tanV)) * this.cssH;
     const kc = snap ? 1 : 1 - Math.exp(-dt * 6);
     this.fitY += (cy - this.fitY) * kc;
     this.fitX += (cx - this.fitX) * kc;

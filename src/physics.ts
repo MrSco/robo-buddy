@@ -150,8 +150,11 @@ export class WindowPhysics {
     if (!this.areas.length) void getWorkArea(this.x + this.w / 2, this.y + this.h / 2).then((a) => (this.area = a));
   }
 
+  /** Physical pixels the window may sink below the work area (the camera's margin under the soles). */
+  floorOverlap = 0;
+
   get floor() {
-    return this.area.bottom - this.h;
+    return this.area.bottom - this.h + this.floorOverlap;
   }
 
   get workArea() {
@@ -253,6 +256,9 @@ export class WindowPhysics {
         this.spin = 0;
         this.mode = "rest";
       }
+    } else if (this.mode === "rest" && this.opts.gravity && this.y !== this.floor) {
+      // The floor moved under him (taskbar overlap toggled, camera margin changed): follow it.
+      this.y = this.floor;
     }
     this.apply();
   }

@@ -30,6 +30,7 @@ const els = {
   tempo: $<HTMLInputElement>("tempo"),
   clickthrough: $<HTMLSelectElement>("clickthrough"),
   autostart: $<HTMLInputElement>("autostart"),
+  taskbar: $<HTMLInputElement>("taskbar"),
   sounds: $<HTMLInputElement>("sounds"),
   bubbles: $<HTMLInputElement>("bubbles"),
   sleep: $<HTMLSelectElement>("sleep"),
@@ -306,6 +307,7 @@ function render() {
   els.sleep.value = String(nearest);
   els.wander.checked = settings.wanderEnabled;
   els.fullscreen.checked = settings.hideWhenFullscreen;
+  els.taskbar.checked = settings.standOnTaskbar;
   applying = false;
   void updatePackDetails();
   void renderLibrary();
@@ -457,6 +459,7 @@ async function main() {
   els.dance.addEventListener("change", () => commit({ danceMode: els.dance.value }));
   els.wander.addEventListener("change", () => commit({ wanderEnabled: els.wander.checked }));
   els.fullscreen.addEventListener("change", () => commit({ hideWhenFullscreen: els.fullscreen.checked }));
+  els.taskbar.addEventListener("change", () => commit({ standOnTaskbar: els.taskbar.checked }));
   els.libsearch.addEventListener("input", () => void renderLibrary());
   els.libsource.addEventListener("change", () => void renderLibrary());
   try {

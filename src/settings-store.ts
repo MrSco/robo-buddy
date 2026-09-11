@@ -28,6 +28,8 @@ export interface Settings {
   /** Per library clip name: role override ("idle", "fidget", "dance", "poke", "held", "fall", "walk", "off"). */
   animRoles: Record<string, string>;
   hideWhenFullscreen: boolean;
+  /** Overlap the taskbar by the camera's bottom margin so the soles sit on its edge. */
+  standOnTaskbar: boolean;
   /** Talk (M6). */
   chatEnabled: boolean;
   chatProvider: string;
@@ -58,6 +60,7 @@ export const DEFAULT_SETTINGS: Settings = {
   idleSets: {},
   animRoles: {},
   hideWhenFullscreen: true,
+  standOnTaskbar: true,
   chatEnabled: false,
   chatProvider: "groq",
   chatEndpoint: "https://api.groq.com/openai/v1",
