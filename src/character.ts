@@ -129,9 +129,41 @@ function bindToSelf(clip: THREE.AnimationClip, bones: Map<BoneName, THREE.Object
   return new THREE.AnimationClip(clip.name, clip.duration, tracks);
 }
 
+/**
+ * Put every skinned bone back into the pose the mesh was bound in. Some exporters (Sketchfab
+ * among them) store the first frame of an animation as the node transforms instead, which
+ * would leave the "rest" pose bent and every retargeted clip skewed by that bend.
+ */
+function restoreBindPose(root: THREE.Object3D) {
+  root.updateMatrixWorld(true);
+  const done = new Set<THREE.Object3D>();
+  const inv = new THREE.Matrix4();
+  const target = new THREE.Matrix4();
+  const depthOf = (o: THREE.Object3D) => {
+    let d = 0;
+    for (let p = o.parent; p; p = p.parent) d++;
+    return d;
+  };
+  root.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (!m.isSkinnedMesh || !m.skeleton) return;
+    // Parents first, so each bone's local transform is taken against an already restored parent.
+    const bones = m.skeleton.bones.map((b, i) => ({ b, i, depth: depthOf(b) })).sort((a, b) => a.depth - b.depth);
+    for (const { b, i } of bones) {
+      if (done.has(b)) continue;
+      done.add(b);
+      target.copy(m.skeleton.boneInverses[i]).invert().premultiply(m.bindMatrix);
+      if (b.parent) target.premultiply(inv.copy(b.parent.matrixWorld).invert());
+      target.decompose(b.position, b.quaternion, b.scale);
+      b.updateWorldMatrix(false, false);
+    }
+  });
+}
+
 export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<Character> {
   const model = await loadModel(pack.base + manifest.model);
   const { root, vrm } = model;
+  if (!vrm) restoreBindPose(root);
 
   if (vrm) {
     VRMUtils.removeUnnecessaryVertices(root);
