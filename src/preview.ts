@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { loadCharacter, refreshSkins, type Character } from "./character";
 import type { Manifest, PackRef } from "./packs";
 import { applyIdle } from "./pose";
@@ -30,11 +31,29 @@ export class LivePreview {
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.6));
-    const key = new THREE.DirectionalLight(0xffffff, 1.4);
-    key.position.set(1.5, 3, 2.5);
-    this.scene.add(key);
-    this.resize();
+    this.hemi = new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.6);
+    this.scene.add(this.hemi);
+    this.key = new THREE.DirectionalLight(0xffffff, 1.4);
+    this.key.position.set(1.5, 3, 2.5);
+    this.scene.add(this.key);
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+    this.lighting = 1;
+  }
+
+  private hemi: THREE.HemisphereLight;
+  private key: THREE.DirectionalLight;
+  private lightLevel = 1;
+  /** Light and reflection strength; 1 is the designed look. */
+  get lighting() {
+    return this.lightLevel;
+  }
+  set lighting(v: number) {
+    this.lightLevel = v;
+    this.hemi.intensity = 1.6 * v;
+    this.key.intensity = 1.4 * v;
+    this.scene.environmentIntensity = 0.7 * v;
   }
 
   resize() {

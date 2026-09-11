@@ -7,6 +7,8 @@ export type ClickThroughMode = "pixel" | "window" | "locked";
 export interface Settings {
   character: string;
   size: number;
+  /** Light and reflection strength on 3D characters, 1 = as designed. */
+  lighting: number;
   musicEnabled: boolean;
   mouseEnabled: boolean;
   physicsEnabled: boolean;
@@ -64,6 +66,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   character: "rocco",
   size: 1,
+  lighting: 1,
   musicEnabled: true,
   mouseEnabled: true,
   physicsEnabled: true,

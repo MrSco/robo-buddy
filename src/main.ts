@@ -859,6 +859,7 @@ function frame() {
     renderer3d.groundPx = physics ? physics.groundOverlap / scaleFactor : 0;
     renderer3d.bubblePx = bubble.visibleHeight();
     renderer3d.crouchPx = physics ? physics.crouchPx / scaleFactor : 0;
+    if (renderer3d.lighting !== settings.lighting) renderer3d.lighting = settings.lighting;
   }
   updateHead();
   updateLook(dt);

@@ -150,6 +150,20 @@ export function refreshSkins(root: THREE.Object3D) {
   });
 }
 
+/** An inverse bind matrix that is the identity or singular carries no bind pose at all. */
+function degenerateInverse(m: THREE.Matrix4): boolean {
+  const e = m.elements;
+  let identity = true;
+  for (let i = 0; i < 16; i++) {
+    const want = i % 5 === 0 ? 1 : 0;
+    if (Math.abs(e[i] - want) > 1e-6) {
+      identity = false;
+      break;
+    }
+  }
+  return identity || Math.abs(m.determinant()) < 1e-12;
+}
+
 function restoreBindPose(root: THREE.Object3D) {
   root.updateMatrixWorld(true);
   const done = new Set<THREE.Object3D>();
@@ -175,8 +189,18 @@ function restoreBindPose(root: THREE.Object3D) {
     for (const { b, i } of bones) {
       if (done.has(b)) continue;
       done.add(b);
+      // Joints nothing is weighted to sometimes ship an identity (or empty) inverse bind
+      // matrix; placing them from it would drop them at the origin and swing their children
+      // on a huge lever. They keep the pose the file gave them; children are still placed
+      // relative to whatever they end up as.
+      const bind = m.skeleton.boneInverses[i];
+      if (degenerateInverse(bind)) {
+        b.updateWorldMatrix(false, false);
+        boneBox.expandByPoint(b.getWorldPosition(wp));
+        continue;
+      }
       saved.set(b, { p: b.position.clone(), q: b.quaternion.clone(), s: b.scale.clone() });
-      target.copy(m.skeleton.boneInverses[i]).invert().premultiply(m.matrixWorld);
+      target.copy(bind).invert().premultiply(m.matrixWorld);
       if (b.parent) target.premultiply(inv.copy(b.parent.matrixWorld).invert());
       target.decompose(b.position, b.quaternion, b.scale);
       b.updateWorldMatrix(false, false);

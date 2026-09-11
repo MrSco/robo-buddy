@@ -28,6 +28,8 @@ const els = {
   bring: $<HTMLButtonElement>("bring"),
   size: $<HTMLInputElement>("size"),
   sizeOut: $<HTMLOutputElement>("size-out"),
+  lighting: $<HTMLInputElement>("lighting"),
+  lightOut: $<HTMLOutputElement>("light-out"),
   paused: $<HTMLInputElement>("paused"),
   mouse: $<HTMLInputElement>("mouse"),
   physics: $<HTMLInputElement>("physics"),
@@ -414,6 +416,9 @@ function render() {
   els.character.value = settings.character;
   els.size.value = String(settings.size);
   els.sizeOut.value = `${Math.round(settings.size * 100)}%`;
+  els.lighting.value = String(settings.lighting ?? 1);
+  els.lightOut.value = `${Math.round((settings.lighting ?? 1) * 100)}%`;
+  if (live) live.lighting = settings.lighting ?? 1;
   els.paused.checked = settings.paused;
   els.mouse.checked = settings.mouseEnabled;
   els.physics.checked = settings.physicsEnabled;
@@ -1086,6 +1091,11 @@ async function main() {
     els.sizeOut.value = `${Math.round(Number(els.size.value) * 100)}%`;
   });
   els.size.addEventListener("change", () => commit({ size: Number(els.size.value) }));
+  els.lighting.addEventListener("input", () => {
+    els.lightOut.value = `${Math.round(Number(els.lighting.value) * 100)}%`;
+    getLive().lighting = Number(els.lighting.value);
+  });
+  els.lighting.addEventListener("change", () => commit({ lighting: Number(els.lighting.value) }));
   els.paused.addEventListener("change", () => commit({ paused: els.paused.checked }));
   els.mouse.addEventListener("change", () => commit({ mouseEnabled: els.mouse.checked }));
   els.physics.addEventListener("change", () => commit({ physicsEnabled: els.physics.checked }));

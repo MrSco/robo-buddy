@@ -80,31 +80,66 @@ export const GENERIC_TO_VRM: Record<string, BoneName> = {
   "thigh.r": "rightUpperLeg", "shin.r": "rightLowerLeg", "foot.r": "rightFoot", "toe.r": "rightToes",
 };
 
+/** Valve biped (Source engine, Source Filmmaker exports): bip_pelvis, bip_upperArm_R, bip_knee_L... */
+export const VALVE_TO_VRM: Record<string, BoneName> = {
+  bip_pelvis: "hips", bip_spine_0: "spine", bip_spine_2: "chest", bip_spine_3: "upperChest", bip_neck: "neck", bip_head: "head",
+};
+for (const side of ["Left", "Right"] as const) {
+  const S = side.toLowerCase() === "left" ? "left" : "right";
+  const v = side === "Left" ? "l" : "r";
+  VALVE_TO_VRM[`bip_collar_${v}`] = `${S}Shoulder` as BoneName;
+  VALVE_TO_VRM[`bip_upperarm_${v}`] = `${S}UpperArm` as BoneName;
+  VALVE_TO_VRM[`bip_lowerarm_${v}`] = `${S}LowerArm` as BoneName;
+  VALVE_TO_VRM[`bip_hand_${v}`] = `${S}Hand` as BoneName;
+  VALVE_TO_VRM[`bip_hip_${v}`] = `${S}UpperLeg` as BoneName;
+  VALVE_TO_VRM[`bip_knee_${v}`] = `${S}LowerLeg` as BoneName;
+  VALVE_TO_VRM[`bip_foot_${v}`] = `${S}Foot` as BoneName;
+  VALVE_TO_VRM[`bip_toe_${v}`] = `${S}Toes` as BoneName;
+  for (const [src, dst] of [["thumb", "Thumb"], ["index", "Index"], ["middle", "Middle"], ["ring", "Ring"], ["pinky", "Little"]] as const) {
+    const parts = dst === "Thumb" ? ["Metacarpal", "Proximal", "Distal"] : ["Proximal", "Intermediate", "Distal"];
+    for (let k = 0; k < 3; k++) VALVE_TO_VRM[`bip_${src}_${k}_${v}`] = `${S}${dst}${parts[k]}` as BoneName;
+  }
+}
+
 export function stripMixamo(name: string): string {
   return name.replace(/^mixamorig:?/i, "");
 }
 
-/** Resolve any supported bone name to the VRM humanoid name, or undefined. */
-export function humanoidNameOf(nodeName: string): BoneName | undefined {
+/**
+ * Resolve a bone name to the VRM humanoid name. `specific` is true for a hit in a named rig's
+ * table (Mixamo, Unreal, Valve), false for the loose generic words, which also match helper
+ * bones ("Neck" above "bip_neck") and must not win over a proper rig bone.
+ */
+export function humanoidMatch(nodeName: string): { bone: BoneName; specific: boolean } | undefined {
   const bare = stripMixamo(nodeName.trim());
-  const direct =
-    MIXAMO_TO_VRM[bare] ??
-    UE_TO_VRM[bare] ??
-    GENERIC_TO_VRM[bare.toLowerCase()] ??
-    GENERIC_TO_VRM[bare.toLowerCase().replace(/[\s_-]/g, "")];
-  if (direct) return direct;
+  const lower = bare.toLowerCase();
+  const specific = MIXAMO_TO_VRM[bare] ?? UE_TO_VRM[bare] ?? VALVE_TO_VRM[lower];
+  if (specific) return { bone: specific, specific: true };
+  const generic = GENERIC_TO_VRM[lower] ?? GENERIC_TO_VRM[lower.replace(/[\s_-]/g, "")];
+  if (generic) return { bone: generic, specific: false };
   // Sketchfab and some exporters number every bone ("Hips_02", "LeftArm_010", "Head.001"):
   // try again without the trailing counter. Mixamo's own digits ("Spine1") have no separator.
   const m = bare.match(/^(.*?)[._]\d+$/);
-  return m ? humanoidNameOf(m[1]) : undefined;
+  return m ? humanoidMatch(m[1]) : undefined;
+}
+
+/** Resolve any supported bone name to the VRM humanoid name, or undefined. */
+export function humanoidNameOf(nodeName: string): BoneName | undefined {
+  return humanoidMatch(nodeName)?.bone;
 }
 
 /** Walk a scene graph and collect humanoid bones by any supported naming scheme. */
 export function findHumanoidBones(root: THREE.Object3D): Map<BoneName, THREE.Object3D> {
   const bones = new Map<BoneName, THREE.Object3D>();
+  const specific = new Set<BoneName>();
   root.traverse((o) => {
-    const name = humanoidNameOf(o.name);
-    if (name && !bones.has(name)) bones.set(name, o);
+    const m = humanoidMatch(o.name);
+    if (!m) return;
+    // First one wins, except that a rig-table match replaces a generic guess.
+    if (!bones.has(m.bone) || (m.specific && !specific.has(m.bone))) {
+      bones.set(m.bone, o);
+      if (m.specific) specific.add(m.bone);
+    }
   });
   return bones;
 }

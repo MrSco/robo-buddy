@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { loadCharacter, refreshSkins, type BoneName, type Character } from "./character";
 import { applyDance } from "./dance";
 import type { Manifest, PackRef } from "./packs";
@@ -85,13 +86,35 @@ export class Renderer3D implements Renderer {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.gl = this.renderer.getContext();
 
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.6));
-    const key = new THREE.DirectionalLight(0xffffff, 1.4);
-    key.position.set(1.5, 3, 2.5);
-    this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0xbfdfff, 0.6);
-    rim.position.set(-2, 2, -2);
-    this.scene.add(rim);
+    this.hemi = new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.6);
+    this.scene.add(this.hemi);
+    this.key = new THREE.DirectionalLight(0xffffff, 1.4);
+    this.key.position.set(1.5, 3, 2.5);
+    this.scene.add(this.key);
+    this.rim = new THREE.DirectionalLight(0xbfdfff, 0.6);
+    this.rim.position.set(-2, 2, -2);
+    this.scene.add(this.rim);
+    // A neutral room to reflect: metals and glossy paint are black without something to mirror.
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+    this.lighting = 1;
+  }
+
+  private hemi: THREE.HemisphereLight;
+  private key: THREE.DirectionalLight;
+  private rim: THREE.DirectionalLight;
+  private lightLevel = 1;
+  /** Light and reflection strength; 1 is the designed look. */
+  get lighting() {
+    return this.lightLevel;
+  }
+  set lighting(v: number) {
+    this.lightLevel = v;
+    this.hemi.intensity = 1.6 * v;
+    this.key.intensity = 1.4 * v;
+    this.rim.intensity = 0.6 * v;
+    this.scene.environmentIntensity = 0.7 * v;
   }
 
   async load(pack: PackRef, manifest: Manifest) {
