@@ -30,6 +30,15 @@ export class WindowPhysics {
   onPoke?: () => void;
   /** Set by the caller: fired when the window hits the floor with some speed. */
   onLand?: (speed: number) => void;
+  /** Set by the caller: he hit his head on the top of the screen pulling himself onto a window. */
+  onBump?: () => void;
+  /**
+   * Physical px from the window's top edge down to the top of his head when he stands straight
+   * (measured by the renderer). 0 until measured; a fifth of the window is assumed then.
+   */
+  headPx = 0;
+  /** Physical px from the window's top edge down to the top of his head as posed right now. */
+  crownPx = 0;
   /** Smoothed window acceleration in px/s^2 (screen space, y down), for secondary motion. */
   accelX = 0;
   accelY = 0;
@@ -188,6 +197,75 @@ export class WindowPhysics {
   }
 
   private static readonly EDGE = 28;
+  /** This much of the window (with his head in it) may poke above the screen before it counts. */
+  private static readonly SLACK = 0.04;
+  /** The most he can duck to fit under the top of the screen, as a fraction of the window height. */
+  private static readonly CROUCH = 0.15;
+  /** Windows he bumped his head on (hwnd to seconds); not grabbed again at once, not climbed for a while. */
+  private bumped = new Map<number, number>();
+  /** Seconds left in which the ceiling does not push him back down: he is falling away from it after a bump. */
+  private ceilingFree = 0;
+  /** The edge he last bumped on: others at the same height are left alone for a moment too. */
+  private lastBump = { top: NaN, at: -Infinity };
+
+  private justBumpedAt(top: number) {
+    return Math.abs(top - this.lastBump.top) < 12 && performance.now() / 1000 - this.lastBump.at < 4;
+  }
+
+  /**
+   * An edge worth trying even though he cannot stand up there: at least a bit below the top of
+   * the screen, so the pull-up gets going before his head meets it. A maximised window's edge
+   * hugs the top and is never grabbed.
+   */
+  private worthABump(s: Surface): boolean {
+    return s.top >= this.areaAt((s.left + s.right) / 2, s.top).top + this.h * 0.2;
+  }
+
+  private get headTop() {
+    return this.headPx > 0 ? this.headPx : this.h * 0.2;
+  }
+
+  private get crownNow() {
+    return this.crownPx > 0 ? this.crownPx : this.headTop;
+  }
+
+  /**
+   * Whether standing on `s` keeps his head on screen (ducking allowed), and how far he would
+   * have to duck for it, in physical px. The ceiling is the top of the monitor the edge is on.
+   */
+  private headroom(s: Surface): { fit: boolean; crouch: number } {
+    const ceiling = this.areaAt((s.left + s.right) / 2, s.top).top;
+    const over = ceiling - (s.top - this.h + this.headTop) - this.h * WindowPhysics.SLACK;
+    if (over <= 0) return { fit: true, crouch: 0 };
+    return { fit: over <= this.h * WindowPhysics.CROUCH, crouch: over };
+  }
+
+  /** How far he has to duck where he stands (or is pulling himself up to), physical px. */
+  get crouchPx(): number {
+    if (this.mode !== "rest" && this.mode !== "mantling") return 0;
+    const s = this.surfaceOf(this.support);
+    if (!s) return 0;
+    return Math.min(this.headroom(s).crouch, this.h * WindowPhysics.CROUCH);
+  }
+
+  private bumpedRecently(hwnd: number, seconds: number) {
+    const at = this.bumped.get(hwnd);
+    return at !== undefined && performance.now() / 1000 - at < seconds;
+  }
+
+  /** Let go of the window he is climbing: his head met the top of the screen. */
+  private bump(s: Surface) {
+    this.bumped.set(s.hwnd, performance.now() / 1000);
+    this.lastBump = { top: s.top, at: performance.now() / 1000 };
+    this.support = null;
+    this.mode = "falling";
+    this.mantleProgress = 0;
+    this.ceilingFree = 0.6;
+    this.vy = 140;
+    this.vx = (Math.random() < 0.5 ? -1 : 1) * 40;
+    this.spin = 0;
+    this.onBump?.();
+  }
   /** Where his hands are when he hangs by them: this fraction of the window height below its top. */
   private static readonly HAND = 0.07;
   private hangTimer = 0;
@@ -209,6 +287,7 @@ export class WindowPhysics {
       if (s.top < lo || s.top > hi) continue;
       if (cx < s.left + WindowPhysics.EDGE || cx > s.right - WindowPhysics.EDGE) continue;
       if (this.occluded(i, cx)) continue;
+      if (!this.headroom(s).fit || this.bumpedRecently(s.hwnd, 4) || this.justBumpedAt(s.top)) continue;
       this.support = s.hwnd;
       this.mode = "mantling";
       this.mantleKind = "step";
@@ -231,6 +310,8 @@ export class WindowPhysics {
       if (s.top < lo || s.top > hi) continue;
       if (cx < s.left + WindowPhysics.EDGE || cx > s.right - WindowPhysics.EDGE) continue;
       if (this.occluded(i, cx)) continue;
+      if (this.bumpedRecently(s.hwnd, 4) || this.justBumpedAt(s.top)) continue;
+      if (!this.headroom(s).fit && !this.worthABump(s)) continue;
       this.support = s.hwnd;
       this.mode = "hanging";
       this.hangTimer = 0;
@@ -256,6 +337,8 @@ export class WindowPhysics {
       const tx = Math.max(s.left + WindowPhysics.EDGE + 8, Math.min(s.right - WindowPhysics.EDGE - 8, cx));
       if (tx < b.left + this.w / 2 || tx > b.right - this.w / 2) continue; // must be able to walk there
       if (this.occluded(i, tx)) continue;
+      // Too tall to stand on: he may still try once and bump his head, then leaves it alone.
+      if (!this.headroom(s).fit && (this.bumpedRecently(s.hwnd, 600) || !this.worthABump(s))) continue;
       const dist = Math.abs(tx - cx);
       if (dist > 900) continue;
       if (!best || dist < best.dist) best = { x: tx - this.w / 2, hwnd: s.hwnd, top: s.top, dist };
@@ -295,6 +378,7 @@ export class WindowPhysics {
       const fy = s.top - this.h;
       if (fy < this.y - 4) continue; // its top edge is above his feet already
       if (this.occluded(i, cx)) continue; // that edge is hidden behind another window
+      if (!this.headroom(s).fit) continue; // standing there would put his head off screen
       if (fy < best) {
         best = fy;
         hwnd = s.hwnd;
@@ -401,8 +485,11 @@ export class WindowPhysics {
         }
         this.vx *= Math.max(0, 1 - FLOOR_FRICTION * dt);
       }
-      if (this.y < this.area.top) {
-        this.y = this.area.top;
+      // The top of the screen stops his head, not the empty part of the window above it; right
+      // after a head bump he is already past it and falling away, so it is left alone.
+      this.ceilingFree = Math.max(0, this.ceilingFree - dt);
+      if (this.ceilingFree <= 0 && this.y + this.crownNow < this.area.top) {
+        this.y = this.area.top - this.crownNow;
         this.vy = Math.abs(this.vy) * BOUNCE;
       }
       if (this.x < left) {
@@ -443,7 +530,12 @@ export class WindowPhysics {
         const from = this.mantleFrom;
         const to = s.top - this.h;
         this.y = from + (to - from) * ease;
-        if (p >= 1) {
+        // Not enough screen above the window: the moment his head (as posed, ducking and all)
+        // reaches the top of the screen, it hits, and he lets go.
+        const ceiling = this.areaAt((s.left + s.right) / 2, s.top).top;
+        if (!this.headroom(s).fit && this.y + this.crownNow < ceiling - this.h * WindowPhysics.SLACK) {
+          this.bump(s);
+        } else if (p >= 1) {
           this.mode = "rest";
           this.vy = 0;
         }
@@ -456,6 +548,9 @@ export class WindowPhysics {
         // The window he stood on closed, minimised or slid away: fall to whatever is below.
         this.support = null;
         if (this.opts.gravity) this.mode = "falling";
+      } else if (s && !this.headroom(s).fit && this.y + this.crownNow < this.areaAt((s.left + s.right) / 2, s.top).top - this.h * WindowPhysics.SLACK) {
+        // The window he stands on was pushed up until even ducking cannot fit him: knocked off.
+        this.bump(s);
       } else if (this.opts.gravity && this.y !== this.floor) {
         // The floor moved under him (his window moved, taskbar overlap toggled): follow it.
         this.y = this.floor;

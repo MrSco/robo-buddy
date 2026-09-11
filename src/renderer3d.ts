@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { loadCharacter, type BoneName, type Character } from "./character";
 import { applyDance } from "./dance";
 import type { Manifest, PackRef } from "./packs";
-import { applyDangle, applyFlail, applyHeldByArm, applyHeldByLeg, applyIdle, applyLimp, applyLookAt, applySleep } from "./pose";
+import { applyCrouch, applyDangle, applyFlail, applyHeldByArm, applyHeldByLeg, applyIdle, applyLimp, applyLookAt, applySleep } from "./pose";
 import { LimbSprings } from "./secondary";
 import { MirrorApplier, easePose, type MirrorPose } from "./mocap";
 import { canonicalRig } from "./retarget";
@@ -39,6 +39,9 @@ export class Renderer3D implements Renderer {
   groundPx = 0;
   /** CSS pixels a showing speech bubble needs above the head; the fit zooms out to make room. */
   bubblePx = 0;
+  /** CSS pixels he must duck so his head stays under the top of the screen (the physics decides). */
+  crouchPx = 0;
+  private crouchU = 0;
   /** Dev: frames where both arms were straight out sideways, and when it last happened. */
   tposeFrames = 0;
   tposeLast = "";
@@ -382,6 +385,11 @@ export class Renderer3D implements Renderer {
     const rigid = grab && grab.part !== "head" && grab.part !== "torso" ? grab.part : null;
     this.springs.update(c, input.dt, input.t, input.accelX, input.accelY, this.springAmount, rigid);
     applyLimp(c, this.downAmount);
+    // Ducking under the top of the screen, eased so it reads as him bending, not snapping.
+    const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    const crouchTarget = (this.crouchPx * 2 * Math.max(this.fitDist, 0.05) * tanV) / this.cssH;
+    this.crouchU += (crouchTarget - this.crouchU) * Math.min(1, input.dt * 6);
+    if (this.crouchU > 1e-4) applyCrouch(c, this.crouchU);
     if (!(input.state === "sleep" && clipDriven)) applySleep(c, input.t, input.sleepAmount);
     c.update(input.dt);
     this.detectTpose(c, input);

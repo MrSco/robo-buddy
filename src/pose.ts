@@ -250,3 +250,38 @@ export function applySleep(c: Character, t: number, amount: number) {
   rotateWorld(c.bone("leftUpperArm"), WORLD_Z, -0.12 * amount);
   rotateWorld(c.bone("rightUpperArm"), WORLD_Z, 0.12 * amount);
 }
+
+const crouchAxis = new THREE.Vector3();
+const crouchA = new THREE.Vector3();
+const crouchB = new THREE.Vector3();
+
+/**
+ * Duck so he loses `drop` of height (world units): knees forward, hips down, feet flat on the
+ * same spot, a little lean. Used when the window he stands on leaves too little screen above.
+ * Legs no clip drives are reset first so the bend never accumulates frame over frame.
+ */
+export function applyCrouch(c: Character, drop: number) {
+  if (drop <= 1e-5) return;
+  const hip = c.bone("leftUpperLeg") ?? c.bone("rightUpperLeg");
+  const foot = c.bone("leftFoot") ?? c.bone("rightFoot");
+  if (!hip || !foot) return;
+  for (const n of ["leftUpperLeg", "leftLowerLeg", "leftFoot", "rightUpperLeg", "rightLowerLeg", "rightFoot"] as const) {
+    const b = c.bone(n);
+    if (b && !c.animatedBones.has(b)) resetBone(c, b);
+  }
+  c.root.updateMatrixWorld(true);
+  hip.getWorldPosition(crouchA);
+  foot.getWorldPosition(crouchB);
+  const len = Math.max(1e-3, crouchA.y - crouchB.y);
+  // Symmetric bend: thigh forward by a, shin back by the same, so the foot stays under the hip.
+  const a = Math.acos(THREE.MathUtils.clamp(1 - Math.min(drop, len * 0.45) / len, -1, 1));
+  // His right in world space; rotating about it by -a swings a knee toward his front.
+  crouchAxis.set(1, 0, 0).applyQuaternion(c.root.quaternion).normalize();
+  for (const side of ["left", "right"] as const) {
+    rotateWorld(c.bone(`${side}UpperLeg`), crouchAxis, -a);
+    rotateWorld(c.bone(`${side}LowerLeg`), crouchAxis, 2 * a);
+    rotateWorld(c.bone(`${side}Foot`), crouchAxis, -a);
+  }
+  rotateWorld(c.bone("chest") ?? c.bone("spine"), crouchAxis, a * 0.3);
+  c.root.position.y -= len * (1 - Math.cos(a));
+}

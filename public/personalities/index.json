@@ -18,6 +18,7 @@
         "sleep": ["Gonna rest my eyes.", "Wake me for something good."],
         "wake": ["Hm? I'm up.", "Was I out?"],
         "land": ["Cool. Cool cool.", "Ow, kind of.", "Nice throw."],
+        "bump": ["Ow. Low ceiling.", "Nope. Too high.", "That's the top, then."],
         "dance": ["Oh this? Sure.", "Guess we're doing this.", "Fine, one song."],
         "idle": ["Nothing's happening. I like it.", "You ever just stand? Great, isn't it.", "I could go for a nap.", "Your wallpaper is okay.", "Big day. Big, big day.", "Still here."]
       }
@@ -34,6 +35,7 @@
         "sleep": ["Power nap. Champions rest.", "Recharging for greatness."],
         "wake": ["I'M UP! Let's win!", "Nap complete. Let's go!"],
         "land": ["Stuck the landing!", "Ten out of ten!", "Again! Again!"],
+        "bump": ["Bonk! Ha!", "Too tall for that one!", "Almost made it!"],
         "dance": ["This is our song!", "Turn it UP!", "Nobody dances like us!"],
         "idle": ["You're crushing it today.", "Best desk in the building.", "Drink some water, champ.", "Look at you, working!", "We are unstoppable.", "Posture check! Nailed it."]
       }
@@ -50,6 +52,7 @@
         "sleep": ["Finally, some peace.", "Don't wake me."],
         "wake": ["I was resting!", "This better be good."],
         "land": ["My back!", "Was that necessary?", "I'm filing a complaint."],
+        "bump": ["My head!", "Who put that there.", "Ridiculous screen."],
         "dance": ["This isn't music.", "Fine. One song. Then quiet.", "In my day we had melodies."],
         "idle": ["Screens these days.", "Nobody writes letters anymore.", "It's too bright in here.", "I've seen better wallpapers.", "Kids and their clouds.", "Hmph."]
       }
@@ -66,6 +69,7 @@
         "sleep": ["I shall rest my eyes, with your permission.", "Do call if needed."],
         "wake": ["At once.", "I am awake and attentive."],
         "land": ["Quite the landing.", "No harm done.", "I shall recover my composure."],
+        "bump": ["Mind the ceiling.", "Insufficient headroom, it seems.", "Ah. The top."],
         "dance": ["A little music. How civilised.", "One does what one can.", "Shall we?"],
         "idle": ["Everything is in order.", "Might I suggest a short break?", "The desktop is tidy. Mostly.", "A cup of tea would not go amiss.", "Standing by.", "All quiet."]
       }
@@ -82,6 +86,7 @@
         "sleep": ["Rest is training too.", "Taking five."],
         "wake": ["Right. Where were we.", "Up. Let's go."],
         "land": ["Shake it off.", "Back on your feet.", "Good recovery."],
+        "bump": ["Know your limits.", "Too high. Noted.", "Walk it off."],
         "dance": ["Movement break!", "Two minutes, then back to it.", "Good energy."],
         "idle": ["What's the one thing today?", "Stand up, stretch, sit back down.", "Water. Now.", "One task at a time.", "You've done harder things.", "Eyes off the screen for twenty seconds."]
       }

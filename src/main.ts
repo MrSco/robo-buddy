@@ -146,6 +146,16 @@ async function boot() {
       if (landClip) landUntil = start + Math.max(0.4, renderer.clipDuration(landClip.name) * (tumbled ? 0.97 : 0.9));
     }
   };
+  p.onBump = () => {
+    // Head into the top of the screen: a squash, a thud and a word, then the fall does the rest.
+    const now = clock.elapsedTime;
+    sinceLand = 0;
+    landStrength = 0.5;
+    behavior.interrupt(now);
+    behavior.rest(now, 12);
+    sounds.play("land");
+    speak("bump");
+  };
   await p.init();
   if (IN_TAURI) {
     const win = getCurrentWindow();
@@ -717,7 +727,7 @@ function debugTitle(t: number) {
   }
   const title =
     `Robo Buddy | ${p.mode} y=${p.y.toFixed(0)} air=${p.airborne} yaw=${yaw.toFixed(2)} cur=${cursor.x},${cursor.y},${cursor.buttons}` +
-    ` | pack=${pack?.id} state=${currentState} grab=${grabPart ?? '-'} talk=${talk.open} talking=${voice.speaking} keys=${typingRate.toFixed(1)}/${typingAmount.toFixed(2)}/${keyEvents} sup=${physics?.support ?? '-'} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
+    ` | pack=${pack?.id} state=${currentState} grab=${grabPart ?? '-'} talk=${talk.open} talking=${voice.speaking} keys=${typingRate.toFixed(1)}/${typingAmount.toFixed(2)}/${keyEvents} sup=${physics?.support ?? '-'} head=${Math.round(p.headPx)} crouch=${Math.round(p.crouchPx)} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
     (m ? ` | lvl=${m.level.toFixed(2)} gate=${m.gateLevel.toFixed(2)}/${m.threshold.toFixed(2)} bpm=${m.bpm.toFixed(0)} dance=${m.dancing} amt=${danceAmount.toFixed(2)} beats=${m.beats.toFixed(1)}` : "");
   getCurrentWindow().setTitle(title).catch(() => {});
 }
@@ -754,6 +764,7 @@ function frame() {
   if (renderer3d) {
     renderer3d.groundPx = physics ? physics.groundOverlap / scaleFactor : 0;
     renderer3d.bubblePx = bubble.visibleHeight();
+    renderer3d.crouchPx = physics ? physics.crouchPx / scaleFactor : 0;
   }
   updateHead();
   updateLook(dt);
@@ -861,6 +872,14 @@ function frame() {
   if (renderer) {
     const a = renderer.bubbleAnchor();
     bubble.update(t, a.x, a.y, cssW);
+    // Where the top of his head is in the window right now, for the ceiling checks; and, while
+    // he just stands there with no bubble zooming the fit out, how much window sits above his
+    // head when upright, which tells the physics which windows he can stand on top of.
+    if (physics && renderer === renderer3d) {
+      physics.crownPx = a.y * scaleFactor;
+      const plainIdle = currentState === "idle" && resolved.clip?.name === behavior.stateClip("idle")?.name;
+      if (physics.mode === "rest" && physics.crouchPx === 0 && bubble.visibleHeight() === 0 && plainIdle && a.y > 0) physics.headPx = a.y * scaleFactor;
+    }
   }
   updateClickThrough();
   debugTitle(t);

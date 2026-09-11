@@ -44,7 +44,7 @@ export interface Manifest {
   /** Who he is when talking (M6); a default persona is built from the name when absent. */
   persona?: string;
   /** Optional speech-bubble lines per event; one is picked at random. */
-  lines?: Partial<Record<"greet" | "poked" | "sleep" | "wake" | "land" | "dance", string[]>>;
+  lines?: Partial<Record<"greet" | "poked" | "sleep" | "wake" | "land" | "bump" | "dance", string[]>>;
   /** Optional sound files per event, relative to the pack. */
   sounds?: Partial<Record<"poked" | "land" | "wake" | "greet", string>>;
   reactions: {

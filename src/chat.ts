@@ -15,7 +15,7 @@ export interface ChatMessage {
   content: string;
 }
 
-export type LineEvent = "greet" | "poked" | "sleep" | "wake" | "land" | "dance" | "idle";
+export type LineEvent = "greet" | "poked" | "sleep" | "wake" | "land" | "bump" | "dance" | "idle";
 export type Lines = Partial<Record<LineEvent, string[]>>;
 
 /** What he is, unless the pack or a personality says otherwise. */
@@ -99,6 +99,7 @@ const LINE_SPEC: Array<[LineEvent, number, string]> = [
   ["sleep", 4, "as you doze off after being ignored"],
   ["wake", 4, "as you are woken up"],
   ["land", 6, "right after being thrown and hitting the floor"],
+  ["bump", 4, "when you bang your head on the top of the screen climbing onto a window that is too high, and fall off"],
   ["dance", 6, "when music starts and you begin dancing"],
   ["idle", 14, "random remarks while standing around, about being a desktop buddy, the user's day, or nothing in particular"],
 ];
