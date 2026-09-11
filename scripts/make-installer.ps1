@@ -1,4 +1,4 @@
-# Builds the Windows installer and copies it to dist\.
+# Builds the Windows installer and copies it to release\.
 # Usage (from the repo root):  pwsh scripts/make-installer.ps1
 # Needs: Node + pnpm, Rust (the gnu toolchain this repo is set up for), and `pnpm install` done once.
 $ErrorActionPreference = "Stop"

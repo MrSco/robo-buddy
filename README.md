@@ -20,7 +20,7 @@ see `public/characters/rocco/manifest.json` and `pixel-pal/manifest.json` for th
 
 ## Install and run
 
-**Just install it (you or a friend):** run `dist\RoboBuddy-Setup-<version>.exe`. It installs per user, adds "Robo Buddy"
+**Just install it (you or a friend):** run `release\RoboBuddy-Setup-<version>.exe`. It installs per user, adds "Robo Buddy"
 to the Start menu, and starts the buddy. The only requirement is Windows 10/11 with the WebView2 runtime, which every
 current Windows already has (the installer fetches it otherwise). Uninstall from Settings > Apps like any other app.
 
@@ -31,7 +31,7 @@ current Windows already has (the installer fetches it otherwise). Uninstall from
 - Talking needs an API key (Groq is free): Settings > Talk, see the Help tab there for the two-minute setup.
 
 **Build the installer yourself:** `pnpm install` once, then `pwsh scripts/make-installer.ps1`. It runs `pnpm tauri build`
-and copies the setup exe and the MSI into `dist\`. Requirements: Node 20+, pnpm, Rust (this repo uses the gnu toolchain;
+and copies the setup exe and the MSI into `release\`. Requirements: Node 20+, pnpm, Rust (this repo uses the gnu toolchain;
 see the top of this README), and the Visual C++ build tools that Rust asks for.
 
 **Run from source while developing:** `pnpm tauri dev` starts the Vite dev server and a debug build with hot reload of the
