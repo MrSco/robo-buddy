@@ -284,4 +284,9 @@ is commodity and took one session. We keep our codebase and borrow patterns from
 - Throw spin: releasing with sideways speed sets `spin`; the renderer integrates a tumble while airborne, rotates about the body's
   middle and widens the camera fit to the rotated extent so no part leaves the window. Spin is zeroed on floor contact; a stiff spring
   brings him upright, then a hard landing plays the pack's `land` clip (Jump Land) before the idle resumes.
+- Knocked down: a landing while tumbling (or a very hard one) freezes the clip, flops him onto his side with the lowest point on
+  the floor line, arms and head go limp for 1.1-1.7 s, then he springs upright into the land clip. Music moves and the dance clip
+  are suppressed while held, airborne or down; limb holds use the hanging clip as their base. Wall bounces reverse the spin.
+- Lesson: a pointerdown must seed the left-button bit itself; the global button poll can lag a frame and the press was read as a
+  release, turning a drag into a poke.
 - Step 2 (deferred until played with): a real Rapier ragdoll with joint limits while airborne, blended back to the idle on landing.

@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { loadCharacter, type Character } from "./character";
 import { applyDance } from "./dance";
 import type { Manifest, PackRef } from "./packs";
-import { applyFlail, applyHeldByArm, applyHeldByLeg, applyIdle, applyLookAt, applySleep } from "./pose";
+import { applyFlail, applyHeldByArm, applyHeldByLeg, applyIdle, applyLimp, applyLookAt, applySleep } from "./pose";
 import { LimbSprings } from "./secondary";
 import type { FrameInput, GrabPart, Renderer, StateName } from "./renderer";
 
@@ -41,6 +41,14 @@ export class Renderer3D implements Renderer {
   private springAmount = 0;
   private tumble = 0;
   private tumbleVel = 0;
+  private downAmount = 0;
+  /** Which side he lies on while knocked down (+1 / -1), chosen when he goes down. */
+  private lieSide = 0;
+
+  /** Current body rotation from a throw, radians; used to decide whether a landing knocks him down. */
+  get tumbleAngle() {
+    return this.tumble;
+  }
   private lastGrab: GrabPart | null = null;
   private baseCenter = new THREE.Vector3();
   private baseSize = new THREE.Vector3();
@@ -176,18 +184,22 @@ export class Renderer3D implements Renderer {
     const grab = input.state === "dragged" ? input.grab : null;
     if (grab) this.lastGrab = grab.part;
     const limbHold = !!grab && grab.part !== "head" && grab.part !== "torso";
-    // Held by a limb: keep whatever clip was playing as the base and pose the limbs on top,
-    // instead of switching to the two-handed hanging clip.
-    this.syncClip(limbHold ? { ...input, clip: null } : input);
-    c.beginFrame(input.dt);
+    const down = input.state === "down";
+    // Held by a limb the hanging clip still gives the body its slack base; the held limb and
+    // the free ones are re-aimed on top of it, so the dance never keeps going in his hands.
+    this.syncClip(input);
+    // Knocked down: the clip freezes where it was and the limp pose is laid over it.
+    c.beginFrame(down ? 0 : input.dt);
 
     const root = c.root;
     root.position.y = 0;
     const clipDriven = input.clip !== null && !limbHold;
+    // No music moves while he is in the air, in the user's hand or on the floor.
+    const calm = input.state === "dragged" || input.airborne || input.state === "land" || down;
 
     // Procedural base pose for whatever the clip does not cover.
-    if (input.airborne && !clipDriven) applyFlail(c, input.t);
-    else applyIdle(c, input.t, 1 - input.danceAmount * 0.7);
+    if (input.airborne && !clipDriven && !down) applyFlail(c, input.t);
+    else applyIdle(c, input.t, calm ? 1 : 1 - input.danceAmount * 0.7);
 
     // Held by a limb: pose that limb toward the cursor and let the body hang from it.
     this.heldAmount += ((limbHold ? 1 : 0) - this.heldAmount) * Math.min(1, input.dt * 10);
@@ -203,15 +215,9 @@ export class Renderer3D implements Renderer {
 
     let nod = 0;
     let roll = 0;
-    if (input.music && !(input.state === "dance" && clipDriven)) {
+    if (input.music && !calm && !(input.state === "dance" && clipDriven)) {
       ({ nod, roll } = applyDance(c, input.music, input.danceAmount));
     }
-
-    // Secondary motion while held or airborne: limbs lag behind the window's acceleration.
-    const wantSprings = input.state === "dragged" || input.airborne || input.state === "land";
-    this.springAmount += ((wantSprings ? 1 : 0) - this.springAmount) * Math.min(1, input.dt * (wantSprings ? 8 : 3));
-    const rigid = grab && grab.part !== "head" && grab.part !== "torso" ? grab.part : null;
-    this.springs.update(c, input.dt, input.t, input.accelX, input.accelY, this.springAmount, rigid);
 
     // Poke: hop with the head thrown back, unless the pack has its own poked clip.
     let pokePitch = 0;
@@ -242,13 +248,25 @@ export class Renderer3D implements Renderer {
       this.swingVel += (-30 * this.swing - 6 * this.swingVel) * input.dt;
       this.swing += this.swingVel * input.dt;
     }
-    // Tumble while airborne after a throw; on the ground the spring pulls him upright again.
-    if (input.airborne && Math.abs(input.spin) > 0.01) {
+    // Tumble while airborne after a throw; knocked down he flops onto his side and lies
+    // there; otherwise the spring pulls him upright again.
+    const wrap = (a: number) => ((a + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+    this.downAmount += ((down ? 1 : 0) - this.downAmount) * Math.min(1, input.dt * (down ? 5 : 3));
+    if (down && this.lieSide === 0) {
+      this.lieSide = Math.abs(this.tumble) > 0.25 ? Math.sign(this.tumble) : Math.sign(input.vx) || (Math.random() < 0.5 ? -1 : 1);
+    }
+    if (!down) this.lieSide = 0;
+    if (input.airborne && Math.abs(input.spin) > 0.01 && !down) {
       this.tumbleVel += (input.spin - this.tumbleVel) * Math.min(1, input.dt * 4);
       this.tumble += this.tumbleVel * input.dt;
+    } else if (down) {
+      // Fall over to the nearest side, softly, and stay there.
+      const err = wrap(this.lieSide * Math.PI * 0.5 - this.tumble);
+      this.tumbleVel += (22 * err - 7 * this.tumbleVel) * input.dt;
+      this.tumble = wrap(this.tumble + this.tumbleVel * input.dt);
     } else {
       // Shortest way back to upright (or to the flip target).
-      this.tumble = ((this.tumble + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+      this.tumble = wrap(this.tumble);
       this.tumbleVel += (-40 * this.tumble - 9 * this.tumbleVel) * input.dt;
       this.tumble += this.tumbleVel * input.dt;
       if (Math.abs(this.tumble) < 0.002 && Math.abs(this.tumbleVel) < 0.01) this.tumble = this.tumbleVel = 0;
@@ -256,11 +274,15 @@ export class Renderer3D implements Renderer {
     // Upside down when held by a leg: the whole body flips about the grab side.
     const flip = this.flipAmount * Math.PI * (this.lastGrab === "leftLeg" ? -1 : 1);
     root.rotation.z = this.lean + this.swing + flip + this.tumble;
-    // Tumbling about the feet would swing him off screen; offset so the spin is about the middle.
+    // Tumbling about the feet would swing him off screen; offset so the spin is about the
+    // middle, and keep whichever point is lowest resting on the floor line, so lying on his
+    // side he is actually on the ground rather than hovering at standing-centre height.
     root.position.x = 0;
     if (Math.abs(this.tumble) > 0.001) {
       const half = this.baseSize.y * 0.5;
-      root.position.y += half - half * Math.cos(this.tumble);
+      const thick = this.baseSize.y * 0.16;
+      const centreY = half * Math.abs(Math.cos(this.tumble)) + thick * Math.abs(Math.sin(this.tumble));
+      root.position.y += centreY - half * Math.cos(this.tumble);
       root.position.x = half * Math.sin(this.tumble);
     }
     // Keep the feet on the floor when upright; when flipped, the pivot moves to the top.
@@ -270,8 +292,15 @@ export class Renderer3D implements Renderer {
     root.rotation.y = this.facing;
 
     const awake = 1 - input.sleepAmount;
-    const lookScale = awake * (1 - Math.min(1, Math.abs(this.facing) / 1.2));
+    const lookScale = awake * (1 - Math.min(1, Math.abs(this.facing) / 1.2)) * (1 - this.downAmount);
     applyLookAt(c, input.yaw * lookScale, (input.pitch + pokePitch + nod) * lookScale, roll * awake);
+    // Secondary motion while held, airborne or down: limbs lag behind the window's acceleration.
+    // After look-at, which resets the head and neck each frame, so the head spring survives.
+    const wantSprings = input.state === "dragged" || input.airborne || input.state === "land" || down;
+    this.springAmount += ((wantSprings ? 1 : 0) - this.springAmount) * Math.min(1, input.dt * (wantSprings ? 8 : 3));
+    const rigid = grab && grab.part !== "head" && grab.part !== "torso" ? grab.part : null;
+    this.springs.update(c, input.dt, input.t, input.accelX, input.accelY, this.springAmount, rigid);
+    applyLimp(c, this.downAmount);
     if (!(input.state === "sleep" && clipDriven)) applySleep(c, input.t, input.sleepAmount);
     c.update(input.dt);
     this.fitCamera(input.dt);

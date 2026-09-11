@@ -242,9 +242,11 @@ export class WindowPhysics {
       if (this.x < left) {
         this.x = left;
         this.vx = Math.abs(this.vx) * BOUNCE;
+        this.spin = -this.spin * 0.8;
       } else if (this.x > right) {
         this.x = right;
         this.vx = -Math.abs(this.vx) * BOUNCE;
+        this.spin = -this.spin * 0.8;
       }
       if (this.y === floor && Math.abs(this.vx) < SETTLE_SPEED && this.vy === 0) {
         this.vx = 0;

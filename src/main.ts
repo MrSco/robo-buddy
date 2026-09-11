@@ -75,6 +75,8 @@ const behavior = new Behavior();
 let pokeClip: ClipChoice | null = null;
 let landClip: ClipChoice | null = null;
 let landUntil = -1;
+/** Knocked down after a tumbling or very hard landing: limp on the floor until this time. */
+let downUntil = -1;
 let grabPart: import("./renderer").GrabPart | null = null;
 let lastAct = "idle";
 let lastFree = false;
@@ -103,9 +105,14 @@ async function boot() {
       sounds.play("land");
     }
     // A hard landing plays the pack's landing clip (Jump Land by default) before idling.
-    if (landStrength > 0.35 && renderer?.kind === "3d") {
+    // If he came in tumbling (or really hard) he first lies limp for a moment, then gets up.
+    const now = clock.elapsedTime;
+    if (landStrength > 0.35 && renderer?.kind === "3d" && downUntil < now && landUntil < now) {
+      const tumbled = Math.abs(renderer3d?.tumbleAngle ?? 0) > 0.25 || landStrength > 0.7;
+      downUntil = tumbled ? now + 1.1 + Math.random() * 0.6 : -1;
       landClip = behavior.stateClip("land");
-      if (landClip) landUntil = clock.elapsedTime + Math.max(0.4, renderer.clipDuration(landClip.name) * 0.9);
+      const start = tumbled ? downUntil : now;
+      if (landClip) landUntil = start + Math.max(0.4, renderer.clipDuration(landClip.name) * 0.9);
     }
   };
   await p.init();
@@ -324,6 +331,9 @@ function onGrab(e: PointerEvent) {
   if (e.button !== 0 || !physics || settings.clickThrough === "locked") return;
   grabPart = renderer?.partAt(e.clientX, e.clientY) ?? null;
   press = { t: clock.elapsedTime, x: cursor.x, y: cursor.y };
+  // The button is down right now; the global poll may not have reported it yet, and without
+  // this the next frame would read "released" and turn every drag into a poke.
+  cursor.buttons |= 1;
   activity();
 }
 
@@ -345,6 +355,7 @@ function updatePress(t: number) {
   if (moved > GRAB_MOVE || t - press.t > GRAB_HOLD) {
     press = null;
     physics.grab();
+    downUntil = landUntil = -1;
     behavior.interrupt(t);
   }
 }
@@ -417,6 +428,7 @@ function updateClickThrough() {
 /** Pick the behaviour state for this frame, plus the clip that goes with it. */
 function resolveState(t: number, act: ReturnType<Behavior["update"]>): { state: StateName; clip: ClipChoice | null } {
   if (physics?.mode === "held") return { state: "dragged", clip: behavior.stateClip("dragged") };
+  if (downUntil > t) return { state: "down", clip: null };
   if (physics?.airborne) return { state: "fall", clip: behavior.stateClip("fall") };
   if (pokeUntil > t) return { state: "poked", clip: pokeClip };
   if (landUntil > t) return { state: "land", clip: landClip };

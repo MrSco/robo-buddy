@@ -159,6 +159,33 @@ export function applyHeldByLeg(c: Character, side: "left" | "right", t: number, 
   aimBone(c.bone("rightLowerArm"), c.bone("rightHand"), tmpDir, amount);
 }
 
+const limpUp = new THREE.Vector3();
+
+/**
+ * Knocked out on the floor: arms flop toward the ground, the head lolls. Applied over a
+ * frozen clip pose, after look-at, blended by `amount`.
+ */
+export function applyLimp(c: Character, amount: number) {
+  if (amount <= 0.001) return;
+  c.root.updateMatrixWorld(true);
+  tmpDir.set(-0.2, -1, 0.1).normalize();
+  aimBone(c.bone("leftUpperArm"), c.bone("leftLowerArm"), tmpDir, amount * 0.9);
+  aimBone(c.bone("leftLowerArm"), c.bone("leftHand"), tmpDir, amount * 0.7);
+  tmpDir.set(0.2, -1, 0.1).normalize();
+  aimBone(c.bone("rightUpperArm"), c.bone("rightLowerArm"), tmpDir, amount * 0.9);
+  aimBone(c.bone("rightLowerArm"), c.bone("rightHand"), tmpDir, amount * 0.7);
+  // Head: partway between "along the spine" and "toward the floor".
+  const chest = c.bone("upperChest") ?? c.bone("chest") ?? c.bone("spine");
+  const neck = c.bone("neck");
+  const head = c.bone("head");
+  if (chest && neck && head) {
+    chest.getWorldPosition(aimA);
+    neck.getWorldPosition(limpUp);
+    limpUp.sub(aimA).normalize().addScaledVector(DOWN, 0.6).normalize();
+    aimBone(neck, head, limpUp, amount * 0.7);
+  }
+}
+
 /**
  * Turn head (and a little of the neck/chest) toward a yaw/pitch in radians.
  * Positive yaw looks toward the viewer's right, positive pitch looks up.
