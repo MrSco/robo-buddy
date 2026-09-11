@@ -7,7 +7,7 @@ import { Behavior } from "./behavior";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { listen } from "@tauri-apps/api/event";
 import type { AudioFeatures } from "./audio";
-import { listLibrary, invalidateLibrary, ROLES, type LibraryClip } from "./library";
+import { effectiveManifest, listLibrary, invalidateLibrary, ROLES, type LibraryClip } from "./library";
 import { getSettings, onSettingsChanged, setSettings, type ClickThroughMode, type Settings } from "./settings-store";
 import { listPersonalities, loadUserPersonalities, saveUserPersonalities, slugFor, type Personality } from "./personality";
 import { emit, listen as listenEvent } from "@tauri-apps/api/event";
@@ -330,10 +330,19 @@ async function manifestFor(pack: PackRef): Promise<Manifest> {
 
 let currentManifest: Manifest | null = null;
 
+/** The manifest the buddy runs with: reference defaults for imports, plus the library and the user's roles. */
+async function runningManifestFor(pack: PackRef): Promise<Manifest> {
+  const base = await manifestFor(pack);
+  if (base.renderer !== "3d") return base;
+  const ref = packs.find((p) => p.id === "rocco");
+  const reference = ref ? await manifestFor(ref) : undefined;
+  return effectiveManifest(base, pack.bundled, reference, await listLibrary(reference), settings.animRoles ?? {});
+}
+
 async function updatePackDetails() {
   const pack = packs.find((p) => p.id === settings.character) ?? packs[0];
   if (!pack) return;
-  const m = await manifestFor(pack);
+  const m = await runningManifestFor(pack);
   currentManifest = m;
   // Dance choices for this pack.
   const names = (m.dances ?? []).map((d) => (typeof d === "string" ? d : d.clip)).filter((d) => d !== "procedural");

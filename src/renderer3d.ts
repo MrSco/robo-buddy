@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { loadCharacter, type BoneName, type Character } from "./character";
+import { loadCharacter, refreshSkins, type BoneName, type Character } from "./character";
 import { applyDance } from "./dance";
 import type { Manifest, PackRef } from "./packs";
 import { applyCrouch, applyDangle, applyFlail, applyHeldByArm, applyHeldByLeg, applyIdle, applyLimp, applyLookAt, applySleep } from "./pose";
@@ -113,7 +113,7 @@ export class Renderer3D implements Renderer {
   private frameCharacter() {
     const c = this.character;
     if (!c) return;
-    c.root.updateMatrixWorld(true);
+    refreshSkins(c.root);
     const box = new THREE.Box3().setFromObject(c.root);
     box.getSize(this.baseSize);
     box.getCenter(this.baseCenter);

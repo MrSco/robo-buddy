@@ -4,7 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { Music } from "./audio";
 import { Behavior, type ClipChoice } from "./behavior";
-import { applyLibrary, invalidateLibrary, listLibrary } from "./library";
+import { effectiveManifest, invalidateLibrary, listLibrary } from "./library";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Bubble } from "./bubble";
 import { ChatClient, TalkBox, Voice, defaultPersona, loadOrGeneratePhrases, type LineEvent, type Lines } from "./chat";
@@ -248,6 +248,20 @@ async function boot() {
   });
 }
 
+/** The bundled character's manifest: the template imported models take their animations from. */
+let referencePromise: Promise<Manifest | null> | null = null;
+function referenceManifest(): Promise<Manifest | null> {
+  referencePromise ??= (async () => {
+    try {
+      const ref = await resolvePack("rocco");
+      return validateManifest(await (await fetch(ref.base + "manifest.json")).json());
+    } catch {
+      return null;
+    }
+  })();
+  return referencePromise;
+}
+
 async function loadPack(id: string) {
   if (loading) return;
   loading = true;
@@ -255,8 +269,10 @@ async function loadPack(id: string) {
     const ref = await resolvePack(id);
     const raw = await (await fetch(ref.base + "manifest.json")).json();
     const base = validateManifest(raw);
-    // Every library clip is available to every 3D pack; user roles decide where it is used.
-    const m = base.renderer === "3d" ? applyLibrary(base, await listLibrary(), settings.animRoles ?? {}) : base;
+    // Every library clip is available to every 3D pack (an imported model borrows the bundled
+    // character's animation sections wholesale); user roles decide where each clip is used.
+    const reference = base.renderer === "3d" ? (await referenceManifest()) ?? undefined : undefined;
+    const m = effectiveManifest(base, ref.bundled, reference, await listLibrary(reference), settings.animRoles ?? {});
 
     // Both renderers stay alive for the life of the app; a pack loads into one of them and
     // only becomes the active renderer once it is fully loaded, so the previous character

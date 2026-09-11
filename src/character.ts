@@ -134,6 +134,22 @@ function bindToSelf(clip: THREE.AnimationClip, bones: Map<BoneName, THREE.Object
  * among them) store the first frame of an animation as the node transforms instead, which
  * would leave the "rest" pose bent and every retargeted clip skewed by that bend.
  */
+/**
+ * Recompute every skinned mesh's bone matrices from the bones as they are now. three only does
+ * this when it renders, so bounds taken before the first frame would still describe whatever
+ * pose the file was saved in.
+ */
+export function refreshSkins(root: THREE.Object3D) {
+  root.updateMatrixWorld(true);
+  root.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (m.isSkinnedMesh && m.skeleton) {
+      m.skeleton.update();
+      m.computeBoundingBox();
+    }
+  });
+}
+
 function restoreBindPose(root: THREE.Object3D) {
   root.updateMatrixWorld(true);
   const done = new Set<THREE.Object3D>();
@@ -168,6 +184,7 @@ function restoreBindPose(root: THREE.Object3D) {
     }
   });
   if (!done.size) return;
+  refreshSkins(root);
   // Sanity: the restored skeleton must sit where the mesh is. If the file's matrices follow some
   // other convention the bones would land far away; then the node pose is kept as it was.
   const mh = meshBox.getSize(new THREE.Vector3()).y;
@@ -180,7 +197,7 @@ function restoreBindPose(root: THREE.Object3D) {
       b.quaternion.copy(t.q);
       b.scale.copy(t.s);
     }
-    root.updateMatrixWorld(true);
+    refreshSkins(root);
   }
 }
 

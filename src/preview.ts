@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { loadCharacter, type Character } from "./character";
+import { loadCharacter, refreshSkins, type Character } from "./character";
 import type { Manifest, PackRef } from "./packs";
 import { applyIdle } from "./pose";
 import { MirrorApplier, type MirrorPose } from "./mocap";
@@ -144,7 +144,7 @@ export class LivePreview {
   }
 
   private frame(c: Character) {
-    c.root.updateMatrixWorld(true);
+    refreshSkins(c.root);
     const box = new THREE.Box3().setFromObject(c.root);
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());

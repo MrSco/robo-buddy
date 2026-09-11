@@ -92,6 +92,28 @@ export function invalidateLibrary() {
 }
 
 /**
+ * The manifest a 3D pack actually runs with. An imported model brings no animation of its
+ * own, so it borrows the bundled reference character's states, idle variants, fidgets and
+ * dances (all of which live in the shared clip library); then the library is applied with
+ * the user's role overrides. Bundled packs keep their own manifest as the base.
+ */
+export function effectiveManifest(base: Manifest, bundled: boolean, reference: Manifest | undefined, library: LibraryClip[], roles: Record<string, string>): Manifest {
+  if (base.renderer !== "3d") return base;
+  let m = base;
+  if (reference && !bundled) {
+    m = {
+      ...base,
+      clips: { ...(reference.clips ?? {}), ...(base.clips ?? {}) },
+      states: { ...reference.states, ...base.states },
+      idleVariants: base.idleVariants ?? reference.idleVariants,
+      fidgets: base.fidgets ?? reference.fidgets,
+      dances: base.dances ?? reference.dances,
+    };
+  }
+  return applyLibrary(m, library, roles);
+}
+
+/**
  * Apply the library to a pack's manifest: every library clip becomes available under its
  * library name, and user roles add clips to the behaviour lists. Returns a new manifest.
  */
