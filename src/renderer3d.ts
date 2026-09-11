@@ -250,7 +250,7 @@ export class Renderer3D implements Renderer {
     root.rotation.z = 0;
     const clipDriven = input.clip !== null && !limbHold;
     // No music moves while he is in the air, in the user's hand or on the floor.
-    const calm = input.state === "dragged" || input.airborne || input.state === "land" || down;
+    const calm = input.state === "dragged" || input.airborne || input.state === "land" || down || input.state === "hang" || input.state === "mantle";
 
     // Procedural base pose for whatever the clip does not cover.
     if (input.airborne && !clipDriven && !down && input.flail) applyFlail(c, input.t);
@@ -365,7 +365,7 @@ export class Renderer3D implements Renderer {
     if (this.mirrorAmount < 0.5) applyLookAt(c, input.yaw * lookScale, (input.pitch + pokePitch + nod) * lookScale, roll * awake);
     // Secondary motion while held, airborne or down: limbs lag behind the window's acceleration.
     // After look-at, which resets the head and neck each frame, so the head spring survives.
-    const wantSprings = (input.state === "dragged" || input.airborne || input.state === "land" || down) && !input.mirror;
+    const wantSprings = (input.state === "dragged" || input.airborne || input.state === "land" || down || input.state === "hang") && !input.mirror;
     this.springAmount += ((wantSprings ? 1 : 0) - this.springAmount) * Math.min(1, input.dt * (wantSprings ? 8 : 3));
     const rigid = grab && grab.part !== "head" && grab.part !== "torso" ? grab.part : null;
     this.springs.update(c, input.dt, input.t, input.accelX, input.accelY, this.springAmount, rigid);

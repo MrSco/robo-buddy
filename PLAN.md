@@ -383,6 +383,12 @@ Goal: dynamic phrases and a real conversation, free by default, bring-your-own-k
   he rides along when it moves and falls when it closes, minimises or slides away; wandering is bounded by that window.
   Setting: Stand on other windows. Lesson: GetAsyncKeyState polling misses taps shorter than the poll; bit 0 (pressed since
   the last poll) catches them.
+- Climbing (done): falling past a title bar within arm's reach (edge between his crown and chest, not covered by another
+  window) he grabs it and hangs (Hanging_Idle, hands at the edge, follows the window if it moves) for 0.9 s, then a 0.8 s
+  eased pull-up during which the hanging clip gives way to the landing crouch, and he stands on top. Idle: `climbable()`
+  finds a reachable edge (40-460 px above his hands, walkable, unoccluded); the scheduler walks him under it and `hop()`
+  gives just enough jump for his hands to reach; on a window he sometimes walks off the edge and drops. All under the
+  "Stand on and climb other windows" toggle plus wandering.
 - Webcam capture (done): Settings > Capture (or right-click > Copy me). MediaPipe Pose Landmarker (lite model and WASM
   bundled under `public/mediapipe/`, nothing leaves the PC) tracks 33 landmarks on the webcam feed with a wire skeleton
   drawn over it. `src/mocap.ts` turns world landmarks into world-space rotation deltas against the canonical rig's T-pose

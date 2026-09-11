@@ -587,6 +587,11 @@ function resolveState(t: number, act: ReturnType<Behavior["update"]>): { state: 
   // base and the renderer dangles everything from the grab point.
   if (physics?.mode === "held") return { state: "dragged", clip: behavior.stateClip("dragged") ?? behavior.stateClip("idle") };
   if (downUntil > t) return { state: "down", clip: null };
+  if (physics?.mode === "hanging") return { state: "hang", clip: behavior.stateClip("hang") };
+  if (physics?.mode === "mantling") {
+    // Hang for the first part of the pull-up, then the landing crouch rises into the idle.
+    return { state: "mantle", clip: physics.mantleProgress < 0.45 ? behavior.stateClip("hang") : (behavior.stateClip("land") ?? behavior.stateClip("idle")) };
+  }
   if (physics?.airborne) {
     if (airborneSince < 0) airborneSince = t;
     const long = t - airborneSince > 0.35;
@@ -719,6 +724,8 @@ function frame() {
     w: physics?.w ?? 320,
     left: physics?.bounds.left ?? 0,
     right: physics?.bounds.right ?? 1920,
+    climb: settings.surfacesEnabled && settings.wanderEnabled ? (physics?.climbable() ?? null) : null,
+    onSurface: physics?.onSurface ?? false,
   });
   const resolved = resolveState(t, act);
   currentState = resolved.state;
@@ -730,7 +737,11 @@ function frame() {
     const dir = Math.sign(act.targetX - physics.x) || 1;
     targetFacing = (dir * Math.PI) / 2;
     const step = Math.min(Math.abs(act.targetX - physics.x), act.speed * settings.size * dt);
-    physics.nudge(dir * step);
+    physics.nudge(dir * step, act.beyond);
+  }
+  if (behavior.pendingHop !== null && physics) {
+    physics.hop(behavior.pendingHop);
+    behavior.pendingHop = null;
   }
   facing = targetFacing;
 

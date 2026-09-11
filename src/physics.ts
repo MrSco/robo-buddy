@@ -5,7 +5,7 @@ import { cursor, getWorkArea, getWorkAreas, IN_TAURI, onLeftRelease, type Surfac
  * Moves the OS window itself: custom drag (so we can measure velocity), throw,
  * gravity and bouncing against the work area. All units are physical pixels.
  */
-export type Mode = "rest" | "held" | "falling";
+export type Mode = "rest" | "held" | "falling" | "hanging" | "mantling";
 
 export interface PhysicsOptions {
   gravity: boolean;
@@ -188,6 +188,64 @@ export class WindowPhysics {
   }
 
   private static readonly EDGE = 28;
+  /** Where his hands are when he hangs by them: this fraction of the window height below its top. */
+  private static readonly HAND = 0.07;
+  private hangTimer = 0;
+  private mantleT = 0;
+  /** 0..1 through the pull-up. */
+  mantleProgress = 0;
+
+  /** Falling past a window's top edge within arm's reach: grab it and hang. */
+  private tryGrab(): boolean {
+    const cx = this.x + this.w / 2;
+    const lo = this.y + this.h * 0.03;
+    const hi = this.y + this.h * 0.42;
+    for (let i = 0; i < this.surfaces.length; i++) {
+      const s = this.surfaces[i];
+      if (s.top < lo || s.top > hi) continue;
+      if (cx < s.left + WindowPhysics.EDGE || cx > s.right - WindowPhysics.EDGE) continue;
+      if (this.occluded(i, cx)) continue;
+      this.support = s.hwnd;
+      this.mode = "hanging";
+      this.hangTimer = 0;
+      this.vx = this.vy = this.spin = 0;
+      this.y = s.top - this.h * WindowPhysics.HAND;
+      return true;
+    }
+    return false;
+  }
+
+  /** A window edge he could climb from where he stands: walk under it, hop, grab, pull up. */
+  climbable(): { x: number; hwnd: number; top: number } | null {
+    if (this.mode !== "rest") return null;
+    const cx = this.x + this.w / 2;
+    const hands = this.y + this.h * WindowPhysics.HAND;
+    const b = this.bounds;
+    let best: { x: number; hwnd: number; top: number; dist: number } | null = null;
+    for (let i = 0; i < this.surfaces.length; i++) {
+      const s = this.surfaces[i];
+      if (s.hwnd === this.support) continue;
+      const rise = hands - s.top; // how far above his hands the edge is
+      if (rise < 40 || rise > 460) continue;
+      const tx = Math.max(s.left + WindowPhysics.EDGE + 8, Math.min(s.right - WindowPhysics.EDGE - 8, cx));
+      if (tx < b.left + this.w / 2 || tx > b.right - this.w / 2) continue; // must be able to walk there
+      if (this.occluded(i, tx)) continue;
+      const dist = Math.abs(tx - cx);
+      if (dist > 900) continue;
+      if (!best || dist < best.dist) best = { x: tx - this.w / 2, hwnd: s.hwnd, top: s.top, dist };
+    }
+    return best;
+  }
+
+  /** Jump from rest so his hands reach just above `top` (a window edge); tryGrab does the rest. */
+  hop(top: number) {
+    if (this.mode !== "rest") return;
+    const rise = Math.max(60, this.y + this.h * WindowPhysics.HAND - top + 14);
+    this.support = null;
+    this.mode = "falling";
+    this.vy = -Math.min(1900, Math.sqrt(2 * GRAVITY * rise));
+    this.vx = 0;
+  }
 
   /** True when a window in front of `index` covers the spot on its top edge under his centre. */
   private occluded(index: number, cx: number): boolean {
@@ -242,10 +300,12 @@ export class WindowPhysics {
   }
 
   /** Slide horizontally while resting on the floor (walking). Clamped to the work area. */
-  nudge(dx: number) {
+  nudge(dx: number, beyondEdge = false) {
     if (this.mode !== "rest") return;
     const b = this.bounds;
-    this.x = Math.max(b.left, Math.min(b.right - this.w, this.x + dx));
+    // Walking off a window on purpose: the rest check drops him once his centre leaves it.
+    const margin = beyondEdge ? this.w : 0;
+    this.x = Math.max(b.left - margin, Math.min(b.right - this.w + margin, this.x + dx));
     this.apply();
   }
 
@@ -291,6 +351,11 @@ export class WindowPhysics {
       this.vy += GRAVITY * dt;
       this.x += this.vx * dt;
       this.y += this.vy * dt;
+      // Descending past a title bar within reach: grab it instead of falling on by.
+      if (this.vy >= 0 && this.surfaces.length && this.tryGrab()) {
+        this.apply();
+        return;
+      }
       const landing = this.landingFloor();
       const floor = landing.y;
       if (this.y >= floor) this.support = landing.hwnd;
@@ -327,6 +392,32 @@ export class WindowPhysics {
         this.vx = 0;
         this.spin = 0;
         this.mode = "rest";
+      }
+    } else if (this.mode === "hanging" || this.mode === "mantling") {
+      const s = this.surfaceOf(this.support);
+      if (!s) {
+        // The window he hangs from is gone: drop.
+        this.support = null;
+        this.mode = "falling";
+      } else if (this.mode === "hanging") {
+        this.y = s.top - this.h * WindowPhysics.HAND; // hands stay on the edge even if it moves
+        this.hangTimer += dt;
+        if (this.hangTimer > 0.9) {
+          this.mode = "mantling";
+          this.mantleT = 0;
+        }
+      } else {
+        this.mantleT += dt;
+        const p = Math.min(1, this.mantleT / 0.8);
+        this.mantleProgress = p;
+        const ease = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+        const from = s.top - this.h * WindowPhysics.HAND;
+        const to = s.top - this.h;
+        this.y = from + (to - from) * ease;
+        if (p >= 1) {
+          this.mode = "rest";
+          this.vy = 0;
+        }
       }
     } else if (this.mode === "rest") {
       const s = this.surfaceOf(this.support);

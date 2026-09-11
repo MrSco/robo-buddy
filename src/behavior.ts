@@ -16,7 +16,7 @@ export interface ClipChoice {
 export type Activity =
   | { kind: "idle"; clip: ClipChoice | null }
   | { kind: "fidget"; clip: ClipChoice }
-  | { kind: "walk"; clip: ClipChoice | null; targetX: number; speed: number };
+  | { kind: "walk"; clip: ClipChoice | null; targetX: number; speed: number; then?: "hop"; hopTop?: number; beyond?: boolean };
 
 export interface BehaviorOptions {
   wander: boolean;
@@ -33,6 +33,9 @@ interface Status {
   w: number;
   left: number;
   right: number;
+  /** A window edge he could climb from here (from the physics), and whether he is on one. */
+  climb: { x: number; hwnd: number; top: number } | null;
+  onSurface: boolean;
 }
 
 const MIN_WANDER = 160;
@@ -102,6 +105,9 @@ export class Behavior {
     this.nextEvent = t + 5 + Math.random() * 8;
   }
 
+  /** Set when a walk that was heading for a climb arrives; main performs the hop. */
+  pendingHop: number | null = null;
+
   /** Nothing scheduled for at least `seconds`; used after a landing so he does not fidget at once. */
   rest(t: number, seconds: number) {
     this.nextEvent = Math.max(this.nextEvent, t + seconds);
@@ -125,6 +131,7 @@ export class Behavior {
     }
     if (this.activity.kind === "walk") {
       const arrived = Math.abs(s.x - this.activity.targetX) < 4;
+      if (arrived && this.activity.then === "hop" && s.free) this.pendingHop = this.activity.hopTop ?? null;
       if (arrived || !s.free) {
         this.activity = { kind: "idle", clip: this.stateClip("idle") };
         this.activityEnds = Infinity;
@@ -162,6 +169,26 @@ export class Behavior {
         this.fidgetQueue = seq;
         this.activity = { kind: "fidget", clip: { name: first, loop: false } };
         this.activityEnds = s.t + this.durations(first);
+      });
+    }
+    if (canWalk && s.climb) {
+      // A title bar within reach: stroll under it, jump, grab, pull himself up.
+      const climb = s.climb;
+      const speed = walk!.speed ?? 120;
+      options.push(() => {
+        this.activity = { kind: "walk", clip: { name: walk!.clip, loop: true }, targetX: climb.x, speed, then: "hop", hopTop: climb.top };
+        this.activityEnds = s.t + Math.abs(climb.x - s.x) / speed + 2;
+      });
+      options.push(options[options.length - 1]); // twice as likely as any single other option
+    }
+    if (canWalk && s.onSurface && Math.random() < 0.35) {
+      // Been up here a while: walk off the edge and drop back down.
+      const speed = walk!.speed ?? 120;
+      const goLeft = s.x - s.left < s.right - (s.x + s.w);
+      const target = goLeft ? s.left - s.w * 0.55 : s.right - s.w * 0.45;
+      options.push(() => {
+        this.activity = { kind: "walk", clip: { name: walk!.clip, loop: true }, targetX: target, speed, beyond: true };
+        this.activityEnds = s.t + Math.abs(target - s.x) / speed + 2;
       });
     }
     if (canWalk) {

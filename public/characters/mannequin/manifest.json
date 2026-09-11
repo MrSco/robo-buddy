@@ -38,6 +38,10 @@
     "typing": {
       "clip": "Texting",
       "loop": true
+    },
+    "hang": {
+      "clip": "Hanging_Idle",
+      "loop": true
     }
   },
   "reactions": {
