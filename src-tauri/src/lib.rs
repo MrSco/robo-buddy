@@ -265,6 +265,7 @@ pub fn run() {
             screen::buddy_rect,
             screen::screensaver_start,
             screen::screensaver_stop,
+            screen::screensaver_surfaces,
             take_settings_tab,
             context_menu,
             chat::set_chat_key,

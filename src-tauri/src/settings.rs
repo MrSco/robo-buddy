@@ -34,6 +34,8 @@ pub struct Settings {
     /// Minutes of inactivity before the buddy falls asleep; 0 = never.
     pub sleep_after_min: f64,
     pub sounds_enabled: bool,
+    /// Sound effects during the screensaver; off by default.
+    pub screensaver_sounds: bool,
     pub bubbles_enabled: bool,
     /// Wander along the floor when idle.
     pub wander_enabled: bool,
@@ -98,6 +100,7 @@ impl Default for Settings {
             paused: false,
             sleep_after_min: 5.0,
             sounds_enabled: true,
+            screensaver_sounds: false,
             bubbles_enabled: true,
             wander_enabled: true,
             dance_mode: "random".into(),

@@ -22,6 +22,8 @@ export interface Settings {
   /** Minutes of inactivity before sleeping; 0 = never. */
   sleepAfterMin: number;
   soundsEnabled: boolean;
+  /** Sound effects during the screensaver. Off by default: a sleeping room should stay quiet. */
+  screensaverSounds: boolean;
   bubblesEnabled: boolean;
   /** Wander along the floor when idle. */
   wanderEnabled: boolean;
@@ -80,6 +82,7 @@ export const DEFAULT_SETTINGS: Settings = {
   paused: false,
   sleepAfterMin: 5,
   soundsEnabled: true,
+  screensaverSounds: false,
   bubblesEnabled: true,
   wanderEnabled: true,
   danceMode: "random",

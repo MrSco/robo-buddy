@@ -56,7 +56,6 @@ const canvas = document.getElementById("stage") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d", { alpha: false })!;
 const loading = document.getElementById("loading") as HTMLParagraphElement;
 
-let shot: ImageBitmap | null = null;
 let sprites: Sprite[] = [];
 let screen: MonitorShot | null = null;
 /** Device pixels per CSS pixel for the canvas backing store. */
@@ -65,6 +64,10 @@ let ended = false;
 
 /** Where the buddy's window is, in capture coordinates; null when he is not around. */
 let buddy: { x: number; y: number; w: number; h: number } | null = null;
+/** How fast he is travelling, px/s, from one poll to the next. It is his speed that shoves. */
+let buddyVx = 0;
+let buddyVy = 0;
+let lastBuddy: { x: number; y: number; t: number } | null = null;
 
 const log = (m: string) => void invoke("append_log", { line: `screensaver: ${m}` }).catch(() => {});
 
@@ -75,8 +78,6 @@ async function start() {
   // The window is labelled "screensaver-<n>", one per monitor.
   const index = Number(/(\d+)$/.exec(getCurrentWindow().label)?.[1] ?? 0);
   screen = await invoke<MonitorShot>("capture_desktop", { index });
-  const blob = await (await fetch(`data:image/png;base64,${screen.png}`)).blob();
-  shot = await createImageBitmap(blob);
   // Back to front, so the sprite drawn last is the one that was on top. Each carries its own
   // picture, so a window that was buried still looks like itself once he knocks it loose.
   for (const r of screen.sprites.slice().reverse()) {
@@ -111,22 +112,58 @@ function resize() {
 
 /** The buddy's window, asked for now and then; 20 times a second is plenty for a shove. */
 async function pollBuddy() {
+  let tick = 0;
   while (!ended) {
     try {
       const r = await invoke<{ x: number; y: number; width: number; height: number } | null>("buddy_rect");
       // His window is in virtual-screen pixels; this page draws one monitor.
       buddy = r && screen ? { x: r.x - screen.x, y: r.y - screen.y, w: r.width, h: r.height } : null;
+      if (buddy) {
+        const now = performance.now();
+        if (lastBuddy) {
+          const dt = Math.max(0.016, (now - lastBuddy.t) / 1000);
+          // Smoothed, so one late poll does not read as a sprint.
+          buddyVx = buddyVx * 0.5 + ((buddy.x - lastBuddy.x) / dt) * 0.5;
+          buddyVy = buddyVy * 0.5 + ((buddy.y - lastBuddy.y) / dt) * 0.5;
+        }
+        lastBuddy = { x: buddy.x, y: buddy.y, t: now };
+      } else {
+        lastBuddy = null;
+        buddyVx = 0;
+        buddyVy = 0;
+      }
     } catch {
       buddy = null;
     }
+    // Every few ticks, tell him where the pieces are so he climbs and stands on what is
+    // actually drawn rather than on the real windows hidden behind the backdrop.
+    if (screen && ++tick % 3 === 0) sendSurfaces();
     await new Promise((done) => setTimeout(done, 50));
   }
 }
 
+/** The resting pieces, as things he can stand on, in virtual-screen pixels. */
+function sendSurfaces() {
+  if (!screen) return;
+  const list = sprites
+    .filter((s) => s.asleep)
+    .map((s, i) => ({
+      hwnd: 900000 + i,
+      left: Math.round(screen!.x + s.x),
+      top: Math.round(screen!.y + s.y),
+      right: Math.round(screen!.x + s.x + s.w),
+      bottom: Math.round(screen!.y + s.y + s.h),
+    }));
+  void invoke("screensaver_surfaces", { surfaces: list }).catch(() => {});
+}
+
+/** Below this he is loitering, not charging, and nothing should budge. */
+const SHOVE_SPEED = 140; // px/s
+
 /**
- * He shoves a sprite by running into its edge. Standing in front of a big window is not a
- * shove, so the push only counts when he is barely overlapping it: otherwise a maximised
- * window, which covers him entirely, would take off the moment the screensaver appeared.
+ * It is his speed that shoves things, not merely touching them. Standing inside a maximised
+ * window does nothing, which is why everything used to take off the instant the screensaver
+ * appeared; running into one sends it flying. A landing from above stamps it downward.
  */
 function shove(s: Sprite, dt: number) {
   if (!buddy) return;
@@ -135,18 +172,17 @@ function shove(s: Sprite, dt: number) {
   const bw = buddy.w * 0.32;
   const by = buddy.y + buddy.h * 0.15;
   const bh = buddy.h * 0.85;
-  const overlapX = Math.min(bx + bw, s.x + s.w) - Math.max(bx, s.x);
-  const overlapY = Math.min(by + bh, s.y + s.h) - Math.max(by, s.y);
-  if (overlapX <= 0 || overlapY <= 0) return;
-  // Only a shallow overlap is a collision. Deeper than this and he is simply in front of it.
-  const reach = Math.min(bw, s.w) * 0.9;
-  if (overlapX > reach) return;
-  // Push it the way he is going: out of whichever side of it he came in through.
-  const dir = bx + bw / 2 < s.x + s.w / 2 ? 1 : -1;
-  const force = s.asleep ? 26 : 9;
-  s.vx += dir * 60 * force * dt;
-  s.vy -= 18 * force * dt;
-  s.spin += dir * 0.16 * force * dt;
+  if (bx + bw < s.x || bx > s.x + s.w || by + bh < s.y || by > s.y + s.h) return;
+
+  const speed = Math.hypot(buddyVx, buddyVy);
+  if (speed < SHOVE_SPEED) return;
+  // He pushes it the way he is going, hard enough that a real run sends it properly.
+  const dir = Math.abs(buddyVx) > 40 ? Math.sign(buddyVx) : bx + bw / 2 < s.x + s.w / 2 ? 1 : -1;
+  const push = Math.min(3, speed / 320);
+  s.vx += dir * 900 * push * dt * 6;
+  // Dropping onto something drives it down; running into it lifts it a little.
+  s.vy += (buddyVy > 200 ? 260 : -180) * push * dt * 6;
+  s.spin += dir * 2.4 * push * dt * 6;
   s.asleep = false;
 }
 
@@ -156,12 +192,12 @@ function frame(now: number) {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
 
-  if (screen && shot) {
+  if (screen) {
     const scale = canvas.width / screen.width;
-    // The desktop as it was, dimmed so the loose pieces read as the live part of the picture.
+    // A black stage. Showing the desktop behind the pieces made it unclear what was loose and
+    // what was scenery, and left him climbing windows that were only part of the backdrop.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(shot, 0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "rgba(6, 10, 20, 0.72)";
+    ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const floor = screen.height;

@@ -79,12 +79,22 @@ fn grab(x: i32, y: i32, w: i32, h: i32) -> Result<Vec<u8>, String> {
 /// window to draw itself gives the real thing. Returns RGBA, or None when the window declines
 /// (some hardware-accelerated windows hand back nothing but a flat colour).
 #[cfg(windows)]
-fn capture_window(hwnd: isize, w: i32, h: i32) -> Option<Vec<u8>> {
-    use windows::Win32::Foundation::HWND;
+fn capture_window(hwnd: isize, fx: i32, fy: i32, fw: i32, fh: i32) -> Option<Vec<u8>> {
+    use windows::Win32::Foundation::{HWND, RECT};
     use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};
+    use windows::Win32::UI::WindowsAndMessaging::GetWindowRect;
     const PW_RENDERFULLCONTENT: u32 = 0x00000002;
     unsafe {
         let hwnd = HWND(hwnd as *mut _);
+        // PrintWindow draws the whole window, including the invisible resize border that sits
+        // outside the frame DWM reports. Capturing at the frame size would keep that border on
+        // the left and shift everything, which is the black stripe down each cut-out edge.
+        let mut wr = RECT::default();
+        if GetWindowRect(hwnd, &mut wr).is_err() {
+            return None;
+        }
+        let (w, h) = ((wr.right - wr.left).max(1), (wr.bottom - wr.top).max(1));
+        let (offx, offy) = ((fx - wr.left).max(0), (fy - wr.top).max(0));
         let screen = GetDC(None);
         if screen.is_invalid() {
             return None;
@@ -135,12 +145,19 @@ fn capture_window(hwnd: isize, w: i32, h: i32) -> Option<Vec<u8>> {
             p.swap(0, 2);
             p[3] = 255;
         }
-        Some(pixels)
+        // Keep only the visible frame, dropping the border PrintWindow included.
+        if offx == 0 && offy == 0 && w == fw && h == fh {
+            return Some(pixels);
+        }
+        if offx + fw > w || offy + fh > h {
+            return None;
+        }
+        Some(crop(&pixels, w, offx, offy, fw, fh))
     }
 }
 
 #[cfg(not(windows))]
-fn capture_window(_hwnd: isize, _w: i32, _h: i32) -> Option<Vec<u8>> {
+fn capture_window(_hwnd: isize, _fx: i32, _fy: i32, _fw: i32, _fh: i32) -> Option<Vec<u8>> {
     None
 }
 
@@ -301,7 +318,7 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
                 }
                 // Its own pixels where the window will give them. Otherwise its patch of the
                 // desktop picture, which is right whenever nothing was covering it.
-                if let Some(rgba) = capture_window(hwnd, ww, wh) {
+                if let Some(rgba) = capture_window(hwnd, wx, wy, ww, wh) {
                     if let Ok(png) = encode(&rgba, ww, wh) {
                         return Some(Sprite { x: wx - mx, y: wy - my, width: ww, height: wh, png });
                     }
@@ -369,4 +386,12 @@ pub fn screensaver_stop(app: tauri::AppHandle) -> Result<(), String> {
     }
     let _ = app.emit("screensaver", false);
     Ok(())
+}
+
+/// The screensaver telling the buddy what is standable right now: the cut-out windows where
+/// they have ended up, rather than the real ones sitting untouched behind the backdrop.
+#[tauri::command]
+pub fn screensaver_surfaces(app: tauri::AppHandle, surfaces: Vec<crate::input::Surface>) {
+    use tauri::Emitter;
+    let _ = app.emit("surfaces", &surfaces);
 }

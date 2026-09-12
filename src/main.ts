@@ -215,6 +215,8 @@ async function boot() {
       screensaverOn = e.payload;
       behavior.energetic = e.payload;
       if (physics) physics.roam = e.payload;
+      // A screensaver runs in an empty room; thuds and boings there are just noise.
+      sounds.enabled = settings.soundsEnabled && (!e.payload || settings.screensaverSounds);
       if (e.payload) {
         // Start doing something at once rather than finishing the current doze.
         behavior.interrupt(clock.elapsedTime);
@@ -413,7 +415,7 @@ function applySettings(s: Settings) {
     if (physics.opts.gravity && physics.mode === "rest") physics.mode = "falling";
   }
   if (music) music.threshold = s.musicThreshold;
-  sounds.enabled = s.soundsEnabled;
+  sounds.enabled = s.soundsEnabled && (!screensaverOn || s.screensaverSounds);
   voice.enabled = s.chatVoice;
   voice.engine = s.ttsEngine === "piper" ? "piper" : "windows";
   behavior.opts = { wander: s.wanderEnabled, danceMode: s.danceMode };

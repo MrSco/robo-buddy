@@ -2,7 +2,7 @@
 //! so it cannot rely on webview pointer events; instead we poll the OS cursor
 //! and mouse buttons and stream them to the frontend as `cursor` events.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{thread, time::Duration};
 use tauri::{AppHandle, Emitter};
 
@@ -249,7 +249,7 @@ fn own_popup_in_front(app: &AppHandle) -> bool {
 }
 
 /// A top-level window he can stand on: its frame bounds in physical pixels, in z-order (front first).
-#[derive(Serialize, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct Surface {
     pub hwnd: isize,
     pub left: i32,
@@ -326,6 +326,16 @@ pub fn start_surfaces_thread(app: AppHandle) {
                 let s = state.0.lock().unwrap();
                 s.surfaces_enabled
             };
+            // While the screensaver is up, the windows he can stand on are the cut-out pieces
+            // the screensaver is drawing, not the real ones hidden behind it. That page sends
+            // them, so this thread stands aside.
+            let screensaver = {
+                use tauri::Manager;
+                app.get_webview_window("screensaver-0").is_some()
+            };
+            if screensaver {
+                continue;
+            }
             let now = if enabled { list_surfaces() } else { Vec::new() };
             if now != last {
                 let _ = app.emit("surfaces", &now);
