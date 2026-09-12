@@ -44,7 +44,7 @@
                   <span>Size <output id="size-out">100%</output></span>
                   <input id="size" type="range" min="0.5" max="2.5" step="0.05" />
                 </label>
-                <label class="slider" title="Brightness of the lights and reflections on 3D characters. Turn it up for dark or metallic models. 100% is the designed look.">
+                <label class="slider" title="Brightness of the lights and reflections on the character shown in the preview. Each character keeps its own value, so a dark metallic model can be lit harder than a bright one. 100% is the designed look.">
                   <span>Lighting <output id="light-out">100%</output></span>
                   <input id="lighting" type="range" min="0.3" max="3" step="0.05" />
                 </label>
@@ -213,11 +213,15 @@
                 <h2>Voice</h2>
                 <label class="check" title="Read every reply out loud."><input id="chat-voice" type="checkbox" /> Speak replies out loud</label>
                 <label class="field" title="Windows voice: instant, no setup. Piper: a neural voice that runs on your PC, including cloned voices."><span>Engine</span>
-                  <select id="tts-engine">
-                    <option value="windows">Windows voice</option>
-                    <option value="piper">Piper (local neural voice)</option>
-                  </select>
+                  <div class="row">
+                    <select id="tts-engine" class="grow">
+                      <option value="windows">Windows voice</option>
+                      <option value="piper">Piper (local neural voice)</option>
+                    </select>
+                    <button id="voice-preview" type="button" title="Say a line out loud with the engine and voice selected here.">▶ Preview</button>
+                  </div>
                 </label>
+                <p class="hint" id="voice-preview-status"></p>
                 <div id="piper-fields">
                   <div class="row wrap">
                     <span class="hint grow" id="piper-status">Checking…</span>

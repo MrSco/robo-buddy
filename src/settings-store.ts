@@ -7,8 +7,10 @@ export type ClickThroughMode = "pixel" | "window" | "locked";
 export interface Settings {
   character: string;
   size: number;
-  /** Light and reflection strength on 3D characters, 1 = as designed. */
+  /** Light and reflection strength on 3D characters, 1 = as designed. The global fallback. */
   lighting: number;
+  /** Lighting per character id; a bright scan and a black endoskeleton want very different values. */
+  lightingByCharacter: Record<string, number>;
   musicEnabled: boolean;
   mouseEnabled: boolean;
   physicsEnabled: boolean;
@@ -67,6 +69,7 @@ export const DEFAULT_SETTINGS: Settings = {
   character: "rocco",
   size: 1,
   lighting: 1,
+  lightingByCharacter: {},
   musicEnabled: true,
   mouseEnabled: true,
   physicsEnabled: true,
@@ -121,4 +124,9 @@ export async function setSettings(s: Settings): Promise<void> {
 export async function onSettingsChanged(fn: (s: Settings) => void): Promise<void> {
   if (!IN_TAURI) return;
   await listen<Settings>("settings-changed", (e) => fn({ ...DEFAULT_SETTINGS, ...e.payload }));
+}
+
+/** Lighting for one character: its own value, else the global default. */
+export function lightingFor(settings: Settings, character: string): number {
+  return settings.lightingByCharacter?.[character] ?? settings.lighting ?? 1;
 }

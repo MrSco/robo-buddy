@@ -18,7 +18,8 @@ export interface WorkArea {
   monitorBottom?: number;
 }
 
-export const IN_TAURI = "__TAURI_INTERNALS__" in window;
+// `typeof window` rather than a bare reference, so this module can also be imported by tests.
+export const IN_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 /** Latest global cursor state in physical screen pixels, fed by the Rust polling thread. */
 export const cursor: CursorState = { x: 0, y: 0, buttons: 0, valid: false };

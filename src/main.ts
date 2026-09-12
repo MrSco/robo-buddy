@@ -19,7 +19,7 @@ import { WindowPhysics } from "./physics";
 import type { FrameInput, Renderer, StateName } from "./renderer";
 import { Renderer2D } from "./renderer2d";
 import { Renderer3D } from "./renderer3d";
-import { DEFAULT_SETTINGS, getSettings, onSettingsChanged, type Settings } from "./settings-store";
+import { DEFAULT_SETTINGS, getSettings, lightingFor, onSettingsChanged, type Settings } from "./settings-store";
 
 const BASE_W = 320;
 const BASE_H = 440;
@@ -865,7 +865,8 @@ function frame() {
     renderer3d.groundPx = physics ? physics.groundOverlap / scaleFactor : 0;
     renderer3d.bubblePx = bubble.visibleHeight();
     renderer3d.crouchPx = physics ? physics.crouchPx / scaleFactor : 0;
-    if (renderer3d.lighting !== settings.lighting) renderer3d.lighting = settings.lighting;
+    const want = lightingFor(settings, settings.character);
+    if (renderer3d.lighting !== want) renderer3d.lighting = want;
   }
   updateHead();
   updateLook(dt);

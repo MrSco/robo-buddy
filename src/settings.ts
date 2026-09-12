@@ -8,13 +8,13 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { listen } from "@tauri-apps/api/event";
 import type { AudioFeatures } from "./audio";
 import { effectiveManifest, listLibrary, invalidateLibrary, ROLES, type LibraryClip } from "./library";
-import { getSettings, onSettingsChanged, setSettings, type ClickThroughMode, type Settings } from "./settings-store";
+import { getSettings, lightingFor, onSettingsChanged, setSettings, type ClickThroughMode, type Settings } from "./settings-store";
 import { listPersonalities, loadUserPersonalities, saveUserPersonalities, slugFor, type Personality } from "./personality";
 import { emit, listen as listenEvent } from "@tauri-apps/api/event";
 import { Capture } from "./capture";
 import { PoseRecorder, exportClipGlb } from "./mocap";
 import { canonicalRig } from "./retarget";
-import { defaultPersona, type LineEvent } from "./chat";
+import { defaultPersona, type LineEvent, Voice } from "./chat";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -78,6 +78,8 @@ const els = {
   personalityHint: $<HTMLParagraphElement>("personality-hint"),
   chatSttEndpoint: $<HTMLInputElement>("chat-stt-endpoint"),
   ttsEngine: $<HTMLSelectElement>("tts-engine"),
+  voicePreview: $<HTMLButtonElement>("voice-preview"),
+  voicePreviewStatus: $<HTMLParagraphElement>("voice-preview-status"),
   talkMode: $<HTMLSelectElement>("talk-mode"),
   liveFields: $<HTMLDivElement>("live-fields"),
   pipelineFields: $<HTMLDivElement>("pipeline-fields"),
@@ -145,10 +147,19 @@ function getLive() {
   return live;
 }
 
+/** Put one character's lighting on the slider and on the live preview. */
+function showLightingFor(character: string) {
+  const v = lightingFor(settings, character);
+  els.lighting.value = String(v);
+  els.lightOut.value = `${Math.round(v * 100)}%`;
+  if (live) live.lighting = v;
+}
+
 async function previewPack(id: string) {
   const pack = packs.find((p) => p.id === id);
   if (!pack) return;
   previewing = id;
+  showLightingFor(id);
   for (const b of els.gallery.querySelectorAll("button")) b.classList.toggle("previewing", b.dataset.id === id);
   els.removePack.hidden = pack.bundled;
   els.removePack.textContent = `Remove "${pack.name}"`;
@@ -417,9 +428,7 @@ function render() {
   els.character.value = settings.character;
   els.size.value = String(settings.size);
   els.sizeOut.value = `${Math.round(settings.size * 100)}%`;
-  els.lighting.value = String(settings.lighting ?? 1);
-  els.lightOut.value = `${Math.round((settings.lighting ?? 1) * 100)}%`;
-  if (live) live.lighting = settings.lighting ?? 1;
+  showLightingFor(previewing ?? settings.character);
   els.paused.checked = settings.paused;
   els.mouse.checked = settings.mouseEnabled;
   els.physics.checked = settings.physicsEnabled;
@@ -677,6 +686,27 @@ function wireLive() {
   if (settings?.talkMode === "live") void refreshLiveStatus();
 }
 
+/**
+ * Say a line with whatever engine and voice are selected, so picking a voice does not mean
+ * closing settings and waiting for him to speak on his own.
+ */
+function wireVoicePreview() {
+  const voice = new Voice();
+  voice.onError = (msg) => (els.voicePreviewStatus.textContent = msg);
+  els.voicePreview.addEventListener("click", () => {
+    const name = currentManifest?.name ?? "your buddy";
+    voice.engine = els.ttsEngine.value === "piper" ? "piper" : "windows";
+    els.voicePreviewStatus.textContent =
+      voice.engine === "piper" && !els.piperVoice.value ? "Pick a Piper voice first." : "Speaking…";
+    if (voice.engine === "piper" && !els.piperVoice.value) return;
+    voice.say(`Hi, I'm ${name}. This is how I sound.`);
+    // No end event reaches us for the Windows path, so clear the note after a moment.
+    setTimeout(() => {
+      if (els.voicePreviewStatus.textContent === "Speaking…") els.voicePreviewStatus.textContent = "";
+    }, 4000);
+  });
+}
+
 function wireTalk() {
   wireLive();
   els.chatEnabled.addEventListener("change", () => {
@@ -700,6 +730,7 @@ function wireTalk() {
   els.chatLines.addEventListener("change", () => void commit({ chatGenerateLines: els.chatLines.checked }));
   els.chatCap.addEventListener("change", () => void commit({ chatDailyCap: Math.max(0, Math.round(Number(els.chatCap.value) || 0)) }));
   els.chatSttEndpoint.addEventListener("change", () => void commit({ chatSttEndpoint: els.chatSttEndpoint.value.trim() }));
+  wireVoicePreview();
   els.ttsEngine.addEventListener("change", () => {
     els.piperFields.hidden = els.ttsEngine.value !== "piper";
     void commit({ ttsEngine: els.ttsEngine.value });
@@ -1107,7 +1138,11 @@ async function main() {
     els.lightOut.value = `${Math.round(Number(els.lighting.value) * 100)}%`;
     getLive().lighting = Number(els.lighting.value);
   });
-  els.lighting.addEventListener("change", () => commit({ lighting: Number(els.lighting.value) }));
+  els.lighting.addEventListener("change", () => {
+    // The slider belongs to the character on screen, not to the app.
+    const id = previewing ?? settings.character;
+    void commit({ lightingByCharacter: { ...(settings.lightingByCharacter ?? {}), [id]: Number(els.lighting.value) } });
+  });
   els.paused.addEventListener("change", () => commit({ paused: els.paused.checked }));
   els.mouse.addEventListener("change", () => commit({ mouseEnabled: els.mouse.checked }));
   els.physics.addEventListener("change", () => commit({ physicsEnabled: els.physics.checked }));

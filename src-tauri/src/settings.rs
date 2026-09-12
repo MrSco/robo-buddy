@@ -15,8 +15,10 @@ pub struct Settings {
     pub character: String,
     /// Window scale, 1.0 = 320x440 logical pixels.
     pub size: f64,
-    /// Light and reflection strength on 3D characters, 1.0 = as designed.
+    /// Light and reflection strength on 3D characters, 1.0 = as designed. The global fallback.
     pub lighting: f64,
+    /// Lighting per character id, overriding the global value.
+    pub lighting_by_character: HashMap<String, f64>,
     pub music_enabled: bool,
     pub mouse_enabled: bool,
     pub physics_enabled: bool,
@@ -85,6 +87,7 @@ impl Default for Settings {
             character: "rocco".into(),
             size: 1.0,
             lighting: 1.0,
+            lighting_by_character: HashMap::new(),
             music_enabled: true,
             mouse_enabled: true,
             physics_enabled: true,
@@ -179,3 +182,4 @@ pub fn update<F: FnOnce(&mut Settings)>(app: &AppHandle, f: F) -> Settings {
     let _ = app.emit("settings-changed", snapshot.clone());
     snapshot
 }
+
