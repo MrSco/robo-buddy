@@ -31,7 +31,7 @@ jobs:
           workspaces: src-tauri -> target
 
       # tauri-build reads dist/, so the frontend has to exist first.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 9
 

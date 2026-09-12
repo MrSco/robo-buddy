@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import { open } from "@tauri-apps/plugin-dialog";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { listPacks, type Manifest, type PackRef } from "./packs";
@@ -28,6 +29,7 @@ const els = {
   bring: $<HTMLButtonElement>("bring"),
   size: $<HTMLInputElement>("size"),
   sizeOut: $<HTMLOutputElement>("size-out"),
+  tabVersion: $<HTMLParagraphElement>("tab-version"),
   lighting: $<HTMLInputElement>("lighting"),
   lightOut: $<HTMLOutputElement>("light-out"),
   paused: $<HTMLInputElement>("paused"),
@@ -1105,8 +1107,20 @@ function wireManagement() {
   });
 }
 
+/** Version and build under the tabs, so a bug report can name exactly what is running. */
+async function showVersion() {
+  let version = "";
+  try {
+    version = await getVersion();
+  } catch {
+    // not running inside Tauri
+  }
+  els.tabVersion.textContent = [version && `v${version}`, __BUILD__].filter(Boolean).join(" · ");
+}
+
 async function main() {
   wireTabs();
+  void showVersion();
   wireCapture();
   wireManagement();
   startMeter();

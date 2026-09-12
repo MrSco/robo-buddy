@@ -61,6 +61,14 @@ body {
 .tabs .tab-help {
   margin-top: auto;
 }
+.tabs .tab-version {
+  margin: 8px 8px 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--muted);
+  opacity: 0.75;
+  user-select: text;
+}
 @media (max-width: 640px) {
   .tabs .tab-help {
     margin-top: 0;
