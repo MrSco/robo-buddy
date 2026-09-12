@@ -111,13 +111,14 @@ fn context_menu(app: tauri::AppHandle) -> Result<(), String> {
     };
     let talk_item = MenuItem::with_id(&app, "talk", "Talk to him...", chat, None::<&str>).map_err(|e| e.to_string())?;
     let capture_item = MenuItem::with_id(&app, "capture", "Copy me (webcam)...", true, None::<&str>).map_err(|e| e.to_string())?;
+    let saver_item = MenuItem::with_id(&app, "screensaver", "Screensaver now", true, None::<&str>).map_err(|e| e.to_string())?;
     let settings_item = MenuItem::with_id(&app, "settings", "Settings...", true, None::<&str>).map_err(|e| e.to_string())?;
     let bring_item = MenuItem::with_id(&app, "bring", "Bring buddy here", true, None::<&str>).map_err(|e| e.to_string())?;
     let pause_item = CheckMenuItem::with_id(&app, "pause_ctx", "Pause reactions", true, paused, None::<&str>).map_err(|e| e.to_string())?;
     let quit = MenuItem::with_id(&app, "quit", "Quit Robo Buddy", true, None::<&str>).map_err(|e| e.to_string())?;
     let sep = PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?;
     let sep2 = PredefinedMenuItem::separator(&app).map_err(|e| e.to_string())?;
-    let menu = Menu::with_items(&app, &[&talk_item, &capture_item, &sep, &settings_item, &bring_item, &pause_item, &sep2, &quit]).map_err(|e| e.to_string())?;
+    let menu = Menu::with_items(&app, &[&talk_item, &capture_item, &saver_item, &sep, &settings_item, &bring_item, &pause_item, &sep2, &quit]).map_err(|e| e.to_string())?;
     menu.popup(win.as_ref().window()).map_err(|e| e.to_string())
 }
 
@@ -164,12 +165,13 @@ pub fn run() {
                 });
             }
             let bring_item = MenuItem::with_id(app, "bring", "Bring buddy here", true, None::<&str>)?;
+            let saver_item = MenuItem::with_id(app, "screensaver", "Screensaver now", true, None::<&str>)?;
             let settings_item = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
             let pause_item = CheckMenuItem::with_id(app, "pause", "Pause reactions", true, initial.paused, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit Robo Buddy", true, None::<&str>)?;
             let menu = Menu::with_items(
                 app,
-                &[&bring_item, &settings_item, &pause_item, &PredefinedMenuItem::separator(app)?, &quit],
+                &[&bring_item, &saver_item, &settings_item, &pause_item, &PredefinedMenuItem::separator(app)?, &quit],
             )?;
 
             TrayIconBuilder::with_id("main")
@@ -179,6 +181,12 @@ pub fn run() {
                 .show_menu_on_left_click(true)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "capture" => show_settings_on(app, Some("capture")),
+            "screensaver" => {
+                let _ = screen::screensaver_start(app.clone());
+            }
+                    "screensaver" => {
+                        let _ = screen::screensaver_start(app.clone());
+                    }
             "bring" => input::bring_here(app.clone()),
                     "settings" => show_settings(app),
                     "pause" => {
