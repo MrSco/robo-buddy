@@ -489,3 +489,97 @@ What will and will not look good:
 
 Effort: editor 1 day, mesh and skinning half a day, runtime renderer and retarget
 flattening 1 day, polish (depth order, holes, undo) half a day.
+
+## M10 — Going public, polish and hardening (proposed Sep 11 2026)
+
+### 0. Asset licensing — blocks the repo going public
+
+A survey of what is actually committed turned up three problems. None affects private use; all
+of them matter the moment the repo or a release binary is public.
+
+| Asset | Size | Problem |
+|---|---|---|
+| `assets/mixamo/` (32 FBX) and `public/clips/mixamo/` (GLB) | ~40 MB | Adobe's Mixamo terms allow use inside a project but not redistribution as standalone animation files. A public repo of .fbx/.glb clips is arguably that. |
+| `public/characters/t-800/t-800.glb` | 18 MB | Third-party Sketchfab model of a trademarked character. Licence unverified; Sketchfab models are commonly CC-BY or CC-BY-NC, and either way this is someone else's model of someone else's IP. |
+| `Rocco 3D Model - in3D/` | 14 MB | The author's own body scan, including `head_texture.jpg`. Publishing the repo publishes his likeness source data, and it is already in git history, so removing it later needs a history rewrite. |
+
+Safe to ship: `assets/ual` (CC0, Quaternius), the Mannequin (CC0), Pixel Pal (ours),
+`public/mediapipe` (Apache-2.0, needs an attribution line).
+
+Options, in order of preference:
+
+1. **Slim the public repo.** Ship only CC0 and our own assets. The T-800 becomes a documented
+   user import with a link rather than a bundled pack. Move `Rocco 3D Model - in3D/` out of the
+   repo entirely (history rewrite with `git filter-repo`, force push while the repo is still
+   private). Rocco's playable GLB can stay if the author is happy publishing his own likeness.
+2. **Replace the clip library.** Swap the Mixamo clips for CC0 equivalents (Quaternius UAL
+   already covers idle/walk/dance) so the retargeter still has a library to show off.
+3. **Keep the source private, publish releases only.** Least work, loses the Pages and README
+   showcase value.
+
+Also needed before publishing: a `LICENSE` file (the code is ours; the assets are not, so the
+readme needs a per-asset attribution table), and a note that unsigned installers raise
+SmartScreen until a code-signing certificate is bought.
+
+### 1. Quick wins (about a day together)
+
+- **Per-character lighting.** `settings.lighting` is global, so the bright Rocco and the dark
+  T-800 fight over one slider. Follow the existing `idleSets: Record<string, string[]>` pattern
+  with `lightingByCharacter: Record<string, number>`, falling back to the global value. The
+  slider then edits the active character's entry.
+- **Voice previews.** A Preview button beside the Piper voice dropdown and the Windows voice
+  picker, speaking one of the character's own lines through the existing `speak_piper` command
+  or `speechSynthesis`. Removes the guess-and-restart loop when choosing a voice.
+- **Open the log from Help.** The Help tab names the log path; give it a button, reusing
+  `open_user_folder`.
+- **First-run greeting.** Nothing currently tells a new user he lives in the tray. One bubble
+  on first launch, behind a `seenIntro` setting.
+
+### 2. Release infrastructure
+
+- **CI build on tag.** A GitHub Actions workflow running `tauri build` on `windows-latest`,
+  attaching the NSIS installer and MSI to the release. Removes the "build on Rocco's machine"
+  step from `scripts/make-installer.ps1`.
+- **Auto-update.** Tauri's updater plugin against a static `latest.json` on GitHub Pages, so
+  friends stop re-downloading installers by hand. Needs a signing keypair (the updater's own,
+  not a code-signing cert).
+- **GitHub Pages showcase.** Screenshots of him on the taskbar, standing on a window, dancing,
+  the settings tabs, and a short screen recording of a throw and a climb. The animated WebP
+  format the 2D packs already use is ideal for the demos.
+- **README rewrite** around what it looks like rather than how to build it, with the attribution
+  table from section 0.
+
+### 3. Screensaver mode
+
+He takes over the screen when it idles and plays with a *picture* of the desktop, never the
+desktop itself.
+
+- **Packaging.** Windows screensavers are executables named `.scr` handling `/s` (show), `/p`
+  (preview, draws into a parent HWND) and `/c` (configure). Ship `robo-buddy.scr` as a thin
+  launcher that starts the app with a screensaver flag, or register the main exe directly.
+- **Safe playground.** On start, capture the desktop once (BitBlt of the whole virtual screen)
+  and show it fullscreen. Cut sprites for the real desktop icons (`LVM_GETITEMPOSITION` against
+  the desktop ListView gives exact rects) and for the top-level windows we already enumerate in
+  `input.rs`. He then shoves, throws and stacks those sprites while the real windows never move.
+- **Bigger movement.** The current wander walks along the taskbar. Fullscreen wants running,
+  jumping between window sprites, and climbing them, which the existing `physics.ts` modes
+  (falling, hanging, mantling) mostly already cover once the bounds become the whole screen.
+- **Exit.** Any mouse move or key press ends it, per screensaver convention; the desktop
+  snapshot is discarded and he returns to the taskbar.
+
+Effort is real: three to five days, most of it in the capture and the sprite physics.
+
+### 4. Maintainability
+
+- **Tests.** There are none. The bugs that cost the most time all live in pure functions over
+  data: `humanoidNameOf` and the rig tables, `restoreBindPose`, `reweightSpanningRods`,
+  `effectiveManifest`, `parseCommand`. Vitest plus a few small GLB fixtures would have caught
+  the Valve-bone miss, the numbered-bone miss and the slider regressions. This matters more
+  than usual because several agents work on this repo.
+- **Split `settings.ts`.** Its 1,187 lines are already independent functions (`wireTalk`,
+  `wireManagement`, `wirePersonalityEditor`, `renderLibrary`) with almost no shared state, so
+  a split by tab is low risk and makes each tab reviewable on its own. Leave `main.ts`'s frame
+  loop alone: its state is tick state, and spreading it across files hides ordering bugs.
+- **Texture budget.** The T-800's seven textures decode to about 28 MB (37 MB mipmapped) for a
+  character drawn at 480x660. Halving them saves roughly 18 MB of renderer memory. Moot if the
+  T-800 is unbundled for licensing.
