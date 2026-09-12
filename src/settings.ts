@@ -1115,7 +1115,13 @@ async function showVersion() {
   } catch {
     // not running inside Tauri
   }
-  els.tabVersion.textContent = [version && `v${version}`, __BUILD__].filter(Boolean).join(" · ");
+  // Two lines in the sidebar, one line when the tabs run across the top; the CSS decides.
+  els.tabVersion.textContent = "";
+  for (const part of [version && `v${version}`, __BUILD__].filter(Boolean)) {
+    const line = document.createElement("span");
+    line.textContent = part as string;
+    els.tabVersion.append(line);
+  }
 }
 
 async function main() {

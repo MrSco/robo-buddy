@@ -64,10 +64,16 @@ body {
 .tabs .tab-version {
   margin: 8px 8px 0;
   font-size: 11px;
-  line-height: 1.4;
+  line-height: 1.35;
   color: var(--muted);
   opacity: 0.75;
   user-select: text;
+}
+/* The sidebar is 168px wide, so version and build each get their own line rather than
+   wrapping mid-date. Each line is short enough to fit on its own. */
+.tabs .tab-version span {
+  display: block;
+  white-space: nowrap;
 }
 @media (max-width: 640px) {
   .tabs .tab-help {
@@ -129,6 +135,15 @@ main {
   .tabs h1 {
     margin: 0 10px 0 4px;
     width: 100%;
+  }
+  .tabs .tab-version {
+    margin: 0 0 0 auto;
+  }
+  .tabs .tab-version span {
+    display: inline;
+  }
+  .tabs .tab-version span + span::before {
+    content: " · ";
   }
   main {
     padding: 14px 14px 10px;
