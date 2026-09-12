@@ -624,6 +624,7 @@ function wireTabs() {
   } catch {
     /* no storage */
   }
+  // A window opened for one tab is handled after wiring, once the backend can be asked.
   if (!pages.some((p) => p.dataset.page === initial)) initial = "character";
   show(initial);
 }
@@ -870,6 +871,16 @@ async function saveRecording() {
   }
 }
 
+/** Show the capture tab with the camera on and mirroring, however it was asked for. */
+async function openCapture() {
+  showTab("capture");
+  await startCamera();
+  if (capture?.running && !els.camMirror.checked) {
+    els.camMirror.checked = true;
+    void emit("mirror", { on: true }).catch(() => {});
+  }
+}
+
 function wireCapture() {
   els.camStart.addEventListener("click", () => (capture?.running ? stopCamera() : void startCamera()));
   els.camMirror.addEventListener("change", () => void emit("mirror", { on: els.camMirror.checked }).catch(() => {}));
@@ -879,14 +890,14 @@ function wireCapture() {
   els.camRecord.addEventListener("click", toggleRecording);
   els.camSave.addEventListener("click", () => void saveRecording());
   // Right-click > Copy me: open here with the camera on and mirroring.
-  void listen("capture", async () => {
-    showTab("capture");
-    await startCamera();
-    if (capture?.running && !els.camMirror.checked) {
-      els.camMirror.checked = true;
-      void emit("mirror", { on: true }).catch(() => {});
-    }
-  });
+  void listen("capture", () => void openCapture());
+  // Opened by "Copy me (webcam)" while the page was still loading: the backend kept the tab.
+  void invoke<string | null>("take_settings_tab")
+    .then((tab) => {
+      if (tab === "capture") void openCapture();
+      else if (tab) showTab(tab);
+    })
+    .catch(() => {});
   // Hiding the window (its close button hides it) stops the camera too. WebView2 does not
   // reliably fire visibilitychange for a hidden window, so Rust also sends an event.
   document.addEventListener("visibilitychange", () => {

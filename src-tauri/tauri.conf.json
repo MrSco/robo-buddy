@@ -25,18 +25,6 @@
         "maximizable": false,
         "minimizable": false,
         "visible": false
-      },
-      {
-        "label": "settings",
-        "title": "Robo Buddy Settings",
-        "url": "settings.html",
-        "width": 940,
-        "height": 780,
-        "resizable": true,
-        "visible": false,
-        "center": true,
-        "minWidth": 440,
-        "minHeight": 520
       }
     ],
     "security": {

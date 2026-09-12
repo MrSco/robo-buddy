@@ -13,11 +13,54 @@ mod piper;
 mod packs;
 mod settings;
 
+/// The tab the settings window should open on, left here until the page asks for it.
+#[derive(Default)]
+struct PendingTab(std::sync::Mutex<Option<String>>);
+
+/// Which tab to show, if the window was opened for a particular one. Clears as it is read, so
+/// reopening later lands on whatever tab the user last used.
+#[tauri::command]
+fn take_settings_tab(state: tauri::State<PendingTab>) -> Option<String> {
+    state.0.lock().ok().and_then(|mut t| t.take())
+}
+
 fn show_settings(app: &tauri::AppHandle) {
+    show_settings_on(app, None);
+}
+
+/// Show the settings window, building it the first time and again after it is closed. It is not
+/// declared in tauri.conf.json on purpose: a window declared there is created at launch, and a
+/// second Chromium renderer costs about 100 MB whether or not anyone opens it.
+fn show_settings_on(app: &tauri::AppHandle, tab: Option<&str>) {
+    if let Some(t) = tab {
+        if let Ok(mut pending) = app.state::<PendingTab>().0.lock() {
+            *pending = Some(t.to_string());
+        }
+    }
     if let Some(win) = app.get_webview_window("settings") {
         let _ = win.show();
         let _ = win.unminimize();
         let _ = win.set_focus();
+        // An open window is already listening, so the tab to show can just be sent.
+        if let Some(t) = tab {
+            let _ = win.emit(t, ());
+        }
+        return;
+    }
+    match tauri::WebviewWindowBuilder::new(app, "settings", tauri::WebviewUrl::App("settings.html".into()))
+        .title("Robo Buddy Settings")
+        .inner_size(940.0, 780.0)
+        .min_inner_size(440.0, 520.0)
+        .resizable(true)
+        .center()
+        .build()
+    {
+        Ok(win) => {
+            let _ = win.set_focus();
+        }
+        Err(e) => {
+            let _ = app.emit("settings-error", e.to_string());
+        }
     }
 }
 
@@ -69,6 +112,7 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .manage(PendingTab::default())
         .setup(move |app| {
             let bring_item = MenuItem::with_id(app, "bring", "Bring buddy here", true, None::<&str>)?;
             let settings_item = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
@@ -85,12 +129,7 @@ pub fn run() {
                 .menu(&menu)
                 .show_menu_on_left_click(true)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
-                    "capture" => {
-                show_settings(app);
-                if let Some(win) = app.get_webview_window("settings") {
-                    let _ = win.emit("capture", ());
-                }
-            }
+                    "capture" => show_settings_on(app, Some("capture")),
             "bring" => input::bring_here(app.clone()),
                     "settings" => show_settings(app),
                     "pause" => {
@@ -121,6 +160,7 @@ pub fn run() {
             Ok(())
         })
         .on_menu_event(|app, event| match event.id.as_ref() {
+            "capture" => show_settings_on(app, Some("capture")),
             "talk" => {
                 if let Some(win) = app.get_webview_window("buddy") {
                     let _ = win.emit("talk", ());
@@ -138,13 +178,11 @@ pub fn run() {
             _ => {}
         })
         .on_window_event(|window, event| {
-            // The settings window hides instead of closing so it can be reopened from the tray.
+            // Closing the settings window destroys it, taking its renderer process with it; the
+            // next Settings... builds a fresh one. The webcam stops because the webview is gone.
             if window.label() == "settings" {
-                if let WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    // The webview keeps running while hidden; tell it so the webcam goes off.
+                if let WindowEvent::CloseRequested { .. } = event {
                     let _ = window.emit("settings-hidden", ());
-                    let _ = window.hide();
                 }
             }
         })
@@ -166,6 +204,7 @@ pub fn run() {
             piper::piper_delete_voice,
             packs::save_user_clip,
             open_settings,
+            take_settings_tab,
             context_menu,
             chat::set_chat_key,
             chat::has_chat_key,

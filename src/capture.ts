@@ -97,6 +97,22 @@ export class Capture {
     this.video.srcObject = null;
     const ctx = this.overlay.getContext("2d");
     ctx?.clearRect(0, 0, this.overlay.width, this.overlay.height);
+    // The pose and hand models hold their WASM heap (tens of megabytes) for as long as they
+    // exist. Let them go and pay the reload on the next start rather than carry them while
+    // the camera is off.
+    try {
+      this.landmarker?.close();
+    } catch {
+      // already gone
+    }
+    try {
+      this.handLandmarker?.close();
+    } catch {
+      // already gone
+    }
+    this.landmarker = null;
+    this.handLandmarker = null;
+    this.handLoading = null;
     this.onStatus?.("Camera off.");
   }
 
