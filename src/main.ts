@@ -214,6 +214,7 @@ async function boot() {
     await listen<boolean>("screensaver", (e) => {
       screensaverOn = e.payload;
       behavior.energetic = e.payload;
+      if (physics) physics.roam = e.payload;
       if (e.payload) {
         // Start doing something at once rather than finishing the current doze.
         behavior.interrupt(clock.elapsedTime);

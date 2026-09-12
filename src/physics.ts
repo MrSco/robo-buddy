@@ -196,10 +196,26 @@ export class WindowPhysics {
     return this.onSurface ? 0 : this.floorOverlap;
   }
 
+  /**
+   * Screensaver: he is putting on a show, so the whole desk is his rather than one monitor.
+   * Walking across a monitor edge moves him onto that screen's floor.
+   */
+  roam = false;
+
+  /** Every monitor end to end, for roaming; falls back to the current one before they load. */
+  private get allScreens() {
+    if (!this.areas.length) return { left: this.area.left, right: this.area.right };
+    return {
+      left: Math.min(...this.areas.map((a) => a.left)),
+      right: Math.max(...this.areas.map((a) => a.right)),
+    };
+  }
+
   /** Horizontal range he may wander in: the window he stands on, else the work area. */
   get bounds() {
     const s = this.surfaceOf(this.support);
-    return s ? { left: s.left, right: s.right } : { left: this.area.left, right: this.area.right };
+    if (s) return { left: s.left, right: s.right };
+    return this.roam ? this.allScreens : { left: this.area.left, right: this.area.right };
   }
 
   private static readonly EDGE = 28;
@@ -422,6 +438,15 @@ export class WindowPhysics {
     // Walking off a window on purpose: the rest check drops him once his centre leaves it.
     const margin = beyondEdge ? this.w : 0;
     this.x = Math.max(b.left - margin, Math.min(b.right - this.w + margin, this.x + dx));
+    // Roaming: crossing onto another monitor hands him that screen's floor, so he steps up or
+    // down onto its taskbar rather than walking through the air at the old height.
+    if (this.roam && !this.onSurface) {
+      const here = this.areaAt(this.x + this.w / 2, this.y + this.h / 2);
+      if (here !== this.area) {
+        this.area = here;
+        this.y = this.floor;
+      }
+    }
     this.apply();
   }
 

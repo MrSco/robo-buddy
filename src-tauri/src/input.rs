@@ -173,7 +173,7 @@ pub fn start_topmost_thread(app: AppHandle) {
         {
             use tauri::Manager;
             if let Some(win) = app.get_webview_window("buddy") {
-                if win.is_visible().unwrap_or(false) && !own_popup_in_front() {
+                if win.is_visible().unwrap_or(false) && !own_popup_in_front(&app) {
                     if let Ok(hwnd) = win.hwnd() {
                         use windows::Win32::Foundation::HWND;
                         use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE};
@@ -193,11 +193,47 @@ pub fn start_topmost_thread(app: AppHandle) {
 /// True while a menu (the buddy's right-click menu, the tray menu) or one of our own windows
 /// is in front; re-asserting topmost then would cover the menu the user just opened.
 #[cfg(windows)]
-fn own_popup_in_front() -> bool {
+/// True when this window is one of the screensaver backdrops.
+#[cfg(windows)]
+fn is_screensaver_window(app: &AppHandle, hwnd: isize) -> bool {
+    use tauri::Manager;
+    (0..16).any(|i| {
+        app.get_webview_window(&format!("screensaver-{i}"))
+            .and_then(|w| w.hwnd().ok())
+            .map(|h| h.0 as isize == hwnd)
+            .unwrap_or(false)
+    })
+}
+
+/// Put the buddy at the very top of the topmost band, now rather than at the next tick.
+#[cfg(windows)]
+pub fn raise_buddy(app: &AppHandle) {
+    use tauri::Manager;
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE};
+    if let Some(win) = app.get_webview_window("buddy") {
+        if let Ok(hwnd) = win.hwnd() {
+            // SAFETY: a valid window handle; the flags only reorder, never move or activate.
+            unsafe {
+                let _ = SetWindowPos(HWND(hwnd.0 as *mut core::ffi::c_void), Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            }
+        }
+    }
+}
+
+#[cfg(not(windows))]
+pub fn raise_buddy(_app: &AppHandle) {}
+
+fn own_popup_in_front(app: &AppHandle) -> bool {
     use windows::Win32::UI::WindowsAndMessaging::{GetClassNameW, GetForegroundWindow, GetWindowThreadProcessId};
     unsafe {
         let hwnd = GetForegroundWindow();
         if hwnd.0.is_null() {
+            return false;
+        }
+        // The screensaver is ours and holds focus, but he plays *in* it, so he still has to be
+        // pushed above it. Only a menu or the settings window should hold him back.
+        if is_screensaver_window(app, hwnd.0 as isize) {
             return false;
         }
         let mut pid = 0u32;

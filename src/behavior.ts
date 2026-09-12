@@ -233,7 +233,11 @@ export class Behavior {
     const variants = (m.idleVariants ?? []).filter((v) => this.durations(v) > 0 && on(v));
     const fidgets = (m.fidgets ?? []).filter((f) => (Array.isArray(f) ? f : [f]).every((c) => this.durations(c) > 0) && on(Behavior.fidgetKey(f)));
     const walk = m.states.walk;
-    const canWalk = this.opts.wander && !!walk && this.durations(walk.clip) > 0 && s.right - s.left - s.w > MIN_WANDER * 2;
+    // Two different questions. Can he walk at all, and is there room here to wander about?
+    // They were one test, which stranded him: standing on a window narrower than the wander
+    // minimum, he could not walk, and walking is also how he steps back off the edge.
+    const canWalk = this.opts.wander && !!walk && this.durations(walk.clip) > 0;
+    const roomToWander = s.right - s.left - s.w > MIN_WANDER * 2;
     const options: Array<() => void> = [];
     if (variants.length && !this.energetic) {
       options.push(() => {
@@ -263,7 +267,8 @@ export class Behavior {
       options.push(options[options.length - 1]); // twice as likely as any single other option
       if (this.energetic) for (let i = 0; i < 3; i++) options.push(options[options.length - 1]);
     }
-    if (canWalk && s.onSurface && Math.random() < 0.35) {
+    // Stuck on a perch too small to stroll along: leaving is the only thing left to do.
+    if (canWalk && s.onSurface && (!roomToWander || Math.random() < 0.35)) {
       // Been up here a while: walk off the edge and drop back down.
       const speed = walk!.speed ?? 120;
       const goLeft = s.x - s.left < s.right - (s.x + s.w);
@@ -273,7 +278,7 @@ export class Behavior {
         this.activityEnds = s.t + Math.abs(target - s.x) / speed + 2;
       });
     }
-    if (canWalk) {
+    if (canWalk && roomToWander) {
       options.push(() => {
         const minX = s.left;
         const maxX = s.right - s.w;

@@ -348,6 +348,8 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
         let _ = win.set_position(tauri::PhysicalPosition::new(shot.x, shot.y));
         let _ = win.set_size(tauri::PhysicalSize::new(shot.width as u32, shot.height as u32));
     }
+    // He belongs on top of his own playground, not behind it.
+    crate::input::raise_buddy(&app);
     let _ = app.emit("screensaver", true);
     Ok(())
 }
