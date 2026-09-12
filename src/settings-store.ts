@@ -77,6 +77,10 @@ export interface Settings {
   keyboardEnabled: boolean;
   /** Land on and walk along the top edges of other windows. */
   surfacesEnabled: boolean;
+  /** Open the talk box with a system-wide hotkey. */
+  talkHotkeyEnabled: boolean;
+  /** The combo itself, as "Ctrl+Shift+T". */
+  talkHotkey: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -124,6 +128,8 @@ export const DEFAULT_SETTINGS: Settings = {
   personality: "pack",
   keyboardEnabled: true,
   surfacesEnabled: true,
+  talkHotkeyEnabled: false,
+  talkHotkey: "Ctrl+Shift+T",
 };
 
 export async function getSettings(): Promise<Settings> {

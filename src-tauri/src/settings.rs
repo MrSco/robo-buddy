@@ -86,6 +86,10 @@ pub struct Settings {
     pub live_daily_minutes: u32,
     /// Land on and walk along the top edges of other windows.
     pub surfaces_enabled: bool,
+    /// Open the talk box with a system-wide hotkey, from whatever app has the keyboard.
+    pub talk_hotkey_enabled: bool,
+    /// The hotkey itself, as "Ctrl+Shift+T": modifiers and one key, joined by pluses.
+    pub talk_hotkey: String,
 }
 
 impl Default for Settings {
@@ -135,6 +139,8 @@ impl Default for Settings {
             live_voice: String::new(),
             live_daily_minutes: 30,
             surfaces_enabled: true,
+            talk_hotkey_enabled: false,
+            talk_hotkey: "Ctrl+Shift+T".into(),
         }
     }
 }

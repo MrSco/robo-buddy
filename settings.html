@@ -138,6 +138,17 @@
               </div>
             </div>
             <div class="group">
+              <h2>Hotkey</h2>
+              <label class="check" title="Opens and closes the talk box from whatever app you are in, the same as double-clicking him."><input id="talk-hotkey-enabled" type="checkbox" /> Open the talk box with a hotkey</label>
+              <div class="row">
+                <label class="field small" title="Click the box and press the combo you want. It needs Ctrl, Alt, Shift or Win, or that key would stop working everywhere else."><span>Shortcut</span>
+                  <input id="talk-hotkey" type="text" readonly spellcheck="false" placeholder="click, then press keys" />
+                </label>
+                <button id="talk-hotkey-reset" type="button" class="self-end">Reset</button>
+              </div>
+              <p class="hint" id="talk-hotkey-status"></p>
+            </div>
+            <div class="group">
               <h2>Personality</h2>
               <div class="row wrap">
                 <label class="field grow" title="Who he is when he talks: the system prompt, the pre-baked lines he says, and how creative the model is."><span>Profile</span><select id="personality"></select></label>

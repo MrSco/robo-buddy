@@ -94,6 +94,10 @@ const els = {
   voicePreview: $<HTMLButtonElement>("voice-preview"),
   voicePreviewStatus: $<HTMLParagraphElement>("voice-preview-status"),
   talkMode: $<HTMLSelectElement>("talk-mode"),
+  talkHotkeyEnabled: $<HTMLInputElement>("talk-hotkey-enabled"),
+  talkHotkey: $<HTMLInputElement>("talk-hotkey"),
+  talkHotkeyReset: $<HTMLButtonElement>("talk-hotkey-reset"),
+  talkHotkeyStatus: $<HTMLParagraphElement>("talk-hotkey-status"),
   liveFields: $<HTMLDivElement>("live-fields"),
   pipelineFields: $<HTMLDivElement>("pipeline-fields"),
   liveKey: $<HTMLInputElement>("live-key"),
@@ -467,6 +471,9 @@ function render() {
   els.chatSttEndpoint.value = settings.chatSttEndpoint;
   els.ttsEngine.value = settings.ttsEngine;
   els.piperFields.hidden = settings.ttsEngine !== "piper";
+  els.talkHotkeyEnabled.checked = settings.talkHotkeyEnabled;
+  els.talkHotkey.value = settings.talkHotkey;
+  els.talkHotkey.disabled = !settings.talkHotkeyEnabled;
   els.talkMode.value = settings.talkMode === "live" ? "live" : "pipeline";
   els.liveFields.hidden = settings.talkMode !== "live";
   els.pipelineFields.classList.toggle("dim", settings.talkMode === "live");
@@ -683,6 +690,62 @@ async function refreshLiveStatus() {
   }
 }
 
+/** Writes a KeyboardEvent down the way the Rust side reads it back: "Ctrl+Shift+T". */
+function hotkeyFrom(e: KeyboardEvent): string | null {
+  const parts: string[] = [];
+  if (e.ctrlKey) parts.push("Ctrl");
+  if (e.altKey) parts.push("Alt");
+  if (e.shiftKey) parts.push("Shift");
+  if (e.metaKey) parts.push("Win");
+  const code = e.code;
+  let key = "";
+  if (/^Key[A-Z]$/.test(code)) key = code.slice(3);
+  else if (/^Digit[0-9]$/.test(code)) key = code.slice(5);
+  else if (/^(F[1-9]|F1[0-9]|F2[0-4]|Numpad[0-9])$/.test(code)) key = code;
+  else if (/^(Space|Tab|Enter|Escape|Backspace|Delete|Insert|Home|End|PageUp|PageDown|Arrow(Up|Down|Left|Right))$/.test(code)) key = code;
+  else if (/^(Semicolon|Equal|Comma|Minus|Period|Slash|Backquote|BracketLeft|Backslash|BracketRight|Quote)$/.test(code)) key = code;
+  // Only the modifiers so far: the user is still holding them down, waiting to press the key.
+  if (!key) return null;
+  if (!parts.length) return null;
+  parts.push(key);
+  return parts.join("+");
+}
+
+function wireTalkHotkey() {
+  els.talkHotkeyEnabled.addEventListener("change", () => {
+    els.talkHotkey.disabled = !els.talkHotkeyEnabled.checked;
+    els.talkHotkeyStatus.textContent = els.talkHotkeyEnabled.checked ? "" : "Hotkey off.";
+    void commit({ talkHotkeyEnabled: els.talkHotkeyEnabled.checked });
+  });
+  els.talkHotkey.addEventListener("focus", () => {
+    els.talkHotkeyStatus.textContent = "Press the combo you want…";
+  });
+  els.talkHotkey.addEventListener("keydown", (e) => {
+    // The box only ever holds a combo we wrote, so nothing here should reach the page.
+    e.preventDefault();
+    if (e.key === "Escape") {
+      els.talkHotkey.blur();
+      return;
+    }
+    const combo = hotkeyFrom(e);
+    if (!combo) {
+      els.talkHotkeyStatus.textContent = "Hold Ctrl, Alt, Shift or Win, then press a key.";
+      return;
+    }
+    els.talkHotkey.value = combo;
+    els.talkHotkeyStatus.textContent = "Registering…";
+    void commit({ talkHotkey: combo });
+  });
+  els.talkHotkeyReset.addEventListener("click", () => {
+    els.talkHotkey.value = "Ctrl+Shift+T";
+    void commit({ talkHotkey: "Ctrl+Shift+T" });
+  });
+  // Rust reports what Windows made of it: the combo may already belong to another app.
+  void listen<{ key: string; ok: boolean; error: string }>("talk-hotkey", (e) => {
+    els.talkHotkeyStatus.textContent = e.payload.ok ? `${e.payload.key} is listening.` : e.payload.error;
+  });
+}
+
 function wireLive() {
   els.talkMode.addEventListener("change", () => {
     const live = els.talkMode.value === "live";
@@ -790,6 +853,7 @@ async function setBackdrop(path: string) {
 
 function wireTalk() {
   wireLive();
+  wireTalkHotkey();
   els.chatEnabled.addEventListener("change", () => {
     els.talkFields.classList.toggle("off", !els.chatEnabled.checked);
     void commit({ chatEnabled: els.chatEnabled.checked });
@@ -984,6 +1048,12 @@ async function saveRecording() {
   }
 }
 
+/** Show a tab that was asked for from outside. Capture is the one that needs more than a click. */
+function openTab(name: string) {
+  if (name === "capture") void openCapture();
+  else showTab(name);
+}
+
 /** Show the capture tab with the camera on and mirroring, however it was asked for. */
 async function openCapture() {
   showTab("capture");
@@ -1002,13 +1072,13 @@ function wireCapture() {
   });
   els.camRecord.addEventListener("click", toggleRecording);
   els.camSave.addEventListener("click", () => void saveRecording());
-  // Right-click > Copy me: open here with the camera on and mirroring.
-  void listen("capture", () => void openCapture());
+  // Asked for a particular tab while the window was already open: right-click > Copy me, or
+  // the Settings button in Windows' Screen Saver dialog.
+  void listen<string>("settings-tab", (e) => openTab(e.payload));
   // Opened by "Copy me (webcam)" while the page was still loading: the backend kept the tab.
   void invoke<string | null>("take_settings_tab")
     .then((tab) => {
-      if (tab === "capture") void openCapture();
-      else if (tab) showTab(tab);
+      if (tab) openTab(tab);
     })
     .catch(() => {});
   // Hiding the window (its close button hides it) stops the camera too. WebView2 does not

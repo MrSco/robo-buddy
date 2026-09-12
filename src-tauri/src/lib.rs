@@ -74,7 +74,7 @@ fn show_settings_on(app: &tauri::AppHandle, tab: Option<&str>) {
         let _ = win.set_focus();
         // An open window is already listening, so the tab to show can just be sent.
         if let Some(t) = tab {
-            let _ = win.emit(t, ());
+            let _ = win.emit("settings-tab", t);
         }
         return;
     }
@@ -134,7 +134,9 @@ pub fn run() {
                 Some(ScreensaverArg::Show) => {
                     let _ = screen::screensaver_start(app.clone());
                 }
-                Some(ScreensaverArg::Configure) => show_settings(app),
+                // Windows' Screen Saver dialog sends /c for its Settings button, and every
+                // screensaver setting of ours lives on the Window tab.
+                Some(ScreensaverArg::Configure) => show_settings_on(app, Some("window")),
                 Some(ScreensaverArg::Preview) => {}
                 None => input::bring_here(app.clone()),
             }
@@ -159,14 +161,19 @@ pub fn run() {
         .manage(screen::Backdrop::default())
         .manage(screen::Punch::default())
         .setup(move |app| {
-            // Launched as a screensaver with nothing else running: go straight into it.
-            if let Some(ScreensaverArg::Show) = screensaver_arg(&std::env::args().collect::<Vec<_>>()) {
-                let handle = app.handle().clone();
-                std::thread::spawn(move || {
-                    // Let the buddy window finish loading first, or he blinks in afterwards.
-                    std::thread::sleep(std::time::Duration::from_millis(1200));
-                    let _ = screen::screensaver_start(handle);
-                });
+            // Launched as a screensaver with nothing else running: go straight into it, or
+            // straight to the screensaver settings if that is what was asked for.
+            match screensaver_arg(&std::env::args().collect::<Vec<_>>()) {
+                Some(ScreensaverArg::Show) => {
+                    let handle = app.handle().clone();
+                    std::thread::spawn(move || {
+                        // Let the buddy window finish loading first, or he blinks in afterwards.
+                        std::thread::sleep(std::time::Duration::from_millis(1200));
+                        let _ = screen::screensaver_start(handle);
+                    });
+                }
+                Some(ScreensaverArg::Configure) => show_settings_on(app.handle(), Some("window")),
+                _ => {}
             }
             let bring_item = MenuItem::with_id(app, "bring", "Bring buddy here", true, None::<&str>)?;
             let saver_item = MenuItem::with_id(app, "screensaver", "Screensaver now", true, None::<&str>)?;
@@ -214,6 +221,8 @@ pub fn run() {
             input::start_topmost_thread(app.handle().clone());
             input::start_surfaces_thread(app.handle().clone());
             input::start_key_thread(app.handle().clone());
+            input::start_hotkey_thread(app.handle().clone());
+            screen::refresh_scr();
             audio::start_audio_thread(app.handle().clone());
             Ok(())
         })

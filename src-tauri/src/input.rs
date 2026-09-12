@@ -468,3 +468,157 @@ pub fn start_fullscreen_thread(app: AppHandle) {
         }
     });
 }
+
+/// Turns "Ctrl+Shift+T" into the modifier mask and virtual-key code RegisterHotKey wants.
+/// At least one modifier is required: a bare key would be swallowed everywhere on the machine.
+#[cfg(windows)]
+fn parse_hotkey(spec: &str) -> Result<(u32, u32), String> {
+    const MOD_ALT: u32 = 0x0001;
+    const MOD_CONTROL: u32 = 0x0002;
+    const MOD_SHIFT: u32 = 0x0004;
+    const MOD_WIN: u32 = 0x0008;
+    const MOD_NOREPEAT: u32 = 0x4000;
+    let mut mods = 0u32;
+    let mut key: Option<u32> = None;
+    for part in spec.split('+').map(str::trim).filter(|p| !p.is_empty()) {
+        match part.to_ascii_lowercase().as_str() {
+            "ctrl" | "control" => mods |= MOD_CONTROL,
+            "alt" => mods |= MOD_ALT,
+            "shift" => mods |= MOD_SHIFT,
+            "win" | "super" | "meta" | "cmd" => mods |= MOD_WIN,
+            _ => {
+                if key.is_some() {
+                    return Err("more than one key".into());
+                }
+                key = Some(key_code(part).ok_or_else(|| format!("{part} is not a key I know"))?);
+            }
+        }
+    }
+    let key = key.ok_or("pick a key as well as the modifiers")?;
+    if mods == 0 {
+        return Err("add Ctrl, Alt, Shift or Win, or this key stops working everywhere else".into());
+    }
+    Ok((mods | MOD_NOREPEAT, key))
+}
+
+/// Virtual-key code for a key name. Letters and digits are themselves; the rest are the names
+/// a browser's KeyboardEvent.code uses, which is what the settings page sends.
+#[cfg(windows)]
+fn key_code(name: &str) -> Option<u32> {
+    let n = name.to_ascii_uppercase();
+    if n.len() == 1 {
+        let c = n.as_bytes()[0];
+        if c.is_ascii_uppercase() || c.is_ascii_digit() {
+            return Some(c as u32);
+        }
+    }
+    if let Some(i) = n.strip_prefix('F').and_then(|d| d.parse::<u32>().ok()) {
+        if (1..=24).contains(&i) {
+            return Some(0x6F + i);
+        }
+    }
+    if let Some(i) = n.strip_prefix("NUMPAD").and_then(|d| d.parse::<u32>().ok()) {
+        if i <= 9 {
+            return Some(0x60 + i);
+        }
+    }
+    Some(match n.as_str() {
+        "SPACE" => 0x20,
+        "ENTER" | "RETURN" => 0x0D,
+        "TAB" => 0x09,
+        "ESCAPE" | "ESC" => 0x1B,
+        "BACKSPACE" => 0x08,
+        "DELETE" | "DEL" => 0x2E,
+        "INSERT" => 0x2D,
+        "HOME" => 0x24,
+        "END" => 0x23,
+        "PAGEUP" => 0x21,
+        "PAGEDOWN" => 0x22,
+        "ARROWUP" | "UP" => 0x26,
+        "ARROWDOWN" | "DOWN" => 0x28,
+        "ARROWLEFT" | "LEFT" => 0x25,
+        "ARROWRIGHT" | "RIGHT" => 0x27,
+        "SEMICOLON" => 0xBA,
+        "EQUAL" => 0xBB,
+        "COMMA" => 0xBC,
+        "MINUS" => 0xBD,
+        "PERIOD" => 0xBE,
+        "SLASH" => 0xBF,
+        "BACKQUOTE" => 0xC0,
+        "BRACKETLEFT" => 0xDB,
+        "BACKSLASH" => 0xDC,
+        "BRACKETRIGHT" => 0xDD,
+        "QUOTE" => 0xDE,
+        _ => return None,
+    })
+}
+
+/// Holds the system-wide talk hotkey, re-registering it whenever the setting changes. The
+/// registration belongs to this thread, so the message pump has to live here too; it reports what
+/// happened on `talk-hotkey` so the settings page can say whether the combo was taken.
+pub fn start_hotkey_thread(app: AppHandle) {
+    thread::spawn(move || {
+        #[cfg(windows)]
+        {
+            use windows::Win32::UI::Input::KeyboardAndMouse::{RegisterHotKey, UnregisterHotKey, HOT_KEY_MODIFIERS};
+            use windows::Win32::UI::WindowsAndMessaging::{PeekMessageW, MSG, PM_REMOVE, WM_HOTKEY};
+            use tauri::Manager;
+            const ID: i32 = 0xB0DD;
+            // What is registered right now, blank for nothing. Compared against the setting as a
+            // string so a combo that cannot be registered is only complained about once.
+            let mut have = String::new();
+            let mut ticks = 0u32;
+            loop {
+                thread::sleep(Duration::from_millis(25));
+                ticks += 1;
+                if ticks % 8 == 0 {
+                    let want = {
+                        let state = app.state::<crate::settings::SettingsState>();
+                        let s = state.0.lock().unwrap();
+                        if s.talk_hotkey_enabled { s.talk_hotkey.trim().to_string() } else { String::new() }
+                    };
+                    if want != have {
+                        if !have.is_empty() {
+                            // SAFETY: unregistering our own id from the thread that took it.
+                            let _ = unsafe { UnregisterHotKey(None, ID) };
+                        }
+                        have = want.clone();
+                        let status = if want.is_empty() {
+                            None
+                        } else {
+                            Some(match parse_hotkey(&want) {
+                                // SAFETY: a thread-owned hotkey; the thread lives as long as the app.
+                                Ok((m, vk)) => match unsafe { RegisterHotKey(None, ID, HOT_KEY_MODIFIERS(m), vk) } {
+                                    Ok(()) => Ok(()),
+                                    Err(_) => Err(format!("{want} is already taken by another app")),
+                                },
+                                Err(e) => Err(e),
+                            })
+                        };
+                        if let Some(res) = status {
+                            let _ = app.emit(
+                                "talk-hotkey",
+                                serde_json::json!({
+                                    "key": want,
+                                    "ok": res.is_ok(),
+                                    "error": res.err().unwrap_or_default(),
+                                }),
+                            );
+                        }
+                    }
+                }
+                let mut msg = MSG::default();
+                // SAFETY: draining this thread's own queue.
+                while unsafe { PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE) }.as_bool() {
+                    if msg.message == WM_HOTKEY && msg.wParam.0 as i32 == ID {
+                        if let Some(win) = app.get_webview_window("buddy") {
+                            let _ = win.emit("talk", ());
+                        }
+                    }
+                }
+            }
+        }
+        #[cfg(not(windows))]
+        let _ = &app;
+    });
+}

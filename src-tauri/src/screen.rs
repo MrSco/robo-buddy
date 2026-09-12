@@ -574,6 +574,26 @@ pub fn windows_screensaver_status() -> bool {
     }
 }
 
+/// Keep the registered `.scr` in step with the exe. It is a copy, so every update leaves the old
+/// build sitting there as the thing Windows actually launches; refresh it at startup, quietly,
+/// since a `.scr` that is running right now cannot be overwritten and will be caught next time.
+pub fn refresh_scr() {
+    #[cfg(windows)]
+    {
+        if !windows_screensaver_status() {
+            return;
+        }
+        let (Ok(scr), Ok(exe)) = (scr_path(), std::env::current_exe()) else { return };
+        let same = match (std::fs::metadata(&scr), std::fs::metadata(&exe)) {
+            (Ok(a), Ok(b)) => a.len() == b.len() && a.modified().ok() == b.modified().ok(),
+            _ => false,
+        };
+        if !same {
+            let _ = std::fs::copy(&exe, &scr);
+        }
+    }
+}
+
 /// Register Robo Buddy as the Windows screen saver, or put the previous one back. Enabling copies
 /// the running exe to a `.scr` beside it and points the user's screen-saver setting at it,
 /// remembering whatever was there first; Windows then launches us with `/s` on idle, which the
