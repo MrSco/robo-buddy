@@ -14,8 +14,12 @@ export interface Settings {
   musicEnabled: boolean;
   mouseEnabled: boolean;
   physicsEnabled: boolean;
-  musicThreshold: number;
-  requireTempo: boolean;
+  /**
+   * How eagerly he locks onto a beat, 0..1. Low waits for a tempo to hold steady a long while
+   * before he moves; high starts almost at once. Loudness plays no part: a beat is a beat at any
+   * volume, so a quiet track gets him going just as a loud one does.
+   */
+  musicBeatLock: number;
   clickThrough: ClickThroughMode;
   autostart: boolean;
   paused: boolean;
@@ -83,8 +87,7 @@ export const DEFAULT_SETTINGS: Settings = {
   musicEnabled: true,
   mouseEnabled: true,
   physicsEnabled: true,
-  musicThreshold: 0.15,
-  requireTempo: false,
+  musicBeatLock: 0.7,
   clickThrough: "pixel",
   autostart: false,
   paused: false,
@@ -144,4 +147,13 @@ export async function onSettingsChanged(fn: (s: Settings) => void): Promise<void
 /** Lighting for one character: its own value, else the global default. */
 export function lightingFor(settings: Settings, character: string): number {
   return settings.lightingByCharacter?.[character] ?? settings.lighting ?? 1;
+}
+
+/**
+ * The beat-lock slider in seconds: 0 waits eight seconds for a tempo to prove itself, 1 moves
+ * after one. Shared so the settings window and the buddy read the slider the same way.
+ */
+export function beatLockSeconds(lock: number): number {
+  const v = Number.isFinite(lock) ? Math.min(1, Math.max(0, lock)) : 0.7;
+  return 8 - v * 7;
 }

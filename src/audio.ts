@@ -33,24 +33,26 @@ export class Music {
   pulse = 0;
   dancing = false;
   /**
-   * Slow average of the level (about a second) that the dance gate compares with the
-   * threshold. The instantaneous level of real music swings around any threshold every
-   * beat, which kept resetting the "loud for long enough" timer and he never started.
+   * Slow average of the level, about a second. Nothing is decided by it any more; it is kept
+   * because the settings meter and the debug line both show it.
    */
   gateLevel = 0;
   /** While our own voice plays through the speakers, neither start nor stop dancing on it. */
   hold = false;
-  /** When true, dancing also needs a stable tempo estimate. Filters game audio and speech. */
-  requireTempo = false;
+  /**
+   * Seconds a tempo must hold steady before he starts. This, not loudness, is what decides:
+   * a beat is a beat whether the music is loud or barely audible, and quiet tracks used to leave
+   * him standing still. Longer is stricter and keeps him from moving to whatever rhythm happens to
+   * be in background noise.
+   */
+  lockSeconds = 3;
   private stableSince = -1;
   private lastBpmSample = 0;
 
-  private aboveSince = -1;
   private belowSince = -1;
   private lastBeatAt = -1;
   private beatQueued = false;
 
-  constructor(public threshold = 0.15) {}
 
   async start() {
     if (!IN_TAURI) {
@@ -80,29 +82,31 @@ export class Music {
     if (r.bpm > 0) this.bpm = this.bpm === 0 ? r.bpm : this.bpm + (r.bpm - this.bpm) * 0.1;
     if (r.silent) this.bpm = 0;
 
-    // Tempo stability: the raw estimate must stay within 4 bpm for 3 s.
+    // Tempo stability: the raw estimate has to stay within 4 bpm for as long as the lock asks.
     if (r.bpm > 0 && Math.abs(r.bpm - this.lastBpmSample) < 4) {
       if (this.stableSince < 0) this.stableSince = now;
     } else {
       this.stableSince = -1;
     }
     this.lastBpmSample = r.bpm;
-    const tempoOk = !this.requireTempo || (this.stableSince >= 0 && now - this.stableSince > 3);
+    const hasBeat = !r.silent && r.bpm > 0;
+    const locked = hasBeat && this.stableSince >= 0 && now - this.stableSince > this.lockSeconds;
 
-    // Dance state with hysteresis: starts once the average is over the threshold for half a
-    // second, stops only after it sits well under it for two seconds (or on silence).
+    // Kept for the meter and the debug line only; how loud it is no longer decides anything.
     this.gateLevel += (r.level - this.gateLevel) * (1 - Math.exp(-dt * 1.5));
-    const gate = this.dancing ? this.threshold * 0.8 : this.threshold;
+    // Committing to a dance asks for a tempo that has held steady; staying in one only asks that
+    // there is still a beat. Demanding the full lock throughout dropped him mid-song: one estimate
+    // jumping more than 4 bpm resets the stability timer, and waiting out another few seconds of
+    // lock outlasts the stop delay, so he fell back to idling between dances until it re-locked.
+    // He stops once the beat has been gone a couple of seconds, or at once on real silence, so a
+    // gap between tracks does not drop him instantly.
     if (this.hold) {
-      this.aboveSince = -1;
       this.belowSince = -1;
-    } else if (this.gateLevel > gate && !r.silent && tempoOk) {
-      if (this.aboveSince < 0) this.aboveSince = now;
+    } else if (this.dancing ? hasBeat : locked) {
       this.belowSince = -1;
-      if (!this.dancing && now - this.aboveSince > 0.5) this.dancing = true;
+      this.dancing = true;
     } else {
       if (this.belowSince < 0) this.belowSince = now;
-      this.aboveSince = -1;
       if (this.dancing && (now - this.belowSince > 2.0 || r.silent)) this.dancing = false;
     }
 

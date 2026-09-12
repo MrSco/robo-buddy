@@ -23,9 +23,9 @@ pub struct Settings {
     pub mouse_enabled: bool,
     pub physics_enabled: bool,
     /// Level (0..1) a track must exceed before dancing starts.
-    pub music_threshold: f64,
+    /// How eagerly he locks onto a beat, 0..1; loudness no longer gates dancing.
+    pub music_beat_lock: f64,
     /// Only dance once a stable tempo has been estimated. Filters game audio.
-    pub require_tempo: bool,
     /// "pixel" (hit-test the drawn pixels), "window" (whole window clickable), "locked" (never clickable).
     pub click_through: String,
     pub autostart: bool,
@@ -98,8 +98,7 @@ impl Default for Settings {
             music_enabled: true,
             mouse_enabled: true,
             physics_enabled: true,
-            music_threshold: 0.15,
-            require_tempo: false,
+            music_beat_lock: 0.7,
             click_through: "pixel".into(),
             autostart: false,
             paused: false,

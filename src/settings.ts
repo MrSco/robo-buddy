@@ -9,7 +9,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { listen } from "@tauri-apps/api/event";
 import type { AudioFeatures } from "./audio";
 import { effectiveManifest, listLibrary, invalidateLibrary, ROLES, type LibraryClip } from "./library";
-import { getSettings, lightingFor, onSettingsChanged, setSettings, type ClickThroughMode, type Settings } from "./settings-store";
+import { beatLockSeconds, getSettings, lightingFor, onSettingsChanged, setSettings, type ClickThroughMode, type Settings } from "./settings-store";
 import { listPersonalities, loadUserPersonalities, saveUserPersonalities, slugFor, type Personality } from "./personality";
 import { emit, listen as listenEvent } from "@tauri-apps/api/event";
 import { Capture } from "./capture";
@@ -39,10 +39,8 @@ const els = {
   sensitivity: $<HTMLInputElement>("sensitivity"),
   sensOut: $<HTMLOutputElement>("sens-out"),
   meterFill: $<HTMLDivElement>("meter-fill"),
-  meterMark: $<HTMLDivElement>("meter-mark"),
   meterTxt: $<HTMLSpanElement>("meter-txt"),
   meterBpm: $<HTMLSpanElement>("meter-bpm"),
-  tempo: $<HTMLInputElement>("tempo"),
   clickthrough: $<HTMLSelectElement>("clickthrough"),
   autostart: $<HTMLInputElement>("autostart"),
   taskbar: $<HTMLInputElement>("taskbar"),
@@ -421,9 +419,10 @@ async function updatePackDetails() {
   renderIdleSet(m);
 }
 
-// Sensitivity slider maps 0..1 to threshold 0.5..0.03 (higher slider = more sensitive).
-const thresholdFromSlider = (v: number) => 0.5 - v * 0.47;
-const sliderFromThreshold = (t: number) => Math.min(1, Math.max(0, (0.5 - t) / 0.47));
+/** The slider reads as the wait it buys: "after 3.1 s". */
+function beatLockLabel(lock: number): string {
+  return `after ${beatLockSeconds(lock).toFixed(1)} s`;
+}
 
 async function refreshPacks() {
   packs = await listPacks();
@@ -454,9 +453,8 @@ function render() {
   els.mouse.checked = settings.mouseEnabled;
   els.physics.checked = settings.physicsEnabled;
   els.music.checked = settings.musicEnabled;
-  els.sensitivity.value = String(sliderFromThreshold(settings.musicThreshold));
-  els.sensOut.value = `${Math.round(sliderFromThreshold(settings.musicThreshold) * 100)}%`;
-  els.tempo.checked = settings.requireTempo;
+  els.sensitivity.value = String(settings.musicBeatLock);
+  els.sensOut.value = beatLockLabel(settings.musicBeatLock);
   els.chatEnabled.checked = settings.chatEnabled;
   els.talkFields.classList.toggle("off", !settings.chatEnabled);
   els.chatProvider.value = settings.chatProvider;
@@ -524,15 +522,15 @@ function startMeter() {
     last = now;
     silent = e.payload.silent;
     level += (e.payload.level - level) * (1 - Math.exp(-dt * 1.5));
-    const threshold = thresholdFromSlider(Number(els.sensitivity.value));
-    const on = !silent && level > threshold;
+    // Loudness is shown for reference only now; it is the beat that decides.
+    const bpmNow = e.payload.bpm;
+    const on = !silent && bpmNow > 0;
     els.meterFill.style.width = `${Math.round(Math.min(1, level) * 100)}%`;
     els.meterFill.classList.toggle("on", on);
-    els.meterMark.style.left = `${Math.round(threshold * 100)}%`;
-    els.meterTxt.textContent = silent ? "silent" : on ? "dancing" : "too quiet";
+    els.meterTxt.textContent = silent ? "silent" : on ? "beat found" : "no beat";
     // Straight from the analyser rather than the buddy's smoothed copy, so it keeps moving while
     // he is mid-dance and shows the tempo actually being picked out of the audio right now.
-    const bpm = Math.round(e.payload.bpm);
+    const bpm = Math.round(bpmNow);
     els.meterBpm.textContent = bpm > 0 ? `${bpm} bpm` : "— bpm";
   }).catch(() => {
     els.meterTxt.textContent = "";
@@ -1250,10 +1248,9 @@ async function main() {
   els.physics.addEventListener("change", () => commit({ physicsEnabled: els.physics.checked }));
   els.music.addEventListener("change", () => commit({ musicEnabled: els.music.checked }));
   els.sensitivity.addEventListener("input", () => {
-    els.sensOut.value = `${Math.round(Number(els.sensitivity.value) * 100)}%`;
+    els.sensOut.value = beatLockLabel(Number(els.sensitivity.value));
   });
-  els.sensitivity.addEventListener("change", () => commit({ musicThreshold: thresholdFromSlider(Number(els.sensitivity.value)) }));
-  els.tempo.addEventListener("change", () => commit({ requireTempo: els.tempo.checked }));
+  els.sensitivity.addEventListener("change", () => commit({ musicBeatLock: Number(els.sensitivity.value) }));
   els.sounds.addEventListener("change", () => commit({ soundsEnabled: els.sounds.checked }));
   els.bubbles.addEventListener("change", () => commit({ bubblesEnabled: els.bubbles.checked }));
   els.sleep.addEventListener("change", () => commit({ sleepAfterMin: Number(els.sleep.value) }));

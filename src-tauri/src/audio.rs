@@ -220,8 +220,11 @@ impl Analyzer {
         if energy < 1e-6 {
             return;
         }
+        // 70 rather than 60 at the bottom: a beat correlates just as well at half speed, and the
+        // slowest readings were nearly always that rather than a genuinely slow track. Anything
+        // under 70 is reported at double, which is the figure worth dancing to anyway.
         let lag_min = (HOPS_PER_SEC * 60.0 / 180.0) as usize;
-        let lag_max = (HOPS_PER_SEC * 60.0 / 60.0) as usize;
+        let lag_max = (HOPS_PER_SEC * 60.0 / 70.0) as usize;
         let mut best = (0usize, 0.0f32);
         for lag in lag_min..=lag_max {
             let mut r = 0.0;
@@ -229,9 +232,14 @@ impl Analyzer {
                 r += centered[i] * centered[i - lag];
             }
             r /= energy;
-            // Mild preference for the 90-150 bpm range, where most music sits.
+            // Preference for the range most music sits in, measured on a log scale so that an
+            // octave apart is an even distance. Measured linearly, 80 and 160 bpm are both 40
+            // from 120 and score the same, and 85 even beats 170 -- exactly the pairs the
+            // autocorrelation confuses, since a beat also correlates at half speed. Half-time
+            // therefore kept winning on fast tracks and he danced at half the real tempo.
             let bpm = 60.0 * HOPS_PER_SEC / lag as f32;
-            let w = 1.0 - 0.25 * ((bpm - 120.0).abs() / 60.0).min(1.0);
+            let octaves = (bpm / 125.0).ln() / 0.55;
+            let w = (-0.5 * octaves * octaves).exp();
             let score = r * w;
             if score > best.1 {
                 best = (lag, score);

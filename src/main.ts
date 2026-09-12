@@ -20,7 +20,7 @@ import { WindowPhysics } from "./physics";
 import type { FrameInput, Renderer, StateName } from "./renderer";
 import { Renderer2D } from "./renderer2d";
 import { Renderer3D } from "./renderer3d";
-import { DEFAULT_SETTINGS, getSettings, lightingFor, onSettingsChanged, type Settings } from "./settings-store";
+import { DEFAULT_SETTINGS, beatLockSeconds, getSettings, lightingFor, onSettingsChanged, type Settings } from "./settings-store";
 
 const BASE_W = 320;
 const BASE_H = 440;
@@ -339,9 +339,9 @@ async function loadPack(id: string) {
     pack = ref;
     manifest = m;
 
-    // The music analyser lives across packs; only the threshold changes.
+    // The music analyser lives across packs; only the beat lock changes.
     if (!music) {
-      music = new Music(settings.musicThreshold);
+      music = new Music();
       await music.start();
     }
     currentState = "idle";
@@ -436,7 +436,7 @@ function applySettings(s: Settings) {
     physics.opts.throwable = s.physicsEnabled && (phys.throwable ?? true);
     if (physics.opts.gravity && physics.mode === "rest") physics.mode = "falling";
   }
-  if (music) music.threshold = s.musicThreshold;
+  if (music) music.lockSeconds = beatLockSeconds(s.musicBeatLock);
   sounds.enabled = s.soundsEnabled && (!screensaverOn || s.screensaverSounds);
   voice.enabled = s.chatVoice;
   voice.engine = s.ttsEngine === "piper" ? "piper" : "windows";
@@ -866,7 +866,7 @@ function debugTitle(t: number) {
   const title =
     `Robo Buddy | ${p.mode} y=${p.y.toFixed(0)} air=${p.airborne} yaw=${yaw.toFixed(2)} cur=${cursor.x},${cursor.y},${cursor.buttons}` +
     ` | pack=${pack?.id} state=${currentState} grab=${grabPart ?? '-'} talk=${talk.open} talking=${voice.speaking || live.speaking} live=${live.state}/${Math.round(live.seconds)}s/${live.lastReason} keys=${typingRate.toFixed(1)}/${typingAmount.toFixed(2)}/${keyEvents} sup=${physics?.support ?? '-'} surf=${physics?.surfaces.length ?? 0} ss=${screensaverOn ? 1 : 0} nrg=${behavior.energetic ? 1 : 0} climb=${physics?.climbable() ? 'y' : 'n'} chg=${physics?.chargeTarget() ? 'y' : 'n'} hops=${hopCount} pun=${punchCount} barge=${barging ? 1 : 0} snd=${sounds.last} head=${Math.round(p.headPx)} crouch=${Math.round(p.crouchPx)} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
-    (m ? ` | lvl=${m.level.toFixed(2)} gate=${m.gateLevel.toFixed(2)}/${m.threshold.toFixed(2)} bpm=${m.bpm.toFixed(0)} dance=${m.dancing} amt=${danceAmount.toFixed(2)} beats=${m.beats.toFixed(1)}` : "");
+    (m ? ` | lvl=${m.level.toFixed(2)} lvlAvg=${m.gateLevel.toFixed(2)} lock=${m.lockSeconds.toFixed(1)}s bpm=${m.bpm.toFixed(0)} dance=${m.dancing} amt=${danceAmount.toFixed(2)} beats=${m.beats.toFixed(1)}` : "");
   getCurrentWindow().setTitle(title).catch(() => {});
 }
 
@@ -878,7 +878,6 @@ function frame() {
 
   const paused = settings.paused;
   if (music) {
-    music.requireTempo = settings.requireTempo;
     // His own voice through the speakers must not start (or stop) a dance.
     music.hold = voice.busy(1500) || live.speaking;
     music.update(dt, t);

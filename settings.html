@@ -80,16 +80,15 @@
             <div class="group">
               <h2>Music</h2>
               <label class="check" title="He listens to whatever plays through your speakers (nothing is recorded or sent anywhere) and dances when it sounds like music."><input id="music" type="checkbox" /> Dance to music</label>
-              <label class="slider" title="Higher: quieter audio counts as music. Lower: only loud, steady music gets him dancing. Watch the meter below while adjusting.">
-                <span>Music sensitivity <output id="sens-out"></output></span>
+              <label class="slider" title="How quickly he commits to a beat. Higher: he starts moving almost as soon as a tempo appears. Lower: the tempo has to hold steady for several seconds first, which keeps him still through speech, gunfire and other rhythmic noise. Loudness does not come into it: a beat is a beat however quiet the music is.">
+                <span>Beat lock <output id="sens-out"></output></span>
                 <input id="sensitivity" type="range" min="0" max="1" step="0.01" />
               </label>
-              <div class="meter" title="Live music level. He dances while the bar stays past the marker.">
-                <div class="meter-track"><div class="meter-fill" id="meter-fill"></div><div class="meter-mark" id="meter-mark"></div></div>
+              <div class="meter" title="Live music level and the tempo being picked out of it. The level is shown for reference only; it is the beat that decides whether he dances.">
+                <div class="meter-track"><div class="meter-fill" id="meter-fill"></div></div>
                 <span class="meter-txt" id="meter-txt">listening…</span>
                 <span class="meter-txt" id="meter-bpm" title="The tempo being picked out of the audio right now. It keeps tracking while he dances, so it follows the music from one track to the next.">— bpm</span>
               </div>
-              <label class="check" title="Also require a steady beat before dancing. Cuts out gunfire, speech and game audio at the cost of a few seconds' delay."><input id="tempo" type="checkbox" /> Only dance when a steady tempo is detected</label>
               <label class="field inline" title="Which dance he does when music starts. Random picks a different one each time; the built-in groove is procedural and works on every character.">
                 <span>Dance</span>
                 <select id="dance"></select>
@@ -412,8 +411,8 @@
               <h2>If something is off</h2>
               <ul>
                 <li><b>Can't see him:</b> right-click the tray icon and choose <b>Bring buddy here</b>. He hides while a fullscreen app is focused.</li>
-                <li><b>He dances to game audio:</b> lower the sensitivity while watching the meter, or turn on the steady-tempo option.</li>
-                <li><b>He won't dance to music:</b> raise the sensitivity until the meter says "dancing" while a song plays.</li>
+                <li><b>He dances to game audio:</b> lower the beat lock, so a tempo has to hold steady for longer before he believes it.</li>
+                <li><b>He won't dance to music:</b> raise the beat lock, and check the meter is reading a sensible tempo while a song plays.</li>
                 <li><b>Live voice:</b> on the Talk tab, Engine → Live voice needs an OpenAI key. The talk box then opens a real-time voice session: just speak; the mic button mutes. It ends when the box closes or after 45 quiet seconds, and stops for the day at the minutes cap.</li>
                 <li><b>Talk fails:</b> the Test button shows the provider's exact error. Most often it is a wrong key or a model id the provider no longer offers; press ↻ to see the current list.</li>
                 <li><b>Report a glitch:</b> <code>%APPDATA%\com.rocco.robobuddy\buddy.log</code> records odd animation frames with the state they happened in.</li>
