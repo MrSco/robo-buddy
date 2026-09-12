@@ -547,9 +547,13 @@ async function startLive() {
     if (IN_TAURI) invoke("append_log", { line: `live: ${String(err).slice(0, 300)}` }).catch(() => {});
   }
 }
+live.onMicLevel = (level) => talk.updateMicLevel(level);
 live.onUser = (text, final) => {
   talk.touch();
   activity();
+  // While he is hearing you, the bubble shows what came through, so you can see it landed.
+  if (!final && text.trim()) bubble.listen(text.slice(-120), 2);
+  else bubble.stopListening();
   if (final) talk.remember({ who: "you", text });
 };
 live.onHim = (text, final) => {
@@ -565,6 +569,8 @@ live.onTool = async (call) => {
 };
 live.onStatus = (text) => bubble.say([text], 4, clock.elapsedTime, 1);
 live.onClosed = (reason) => {
+  bubble.stopListening();
+  talk.updateMicLevel(0);
   if (reason !== "close_requested") bubble.say([`Live voice ended (${reason}).`], 5, clock.elapsedTime, 1);
   if (talk.open && liveMode()) talk.hide();
 };

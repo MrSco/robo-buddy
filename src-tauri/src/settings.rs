@@ -133,6 +133,7 @@ fn settings_path(app: &AppHandle) -> Option<PathBuf> {
     Some(dir.join("settings.json"))
 }
 
+#[allow(dead_code)]
 pub fn load(app: &AppHandle) -> Settings {
     settings_path(app)
         .and_then(|p| fs::read_to_string(p).ok())

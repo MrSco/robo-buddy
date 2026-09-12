@@ -62,6 +62,17 @@ html, body {
   font-weight: 500;
 }
 
+.bubble.listening {
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1.5px solid #38bdf8;
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.5);
+  animation: pulse-glow 1.5s infinite ease-in-out;
+}
+.bubble.listening::after {
+  border-top-color: #0f172a;
+}
+
 /* Talk strip at his feet. */
 .talk {
   position: absolute;
@@ -81,6 +92,26 @@ html, body {
   pointer-events: auto;
   z-index: 5;
 }
+
+.vu-meter {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 18px;
+  padding: 0 3px;
+}
+.vu-meter .bar {
+  width: 3px;
+  height: 25%;
+  background: #64748b;
+  border-radius: 2px;
+  transition: height 0.05s ease, background-color 0.1s ease;
+}
+.vu-meter.active .bar {
+  background: #38bdf8;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+}
+
 .talk[hidden] {
   display: none;
 }
@@ -170,5 +201,15 @@ html, body {
   to {
     transform: none;
     opacity: 1;
+  }
+}
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+    border-color: #38bdf8;
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.8);
+    border-color: #7dd3fc;
   }
 }

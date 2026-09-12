@@ -25,6 +25,7 @@ export class Bubble {
     let line = lines[Math.floor(Math.random() * lines.length)];
     if (lines.length > 1 && line === this.lastLine) line = lines[(lines.indexOf(line) + 1) % lines.length];
     this.lastLine = line;
+    this.el.classList.remove("listening");
     this.el.textContent = line;
     this.el.classList.toggle("long", line.length > 28);
     this.el.classList.toggle("xl", line.length > 120);
@@ -49,6 +50,24 @@ export class Bubble {
   /** Hide only if what is showing has this priority (closing the talk strip drops the reply). */
   hideIf(priority: number) {
     if (this.priority === priority) this.hide();
+  }
+
+  /** Enter or update listening state with interim text and high priority. */
+  listen(text = "Listening…", priority = 10) {
+    this.priority = priority;
+    this.el.textContent = `🎤 ${text}`;
+    this.el.classList.add("listening");
+    this.el.classList.toggle("long", text.length > 28);
+    this.el.classList.toggle("xl", text.length > 120);
+    this.el.hidden = false;
+    this.hideAt = Infinity;
+  }
+
+  /** Leave the listening state; a reply that already replaced it is left alone. */
+  stopListening() {
+    if (!this.el.classList.contains("listening")) return;
+    this.el.classList.remove("listening");
+    this.hide();
   }
 
   /** Reposition each frame; (x, y) is the top of the head in CSS pixels. */

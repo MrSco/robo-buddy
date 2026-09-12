@@ -39,6 +39,7 @@ export class LiveVoice {
   onTool?: (call: ToolCall) => Promise<string>;
   onStatus?: (text: string) => void;
   onClosed?: (reason: string) => void;
+  onMicLevel?: (level: number) => void;
 
   private pc: RTCPeerConnection | null = null;
   private dc: RTCDataChannel | null = null;
@@ -46,6 +47,8 @@ export class LiveVoice {
   private audio: HTMLAudioElement;
   private ctx: AudioContext | null = null;
   private analyser: AnalyserNode | null = null;
+  private micAnalyser: AnalyserNode | null = null;
+  private micLevelTimer = 0;
   private levelTimer = 0;
   private lastLoud = -Infinity;
   private userText = "";
@@ -85,6 +88,7 @@ export class LiveVoice {
     this.startedAt = 0;
     try {
       this.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      this.watchMic(this.mic);
       const pc = new RTCPeerConnection();
       this.pc = pc;
       pc.ontrack = (e) => {
@@ -271,6 +275,33 @@ export class LiveVoice {
     }
   }
 
+  private watchMic(stream: MediaStream) {
+    try {
+      this.ctx ??= new AudioContext();
+      const src = this.ctx.createMediaStreamSource(stream);
+      const an = this.ctx.createAnalyser();
+      an.fftSize = 512;
+      src.connect(an);
+      this.micAnalyser = an;
+      const buf = new Uint8Array(an.fftSize);
+      clearInterval(this.micLevelTimer);
+      this.micLevelTimer = window.setInterval(() => {
+        if (!this.micAnalyser) return;
+        this.micAnalyser.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const v = (buf[i] - 128) / 128;
+          sum += v * v;
+        }
+        const rms = Math.sqrt(sum / buf.length);
+        const level = Math.min(1, rms * 4);
+        this.onMicLevel?.(level);
+      }, 50);
+    } catch {
+      // Audio level meter fallback
+    }
+  }
+
   private finish(reason: string) {
     if (this.state === "off") return;
     const secs = this.seconds;
@@ -287,7 +318,10 @@ export class LiveVoice {
     clearTimeout(this.userTimer);
     clearTimeout(this.himTimer);
     clearInterval(this.levelTimer);
+    clearInterval(this.micLevelTimer);
     this.analyser = null;
+    this.micAnalyser = null;
+    this.onMicLevel?.(0);
     try {
       this.dc?.close();
     } catch {

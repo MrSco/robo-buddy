@@ -127,3 +127,14 @@ export class Music {
     this.pulse *= Math.exp(-dt * 8);
   }
 }
+
+let sharedAudioContext: AudioContext | null = null;
+export function getSharedAudioContext(): AudioContext {
+  if (!sharedAudioContext || sharedAudioContext.state === "closed") {
+    sharedAudioContext = new AudioContext();
+  }
+  if (sharedAudioContext.state === "suspended") {
+    void sharedAudioContext.resume().catch(() => {});
+  }
+  return sharedAudioContext;
+}

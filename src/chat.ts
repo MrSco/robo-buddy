@@ -253,7 +253,10 @@ export class TalkBox {
   private send: HTMLButtonElement;
   private logBtn: HTMLButtonElement;
   private logEl: HTMLDivElement;
+  private vuMeter: HTMLDivElement;
   private recorder: MediaRecorder | null = null;
+  private sttCtx: AudioContext | null = null;
+  private sttTimer = 0;
   private chunks: BlobPart[] = [];
   private stream: MediaStream | null = null;
   private idleTimer = 0;
@@ -276,6 +279,13 @@ export class TalkBox {
     this.mic.type = "button";
     this.mic.textContent = "🎤";
     this.mic.title = "Click to talk, click again when done";
+    this.vuMeter = document.createElement("div");
+    this.vuMeter.className = "vu-meter";
+    for (let i = 0; i < 4; i++) {
+      const bar = document.createElement("span");
+      bar.className = "bar";
+      this.vuMeter.appendChild(bar);
+    }
     this.input = document.createElement("input");
     this.input.type = "text";
     this.input.placeholder = "Say something… (Esc closes)";
@@ -292,7 +302,7 @@ export class TalkBox {
     close.type = "button";
     close.textContent = "✕";
     close.title = "Close";
-    this.el.append(this.mic, this.input, this.send, this.logBtn, close);
+    this.el.append(this.mic, this.vuMeter, this.input, this.send, this.logBtn, close);
     this.logEl = document.createElement("div");
     this.logEl.className = "talk-log";
     this.logEl.hidden = true;
@@ -349,6 +359,7 @@ export class TalkBox {
     this.el.hidden = false;
     this.open = true;
     this.mic.hidden = !this.micEnabled;
+    this.vuMeter.hidden = !this.micEnabled;
     if (this.onMicToggle) {
       this.mic.textContent = "🎤";
       this.mic.title = "Listening; click to mute";
@@ -429,6 +440,21 @@ export class TalkBox {
     this.send.disabled = b;
   }
 
+  updateMicLevel(level: number) {
+    const bars = Array.from(this.vuMeter.children) as HTMLElement[];
+    if (level <= 0.01) {
+      this.vuMeter.classList.remove("active");
+      for (const bar of bars) bar.style.height = "20%";
+      return;
+    }
+    this.vuMeter.classList.add("active");
+    bars.forEach((bar, i) => {
+      const mult = i % 2 === 0 ? 1.0 : 0.65;
+      const h = Math.min(100, Math.max(15, Math.round(level * 100 * mult)));
+      bar.style.height = `${h}%`;
+    });
+  }
+
   private async toggleRecording() {
     this.touch();
     if (this.recorder) {
@@ -452,6 +478,29 @@ export class TalkBox {
     this.recorder = rec;
     this.mic.classList.add("rec");
     this.input.placeholder = "Listening… click the mic again when done";
+
+    try {
+      this.sttCtx = new AudioContext();
+      const src = this.sttCtx.createMediaStreamSource(this.stream);
+      const an = this.sttCtx.createAnalyser();
+      an.fftSize = 256;
+      src.connect(an);
+      const buf = new Uint8Array(an.fftSize);
+      clearInterval(this.sttTimer);
+      this.sttTimer = window.setInterval(() => {
+        an.getByteTimeDomainData(buf);
+        let sum = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const v = (buf[i] - 128) / 128;
+          sum += v * v;
+        }
+        const rms = Math.sqrt(sum / buf.length);
+        this.updateMicLevel(Math.min(1, rms * 4));
+      }, 50);
+    } catch {
+      // Audio level fallback
+    }
+
     // Nobody talks for more than half a minute to a desk toy.
     setTimeout(() => {
       if (this.recorder === rec) this.stopRecording(false);
@@ -460,6 +509,14 @@ export class TalkBox {
 
   private stopRecording(discard: boolean) {
     const rec = this.recorder;
+    clearInterval(this.sttTimer);
+    try {
+      this.sttCtx?.close();
+    } catch {
+      // closed
+    }
+    this.sttCtx = null;
+    this.updateMicLevel(0);
     if (!rec) return;
     this.recorder = null;
     this.mic.classList.remove("rec");
