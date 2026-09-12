@@ -215,6 +215,16 @@ pub struct Sprite {
 #[derive(Default)]
 pub struct Shot(pub std::sync::Mutex<Vec<MonitorShot>>);
 
+#[derive(Default)]
+pub struct PageReadiness(pub std::sync::Mutex<(u64, std::collections::BTreeSet<usize>)>);
+
+#[tauri::command]
+pub fn screensaver_page_ready(app: tauri::AppHandle, index: usize) {
+    use tauri::Manager;
+    if let Ok(mut state) = app.state::<PageReadiness>().0.lock() { state.1.insert(index); }
+    crate::chat::append_log(app, format!("screensaver: page {index} ready"));
+}
+
 /// The screensaver playing behind ours, when one was chosen.
 #[derive(Default)]
 pub struct Backdrop(pub std::sync::Mutex<Option<std::process::Child>>);
@@ -436,6 +446,26 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
         app.clone(),
         format!("screensaver: {} windows, {} per screen", windows.len(), shots.iter().map(|s| s.sprites.len().to_string()).collect::<Vec<_>>().join("/")),
     );
+    let generation = {
+        let state = app.state::<PageReadiness>();
+        let mut ready = state.0.lock().map_err(|e| e.to_string())?;
+        ready.0 += 1;
+        ready.1.clear();
+        ready.0
+    };
+    let expected = shots.len();
+    let watchdog = app.clone();
+    std::thread::spawn(move || {
+        for _ in 0..150 {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            let state = watchdog.state::<PageReadiness>();
+            if let Ok(ready) = state.0.lock() {
+                if ready.0 != generation || ready.1.len() >= expected { return; }
+            };
+        }
+        crate::chat::append_log(watchdog.clone(), "screensaver: startup timed out; removing all layers".into());
+        let _ = screensaver_stop(watchdog);
+    });
     // Now the desktop is safely photographed, the one playing underneath can start. Ours are
     // built after it and are topmost too, so they sit over it; the last one raised wins.
     let backdrop_running = if chosen.is_empty() { false } else { start_backdrop(&app, &chosen) };
@@ -470,10 +500,14 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
             Ok(w) => w,
             // Never leave the one underneath playing with nothing over it.
             Err(e) => {
-                stop_backdrop(&app);
+                let _ = screensaver_stop(app.clone());
                 return Err(e.to_string());
             }
         };
+        if app.state::<PageReadiness>().0.lock().map_err(|e| e.to_string())?.0 != generation {
+            let _ = win.destroy();
+            return Err("screensaver startup was cancelled".into());
+        }
         // Physical pixels: a monitor left of or above the primary one has a negative origin,
         // and logical coordinates on the builder do not land there.
         let _ = win.set_position(tauri::PhysicalPosition::new(shot.x, shot.y));
@@ -489,6 +523,9 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn screensaver_stop(app: tauri::AppHandle) -> Result<(), String> {
     use tauri::{Emitter, Manager};
+    // Stop the external renderer even if a WebView is stuck during construction/destruction.
+    stop_backdrop(&app);
+    if let Ok(mut ready) = app.state::<PageReadiness>().0.lock() { ready.0 += 1; ready.1.clear(); }
     for i in 0..16 {
         if let Some(win) = app.get_webview_window(&format!("screensaver-{i}")) {
             // destroy, not close: a close is a polite request that something can refuse or
@@ -548,11 +585,40 @@ fn is_our_scr(path: &str, scr: &std::path::Path) -> bool {
     if path.trim().is_empty() {
         return false;
     }
-    std::path::Path::new(path)
-        .file_name()
-        .zip(scr.file_name())
-        .map(|(a, b)| a.eq_ignore_ascii_case(b))
-        .unwrap_or(false)
+    let candidate = std::path::Path::new(path.trim().trim_matches('"'));
+    // Windows' control panel writes DOS short paths (ROBO-B~1.SCR). Resolve the file
+    // identity before comparing names or we back up ourselves as the "previous" saver.
+    if let (Ok(a), Ok(b)) = (std::fs::canonicalize(candidate), std::fs::canonicalize(scr)) {
+        if a.as_os_str().eq_ignore_ascii_case(b.as_os_str()) { return true; }
+    }
+    candidate.file_name().zip(scr.file_name())
+        .map(|(a, b)| a.eq_ignore_ascii_case(b)).unwrap_or(false)
+}
+
+#[cfg(all(test, windows))]
+mod registration_tests {
+    use super::is_our_scr;
+    use std::os::windows::ffi::OsStrExt;
+
+    #[test]
+    fn recognises_windows_short_paths_and_quoted_paths() {
+        #[link(name = "kernel32")]
+        extern "system" { fn GetShortPathNameW(long: *const u16, short: *mut u16, size: u32) -> u32; }
+        let dir = std::env::temp_dir().join(format!("robo buddy saver test {}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let scr = dir.join("robo-buddy.scr");
+        std::fs::write(&scr, b"test").unwrap();
+        let long: Vec<u16> = scr.as_os_str().encode_wide().chain(Some(0)).collect();
+        let mut short = [0u16; 1024];
+        let length = unsafe { GetShortPathNameW(long.as_ptr(), short.as_mut_ptr(), short.len() as u32) };
+        assert!(length > 0 && length < short.len() as u32);
+        let alias = String::from_utf16_lossy(&short[..length as usize]);
+        assert!(is_our_scr(&alias, &scr));
+        assert!(is_our_scr(&format!("\"{alias}\""), &scr));
+        assert!(!is_our_scr("glmatrix.scr", &scr));
+        std::fs::remove_file(scr).unwrap();
+        std::fs::remove_dir(dir).unwrap();
+    }
 }
 
 /// True when Robo Buddy is the user's current Windows screen saver.
@@ -631,7 +697,14 @@ pub fn set_windows_screensaver(enable: bool) -> Result<String, String> {
             apply_screensaver_active(true);
             Ok("Robo Buddy is now your Windows screen saver.".into())
         } else {
+            let cur: String = desktop.get_value("SCRNSAVE.EXE").unwrap_or_default();
+            if !is_our_scr(&cur, &scr) {
+                return Ok("Your current Windows screen saver was left unchanged.".into());
+            }
             let prev: String = desktop.get_value(PREV_SAVER).unwrap_or_default();
+            if is_our_scr(&prev, &scr) {
+                return Err("The saved previous screen saver points to Robo Buddy itself. Choose your previous saver in Windows settings.".into());
+            }
             desktop.set_value("SCRNSAVE.EXE", &prev).map_err(|e| e.to_string())?;
             let _ = desktop.delete_value(PREV_SAVER);
             apply_screensaver_active(!prev.trim().is_empty());

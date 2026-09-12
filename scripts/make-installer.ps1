@@ -4,7 +4,9 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
+$env:ROBO_BUILD_STRICT = '1'
 pnpm tauri build
+if ($LASTEXITCODE -ne 0) { throw 'Build failed; no installer was copied.' }
 $version = (Get-Content "$root\src-tauri\tauri.conf.json" | ConvertFrom-Json).version
 # dist\ is Vite's frontend output; installers go to release\.
 New-Item -ItemType Directory -Force "$root\release" | Out-Null

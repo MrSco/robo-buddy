@@ -12,6 +12,7 @@ mod input;
 mod piper;
 mod packs;
 mod screen;
+mod saver_launch;
 mod settings;
 
 /// The tab the settings window should open on, left here until the page asks for it.
@@ -124,6 +125,13 @@ fn context_menu(app: tauri::AppHandle) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Do this before Tauri/single-instance/WebView2 initialization: Windows may launch
+    // /s on a different desktop, where the resident's hidden message window is invisible.
+    #[cfg(windows)]
+    if matches!(screensaver_arg(&std::env::args().collect::<Vec<_>>()), Some(ScreensaverArg::Show)) {
+        if let Err(e) = saver_launch::relay() { eprintln!("screensaver launch: {e}"); }
+        return;
+    }
     let context = tauri::generate_context!();
     let initial = settings::load_early(&context.config().identifier);
     tauri::Builder::default()
@@ -132,7 +140,8 @@ pub fn run() {
             // because the buddy is already running. Anything else just summons him.
             match screensaver_arg(&args) {
                 Some(ScreensaverArg::Show) => {
-                    let _ = screen::screensaver_start(app.clone());
+                    let handle = app.clone();
+                    std::thread::spawn(move || { let _ = screen::screensaver_start(handle); });
                 }
                 // Windows' Screen Saver dialog sends /c for its Settings button, and every
                 // screensaver setting of ours lives on the Window tab.
@@ -156,6 +165,7 @@ pub fn run() {
         ))
         .manage(PendingTab::default())
         .manage(screen::Shot::default())
+        .manage(screen::PageReadiness::default())
         .manage(screen::Cycle::default())
         .manage(screen::Standable::default())
         .manage(screen::Backdrop::default())
@@ -223,6 +233,8 @@ pub fn run() {
             input::start_key_thread(app.handle().clone());
             input::start_hotkey_thread(app.handle().clone());
             screen::refresh_scr();
+            #[cfg(windows)]
+            saver_launch::listen(app.handle().clone());
             audio::start_audio_thread(app.handle().clone());
             Ok(())
         })
@@ -275,6 +287,7 @@ pub fn run() {
             screen::buddy_rect,
             screen::buddy_punch,
             screen::buddy_barge,
+            screen::screensaver_page_ready,
             screen::screensaver_start,
             screen::screensaver_stop,
             screen::screensaver_surfaces,

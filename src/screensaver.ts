@@ -185,6 +185,7 @@ async function start() {
   loading.hidden = true;
   resize();
   requestAnimationFrame(frame);
+  await invoke("screensaver_page_ready", { index: screenIndex });
   void pollBuddy();
 }
 
@@ -815,4 +816,5 @@ void start().catch((err) => {
   log(`failed: ${String(err).slice(0, 200)}`);
   loading.hidden = false;
   loading.textContent = `Screensaver: ${String(err).slice(0, 120)}`;
+  end();
 });
