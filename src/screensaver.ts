@@ -27,10 +27,14 @@ interface MonitorShot {
   height: number;
   png: string;
   sprites: SpriteRect[];
+  /** Another screensaver is playing underneath; leave the holes see-through. */
+  seeThrough: boolean;
 }
 
 /** One piece of the desktop he can push about. */
 interface Sprite {
+  /** Stable for the life of the screensaver; his physics tracks what he stands on by it. */
+  id: number;
   img: ImageBitmap;
   /** Where it was cut from, so the hole it leaves can be drawn. */
   homeX: number;
@@ -53,7 +57,7 @@ const FRICTION = 2.4;
 const SETTLE = 28; // px/s
 
 const canvas = document.getElementById("stage") as HTMLCanvasElement;
-const ctx = canvas.getContext("2d", { alpha: false })!;
+const ctx = canvas.getContext("2d", { alpha: true })!;
 const loading = document.getElementById("loading") as HTMLParagraphElement;
 
 let sprites: Sprite[] = [];
@@ -75,6 +79,16 @@ let buddy: { x: number; y: number; w: number; h: number } | null = null;
 /** How fast he is travelling, px/s, from one poll to the next. It is his speed that shoves. */
 let buddyVx = 0;
 let buddyVy = 0;
+/**
+ * The piece he has hold of, if any: hanging from its top edge, pulling himself up onto it, or
+ * standing on it. Its new position is reported to him every tick while he does, and his own
+ * speed never shoves it out from under him.
+ */
+let held: Sprite | null = null;
+/** He is running at a window to shove it. Only then does his speed move anything. */
+let barging = false;
+/** The punch count this page has already acted on, so one punch lands once here. */
+let lastPunchSeq = 0;
 let lastBuddy: { x: number; y: number; t: number } | null = null;
 
 const log = (m: string) => void invoke("append_log", { line: `screensaver: ${m}` }).catch(() => {});
@@ -86,6 +100,12 @@ async function start() {
   // The window is labelled "screensaver-<n>", one per monitor.
   screenIndex = Number(/(\d+)$/.exec(getCurrentWindow().label)?.[1] ?? 0);
   screen = await invoke<MonitorShot>("capture_desktop", { index: screenIndex });
+  // The page's own black would sit in front of anything playing underneath, so it is dropped
+  // when there is something to see. The canvas paints the black itself otherwise.
+  if (screen.seeThrough) {
+    document.documentElement.style.background = "transparent";
+    document.body.style.background = "transparent";
+  }
   const full = await createImageBitmap(await (await fetch(`data:image/png;base64,${screen.png}`)).blob());
   // Punch the windows out of the desktop picture once, here, rather than every frame.
   const holes = document.createElement("canvas");
@@ -102,6 +122,7 @@ async function start() {
   for (const r of screen.sprites.slice().reverse()) {
     const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${r.png}`)).blob());
     sprites.push({
+      id: sprites.length,
       img,
       homeX: r.x,
       homeY: r.y,
@@ -134,7 +155,8 @@ async function pollBuddy() {
   let tick = 0;
   while (!ended) {
     try {
-      const r = await invoke<{ x: number; y: number; width: number; height: number } | null>("buddy_rect");
+      const r = await invoke<{ x: number; y: number; width: number; height: number; punch: number; punchSeq: number; barging: boolean } | null>("buddy_rect");
+      barging = r?.barging ?? false;
       // His window is in virtual-screen pixels; this page draws one monitor.
       buddy = r && screen ? { x: r.x - screen.x, y: r.y - screen.y, w: r.width, h: r.height } : null;
       if (buddy) {
@@ -146,6 +168,12 @@ async function pollBuddy() {
           buddyVy = buddyVy * 0.5 + ((buddy.y - lastBuddy.y) / dt) * 0.5;
         }
         lastBuddy = { x: buddy.x, y: buddy.y, t: now };
+        // He hit something. Every monitor's page sees the same count, so each acts on it once;
+        // the pages he is not standing on find nothing in front of his fist and do nothing.
+        if (r && r.punchSeq !== lastPunchSeq) {
+          lastPunchSeq = r.punchSeq;
+          if (r.punch) punched(r.punch);
+        }
       } else {
         lastBuddy = null;
         buddyVx = 0;
@@ -154,9 +182,10 @@ async function pollBuddy() {
     } catch {
       buddy = null;
     }
-    // Every few ticks, tell him where the pieces are so he climbs and stands on what is
-    // actually drawn rather than on the real windows hidden behind the backdrop.
-    if (screen && ++tick % 3 === 0) sendSurfaces();
+    // Tell him where the pieces are, so he climbs and stands on what is actually drawn rather
+    // than on the real windows hidden behind the backdrop. While he has hold of one it is
+    // moving under him, so he needs telling every tick rather than every third.
+    if (screen && (held || ++tick % 3 === 0)) sendSurfaces();
     await new Promise((done) => setTimeout(done, 50));
   }
 }
@@ -170,8 +199,11 @@ function sendSurfaces() {
   const list = sprites
     .filter((s) => s.asleep)
     .reverse()
-    .map((s, i) => ({
-      hwnd: 900000 + i,
+    .map((s) => ({
+      // Its own id, not its place in this list: pieces drop out of the list the moment they are
+      // knocked loose, and every screen used to number from the same base, so two pieces on two
+      // monitors shared an identity and whatever he was standing on changed name under him.
+      hwnd: 900000 + screenIndex * 1000 + s.id,
       left: Math.round(screen!.x + s.x),
       top: Math.round(screen!.y + s.y),
       right: Math.round(screen!.x + s.x + s.w),
@@ -182,14 +214,71 @@ function sendSurfaces() {
 
 /** Below this he is loitering, not charging, and nothing should budge. */
 const SHOVE_SPEED = 140; // px/s
+/**
+ * How fast a window sinks under his weight while he hangs off it, px/s. He is told where the
+ * pieces are twenty times a second, so a faster sink than this would slide out of the reach of
+ * the grip test below before he had heard about it.
+ */
+const DRAG_SPEED = 620;
+/** How near his hands or feet have to be to a top edge to take hold of it, px. */
+const GRIP = 70;
+/**
+ * A window's top edge has to be at least this far down the screen, as a fraction of his height,
+ * before standing on it keeps his head on screen. Every window on a normal desktop sits higher
+ * than that, which is why he used to reach the top of one and immediately bump his head: he is
+ * 660px tall and a title bar 200px down the screen leaves him nowhere to be. So his weight
+ * drags the window down until there is room, and then he climbs on. At 0.82 the fit works out
+ * for any character, however little of his window sits above his head, within the duck his
+ * physics allows him.
+ */
+const STAND_RATIO = 0.82;
 
 /**
- * It is his speed that shoves things, not merely touching them. Standing inside a maximised
- * window does nothing, which is why everything used to take off the instant the screensaver
- * appeared; running into one sends it flying. A landing from above stamps it downward.
+ * The piece he has hold of now, if any. He takes hold when his hands or his feet are at a
+ * resting piece's top edge (a grab, a landing), and keeps hold for as long as that edge stays
+ * anywhere between his hands and his feet: a pull-up moves the edge from one to the other, and
+ * letting go halfway through it would leave the window stuck above where he can stand.
+ */
+function gripped(): Sprite | null {
+  if (!buddy) return null;
+  const cx = buddy.x + buddy.w / 2;
+  const handY = buddy.y + buddy.h * 0.07;
+  const feetY = buddy.y + buddy.h;
+  const under = (s: Sprite) => s.asleep && cx >= s.x - 20 && cx <= s.x + s.w + 20;
+  if (held && under(held) && held.y >= handY - GRIP && held.y <= feetY + GRIP) return held;
+  // Front-most first: `sprites` is stored back to front for drawing, and he gets hold of the
+  // one on top, the same one his own physics picked out of the surface list.
+  for (let i = sprites.length - 1; i >= 0; i--) {
+    const s = sprites[i];
+    if (!under(s)) continue;
+    if (Math.abs(handY - s.y) < GRIP || Math.abs(feetY - s.y) < GRIP) return s;
+  }
+  return null;
+}
+
+/** His weight pulls the window he is hanging from down, until he has room to stand on it. */
+function dragUnder(s: Sprite, dt: number) {
+  if (!buddy || !screen) return;
+  const want = buddy.h * STAND_RATIO;
+  if (s.y >= want) return;
+  // Something has to stay on screen, or a very tall window would slide away entirely.
+  const lowest = screen.height - s.h * 0.35;
+  const to = Math.min(want, lowest);
+  if (s.y >= to) return;
+  s.y = Math.min(to, s.y + DRAG_SPEED * dt);
+  s.angle = 0;
+}
+
+/**
+ * It is his speed that shoves things, not merely touching them, and only when he means it: a
+ * barge, which he announces. Standing inside a maximised window does nothing, which is why
+ * everything used to take off the instant the screensaver appeared. Walking through one or
+ * jumping at one does nothing either, and that matters more than it sounds: before the barge
+ * was announced, every stroll and every leap at a window knocked it loose, and a loose window
+ * is not something he can stand on, so he never got on top of anything.
  */
 function shove(s: Sprite, dt: number) {
-  if (!buddy) return;
+  if (!buddy || !barging) return;
   // His middle, where the shoving happens; the rest of his window is mostly empty air.
   const bx = buddy.x + buddy.w * 0.34;
   const bw = buddy.w * 0.32;
@@ -209,24 +298,67 @@ function shove(s: Sprite, dt: number) {
   s.asleep = false;
 }
 
+/**
+ * He has thrown a punch, facing `dir`. Whatever is in front of his fist goes flying: far harder
+ * than a shoulder-barge, because a punch is meant to be the big one.
+ */
+function punched(dir: number) {
+  if (!buddy) return;
+  const fistX = buddy.x + buddy.w / 2 + dir * buddy.w * 0.3;
+  const fistY = buddy.y + buddy.h * 0.45;
+  let hit: Sprite | null = null;
+  let nearest = Infinity;
+  // Front-most first, so the one he can actually see takes the hit.
+  for (let i = sprites.length - 1; i >= 0; i--) {
+    const s = sprites[i];
+    if (fistY < s.y || fistY > s.y + s.h) continue;
+    // It has to be in front of his fist. Without this, one behind him reads as touching it and
+    // flies off in the direction he is facing, which is not where he is looking.
+    const ahead = dir > 0 ? s.x + s.w > fistX : s.x < fistX;
+    if (!ahead) continue;
+    // A little reach past the fist, so he does not have to be touching it exactly.
+    const gap = Math.max(0, dir > 0 ? s.x - fistX : fistX - (s.x + s.w));
+    if (gap > 90) continue;
+    if (gap < nearest) {
+      nearest = gap;
+      hit = s;
+    }
+  }
+  if (!hit) return;
+  hit.vx += dir * 1500;
+  hit.vy -= 520;
+  hit.spin += dir * 3.2;
+  hit.asleep = false;
+}
+
 let last = performance.now();
 function frame(now: number) {
   if (ended) return;
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
 
+  held = gripped();
+
   if (screen) {
     const scale = canvas.width / screen.width;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    // Black underneath, so a hole with nothing in it reads as empty rather than as wallpaper.
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // With something playing underneath the holes stay see-through; otherwise they are black,
+    // so an emptied hole reads as empty rather than as wallpaper.
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!screen.seeThrough) {
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
     // The desktop, minus the windows: wallpaper and icons stay, their windows are holes.
     if (backdrop) ctx.drawImage(backdrop, 0, 0, canvas.width, canvas.height);
 
     const floor = screen.height;
     for (const s of sprites) {
-      if (!s.asleep) {
+      if (s === held) {
+        // He is holding this one. Shoving it would fling it out from under him at the very
+        // moment he grabbed it, which is what used to happen on every charge.
+        dragUnder(s, dt);
+      } else if (!s.asleep) {
         shove(s, dt);
         s.vy += GRAVITY * dt;
         s.x += s.vx * dt;
@@ -249,13 +381,16 @@ function frame(now: number) {
             }
           }
         }
-        // Each screen is its own playpen, so nothing slides off onto a neighbour.
-        if (s.x < -s.w * 0.5) {
-          s.x = -s.w * 0.5;
+        // Each screen is its own playpen, so nothing slides off onto a neighbour. Most of a
+        // piece stays on screen: shoved half off, what is left is too narrow to be worth
+        // climbing, and he would rather have something to get on top of.
+        const OFF = 0.22;
+        if (s.x < -s.w * OFF) {
+          s.x = -s.w * OFF;
           s.vx = Math.abs(s.vx) * 0.4;
         }
-        if (s.x > screen.width - s.w * 0.5) {
-          s.x = screen.width - s.w * 0.5;
+        if (s.x > screen.width - s.w * (1 - OFF)) {
+          s.x = screen.width - s.w * (1 - OFF);
           s.vx = -Math.abs(s.vx) * 0.4;
         }
       } else {
@@ -278,7 +413,15 @@ function frame(now: number) {
 function end() {
   if (ended) return;
   ended = true;
-  invoke("screensaver_stop").catch(() => {});
+  // Keep asking until this page goes away with the window. These cover every screen and hide
+  // the cursor, so an unheard request to stop looks exactly like a hung machine, and no one
+  // else is coming along to take them down.
+  let tries = 0;
+  const ask = () => {
+    invoke("screensaver_stop").catch(() => {});
+    if (++tries < 6) setTimeout(ask, 1200);
+  };
+  ask();
 }
 
 let startedAt = performance.now();

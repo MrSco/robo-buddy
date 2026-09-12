@@ -24,6 +24,11 @@ export interface Settings {
   soundsEnabled: boolean;
   /** Sound effects during the screensaver. Off by default: a sleeping room should stay quiet. */
   screensaverSounds: boolean;
+  /**
+   * A .scr to run behind the screensaver, so knocking a window away reveals it playing rather
+   * than plain black. Blank for black.
+   */
+  screensaverBackdrop: string;
   bubblesEnabled: boolean;
   /** Wander along the floor when idle. */
   wanderEnabled: boolean;
@@ -83,6 +88,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sleepAfterMin: 5,
   soundsEnabled: true,
   screensaverSounds: false,
+  screensaverBackdrop: "",
   bubblesEnabled: true,
   wanderEnabled: true,
   danceMode: "random",

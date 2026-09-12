@@ -155,6 +155,8 @@ pub fn run() {
         .manage(PendingTab::default())
         .manage(screen::Shot::default())
         .manage(screen::Standable::default())
+        .manage(screen::Backdrop::default())
+        .manage(screen::Punch::default())
         .setup(move |app| {
             // Launched as a screensaver with nothing else running: go straight into it.
             if let Some(ScreensaverArg::Show) = screensaver_arg(&std::env::args().collect::<Vec<_>>()) {
@@ -182,13 +184,10 @@ pub fn run() {
                 .show_menu_on_left_click(true)
                 .on_menu_event(move |app, event| match event.id.as_ref() {
                     "capture" => show_settings_on(app, Some("capture")),
-            "screensaver" => {
-                let _ = screen::screensaver_start(app.clone());
-            }
                     "screensaver" => {
                         let _ = screen::screensaver_start(app.clone());
                     }
-            "bring" => input::bring_here(app.clone()),
+                    "bring" => input::bring_here(app.clone()),
                     "settings" => show_settings(app),
                     "pause" => {
                         let checked = pause_item.is_checked().unwrap_or(false);
@@ -264,6 +263,8 @@ pub fn run() {
             open_settings,
             screen::capture_desktop,
             screen::buddy_rect,
+            screen::buddy_punch,
+            screen::buddy_barge,
             screen::screensaver_start,
             screen::screensaver_stop,
             screen::screensaver_surfaces,

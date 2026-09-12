@@ -71,14 +71,44 @@ pub fn work_area(x: i32, y: i32) -> WorkArea {
     WorkArea { left: 0, top: 0, right: 1920, bottom: 1040, monitor_bottom: 1080 }
 }
 
+/// True while our screensaver covers the screens.
+fn screensaver_up(app: &AppHandle) -> bool {
+    use tauri::Manager;
+    app.get_webview_window("screensaver-0").is_some()
+}
+
+/// A moment's grace after the screensaver goes up, so the click or key that started it does
+/// not also end it.
+const SAVER_GRACE: Duration = Duration::from_millis(800);
+
 pub fn start_cursor_thread(app: AppHandle) {
     thread::spawn(move || {
         let mut last: Option<CursorState> = None;
+        // Where the cursor was when the screensaver went up, and when. The screensaver ends on
+        // any input, whichever window it lands on: the pages only hear what reaches them, and a
+        // pointer parked over the buddy, or the keys held by some other window, would otherwise
+        // leave them covering every screen with the cursor hidden. This thread sees it all.
+        let mut saver: Option<(i32, i32, std::time::Instant)> = None;
+        let mut tick = 0u32;
         loop {
             if let Some(cur) = read_cursor() {
                 if last != Some(cur) {
                     let _ = app.emit("cursor", cur);
                     last = Some(cur);
+                }
+                tick = tick.wrapping_add(1);
+                if tick % 8 == 0 {
+                    if !screensaver_up(&app) {
+                        saver = None;
+                    } else if let Some((ax, ay, since)) = saver {
+                        let moved = (cur.x - ax).abs() > 12 || (cur.y - ay).abs() > 12;
+                        if since.elapsed() > SAVER_GRACE && (moved || cur.buttons != 0) {
+                            let _ = crate::screen::screensaver_stop(app.clone());
+                            saver = None;
+                        }
+                    } else {
+                        saver = Some((cur.x, cur.y, std::time::Instant::now()));
+                    }
                 }
             }
             thread::sleep(Duration::from_millis(8));
@@ -317,7 +347,8 @@ pub(crate) fn list_surfaces() -> Vec<Surface> {
 /// Streams the windows he can stand on, whenever the set or their bounds change.
 pub fn start_surfaces_thread(app: AppHandle) {
     thread::spawn(move || {
-        let mut last: Vec<Surface> = Vec::new();
+        // What was last sent; None when nothing has been, or the screensaver has had its turn.
+        let mut last: Option<Vec<Surface>> = None;
         loop {
             thread::sleep(Duration::from_millis(150));
             let enabled = {
@@ -328,18 +359,21 @@ pub fn start_surfaces_thread(app: AppHandle) {
             };
             // While the screensaver is up, the windows he can stand on are the cut-out pieces
             // the screensaver is drawing, not the real ones hidden behind it. That page sends
-            // them, so this thread stands aside.
+            // them, so this thread stands aside. It forgets what it last sent, so the real
+            // windows go out again the moment the screensaver ends even if none of them moved:
+            // otherwise he was left with the pieces, or nothing at all, to stand on.
             let screensaver = {
                 use tauri::Manager;
                 app.get_webview_window("screensaver-0").is_some()
             };
             if screensaver {
+                last = None;
                 continue;
             }
             let now = if enabled { list_surfaces() } else { Vec::new() };
-            if now != last {
+            if last.as_ref() != Some(&now) {
                 let _ = app.emit("surfaces", &now);
-                last = now;
+                last = Some(now);
             }
         }
     });
@@ -355,6 +389,9 @@ pub fn start_key_thread(app: AppHandle) {
             let mut presses = 0u32;
             let mut combo: Option<&'static str> = None;
             let mut last_emit = std::time::Instant::now();
+            // When the screensaver went up, if it is up. Any key ends it, whichever window has
+            // the keyboard, and whether or not he is meant to be watching the keys otherwise.
+            let mut saver_since: Option<std::time::Instant> = None;
             loop {
                 thread::sleep(Duration::from_millis(15));
                 let enabled = {
@@ -363,7 +400,13 @@ pub fn start_key_thread(app: AppHandle) {
                     let s = state.0.lock().unwrap();
                     s.keyboard_enabled
                 };
-                if !enabled {
+                let saver = screensaver_up(&app);
+                if !saver {
+                    saver_since = None;
+                } else if saver_since.is_none() {
+                    saver_since = Some(std::time::Instant::now());
+                }
+                if !enabled && !saver {
                     presses = 0;
                     combo = None;
                     continue;
@@ -388,8 +431,14 @@ pub fn start_key_thread(app: AppHandle) {
                     }
                     down[vk] = d;
                 }
+                if let Some(since) = saver_since {
+                    if presses > 0 && since.elapsed() > SAVER_GRACE {
+                        let _ = crate::screen::screensaver_stop(app.clone());
+                        saver_since = None;
+                    }
+                }
                 if last_emit.elapsed() >= Duration::from_millis(250) {
-                    if presses > 0 || combo.is_some() {
+                    if enabled && (presses > 0 || combo.is_some()) {
                         let _ = app.emit("keys", serde_json::json!({ "presses": presses, "combo": combo }));
                     }
                     presses = 0;
@@ -407,7 +456,10 @@ pub fn start_fullscreen_thread(app: AppHandle) {
     thread::spawn(move || {
         let mut last: Option<bool> = None;
         loop {
-            let now = foreground_is_fullscreen();
+            // While our own screensaver is up he is the show, and a backdrop .scr playing behind
+            // it counts as a fullscreen app in front. Never report fullscreen then, or he hides
+            // himself for the whole screensaver.
+            let now = !screensaver_up(&app) && foreground_is_fullscreen();
             if last != Some(now) {
                 let _ = app.emit("fullscreen", serde_json::json!({ "active": now }));
                 last = Some(now);

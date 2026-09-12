@@ -333,6 +333,20 @@
               <label class="check" title="His window overlaps the taskbar so his feet rest on its top edge. Off: he stands just above it."><input id="taskbar" type="checkbox" /> Stand on the taskbar</label>
               <p class="hint">He always stays on top of other windows, and the tray icon has the same menu as right-clicking him.</p>
             </div>
+            <div class="group">
+              <h2>Screensaver</h2>
+              <p class="hint">Right-click him and choose "Screensaver now". He takes over the screen and plays with a picture of your desktop; the real windows are never touched. Any key or mouse movement ends it.</p>
+              <label class="check" title="Pokes, thuds and landings while the screensaver is running. Off by default, since the room is usually empty."><input id="ss-sounds" type="checkbox" /> Sound effects during the screensaver</label>
+              <label class="field" title="Another screensaver to play underneath. Where he knocks a window aside, you see it playing through the hole. Leave blank for plain black.">
+                <span>Play a screensaver behind it (optional)</span>
+                <div class="row">
+                  <input id="ss-backdrop" type="text" spellcheck="false" class="grow" placeholder="blank = black" />
+                  <button id="ss-browse" type="button">Choose .scr…</button>
+                  <button id="ss-clear" type="button">Clear</button>
+                </div>
+              </label>
+              <p class="hint" id="ss-backdrop-status"></p>
+            </div>
           </div>
         </section>
 

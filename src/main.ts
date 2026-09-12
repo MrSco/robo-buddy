@@ -102,6 +102,17 @@ let dancedThisSession = false;
 /** The screensaver is up: he roams and climbs instead of idling on the taskbar. */
 let screensaverOn = false;
 let hopCount = 0;
+let punchCount = 0;
+/**
+ * He is running at a window to shove it, and the screensaver has been told so. Only then does
+ * his speed move anything: told nothing, the page would knock a window loose every time he
+ * walked through it or jumped at it, and it would be gone from under him before he could
+ * grab it. That was why he never got on top of one.
+ */
+let barging = false;
+/** While a punch plays he keeps facing what he hit, rather than snapping back to the front. */
+let holdFacing = 0;
+let holdFacingUntil = 0;
 
 const bubble = new Bubble();
 const sounds = new Sounds();
@@ -218,6 +229,10 @@ async function boot() {
       if (physics) physics.roam = e.payload;
       // A screensaver runs in an empty room; thuds and boings there are just noise.
       sounds.enabled = settings.soundsEnabled && (!e.payload || settings.screensaverSounds);
+      // He IS the screensaver, so the hide-behind-fullscreen rule must not touch him now. A
+      // backdrop .scr goes fullscreen as it starts and would otherwise hide him for the whole
+      // show; reassert visibility here in case a fullscreen app hid him just before it began.
+      void applyVisibility();
       if (e.payload) {
         // Start doing something at once rather than finishing the current doze.
         behavior.interrupt(clock.elapsedTime);
@@ -362,7 +377,7 @@ let hiddenByFullscreen = false;
 async function applyVisibility() {
   if (!IN_TAURI) return;
   const win = getCurrentWindow();
-  const shouldHide = fullscreenActive && settings.hideWhenFullscreen && !settings.paused;
+  const shouldHide = fullscreenActive && settings.hideWhenFullscreen && !settings.paused && !screensaverOn;
   if (shouldHide && !hiddenByFullscreen) {
     hiddenByFullscreen = true;
     await win.hide();
@@ -844,7 +859,7 @@ function debugTitle(t: number) {
   }
   const title =
     `Robo Buddy | ${p.mode} y=${p.y.toFixed(0)} air=${p.airborne} yaw=${yaw.toFixed(2)} cur=${cursor.x},${cursor.y},${cursor.buttons}` +
-    ` | pack=${pack?.id} state=${currentState} grab=${grabPart ?? '-'} talk=${talk.open} talking=${voice.speaking || live.speaking} live=${live.state}/${Math.round(live.seconds)}s/${live.lastReason} keys=${typingRate.toFixed(1)}/${typingAmount.toFixed(2)}/${keyEvents} sup=${physics?.support ?? '-'} surf=${physics?.surfaces.length ?? 0} ss=${screensaverOn ? 1 : 0} nrg=${behavior.energetic ? 1 : 0} climb=${physics?.climbable() ? 'y' : 'n'} chg=${physics?.chargeTarget() ? 'y' : 'n'} hops=${hopCount} snd=${sounds.last} head=${Math.round(p.headPx)} crouch=${Math.round(p.crouchPx)} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
+    ` | pack=${pack?.id} state=${currentState} grab=${grabPart ?? '-'} talk=${talk.open} talking=${voice.speaking || live.speaking} live=${live.state}/${Math.round(live.seconds)}s/${live.lastReason} keys=${typingRate.toFixed(1)}/${typingAmount.toFixed(2)}/${keyEvents} sup=${physics?.support ?? '-'} surf=${physics?.surfaces.length ?? 0} ss=${screensaverOn ? 1 : 0} nrg=${behavior.energetic ? 1 : 0} climb=${physics?.climbable() ? 'y' : 'n'} chg=${physics?.chargeTarget() ? 'y' : 'n'} hops=${hopCount} pun=${punchCount} barge=${barging ? 1 : 0} snd=${sounds.last} head=${Math.round(p.headPx)} crouch=${Math.round(p.crouchPx)} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
     (m ? ` | lvl=${m.level.toFixed(2)} gate=${m.gateLevel.toFixed(2)}/${m.threshold.toFixed(2)} bpm=${m.bpm.toFixed(0)} dance=${m.dancing} amt=${danceAmount.toFixed(2)} beats=${m.beats.toFixed(1)}` : "");
   getCurrentWindow().setTitle(title).catch(() => {});
 }
@@ -937,6 +952,9 @@ function frame() {
     left: physics?.bounds.left ?? 0,
     right: physics?.bounds.right ?? 1920,
     climb: settings.surfacesEnabled && settings.wanderEnabled ? (physics?.climbable() ?? null) : null,
+    // Only during the screensaver: something to run at flat out, whether or not he could ever
+    // stand on it. Without this the charge and the punch never come up at all.
+    charge: screensaverOn && settings.surfacesEnabled && settings.wanderEnabled ? (physics?.chargeTarget() ?? null) : null,
     onSurface: physics?.onSurface ?? false,
   });
   const resolved = resolveState(t, act);
@@ -956,7 +974,24 @@ function frame() {
     behavior.pendingHop = null;
     hopCount++;
   }
+  if (behavior.pendingPunch !== null) {
+    const dir = behavior.pendingPunch;
+    behavior.pendingPunch = null;
+    punchCount++;
+    holdFacing = (dir * Math.PI) / 2;
+    holdFacingUntil = t + 1.2;
+    sounds.play("bump");
+    // The screensaver reads this on its next poll and sends whatever he hit flying. Outside the
+    // screensaver nothing is listening, and the punch is just a punch.
+    void invoke("buddy_punch", { dir }).catch(() => {});
+  }
+  if (t < holdFacingUntil) targetFacing = holdFacing;
   facing = targetFacing;
+  const bargeNow = screensaverOn && act.kind === "walk" && act.then === "barge";
+  if (bargeNow !== barging) {
+    barging = bargeNow;
+    void invoke("buddy_barge", { on: barging }).catch(() => {});
+  }
 
   if (renderer) {
     const input: FrameInput = {

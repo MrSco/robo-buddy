@@ -36,6 +36,8 @@ pub struct Settings {
     pub sounds_enabled: bool,
     /// Sound effects during the screensaver; off by default.
     pub screensaver_sounds: bool,
+    /// A .scr to run behind the screensaver; blank means a plain black backdrop.
+    pub screensaver_backdrop: String,
     pub bubbles_enabled: bool,
     /// Wander along the floor when idle.
     pub wander_enabled: bool,
@@ -101,6 +103,7 @@ impl Default for Settings {
             sleep_after_min: 5.0,
             sounds_enabled: true,
             screensaver_sounds: false,
+            screensaver_backdrop: String::new(),
             bubbles_enabled: true,
             wander_enabled: true,
             dance_mode: "random".into(),

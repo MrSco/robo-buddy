@@ -16,7 +16,22 @@ export interface ClipChoice {
 export type Activity =
   | { kind: "idle"; clip: ClipChoice | null }
   | { kind: "fidget"; clip: ClipChoice }
-  | { kind: "walk"; clip: ClipChoice | null; targetX: number; speed: number; then?: "hop"; hopTop?: number; beyond?: boolean };
+  | {
+      kind: "walk";
+      clip: ClipChoice | null;
+      targetX: number;
+      speed: number;
+      /**
+       * What to do on arrival: leap at the window edge and climb it, hit it, or barge straight
+       * through it. Only a barge lets his speed shove the window; the other two need it to stay
+       * put until he has hold of it.
+       */
+      then?: "hop" | "punch" | "barge";
+      hopTop?: number;
+      /** Which way he is facing when he lands the punch, -1 or 1. */
+      punchDir?: number;
+      beyond?: boolean;
+    };
 
 export interface BehaviorOptions {
   wander: boolean;
@@ -35,8 +50,12 @@ interface Status {
   right: number;
   /** A window edge he could climb from here (from the physics), and whether he is on one. */
   climb: { x: number; hwnd: number; top: number } | null;
-  /** Something to run at and leap at, even when standing on it is out of the question. */
-  charge?: { x: number; hwnd: number; top: number } | null;
+  /**
+   * Something to run at and leap at, even when standing on it is out of the question. Null
+   * outside the screensaver. Required, not optional: as an optional field it was quietly never
+   * passed, and the whole charge-and-punch behaviour sat dead behind it.
+   */
+  charge: { x: number; hwnd: number; top: number } | null;
   onSurface: boolean;
 }
 
@@ -178,6 +197,16 @@ export class Behavior {
 
   /** Set when a walk that was heading for a climb arrives; main performs the hop. */
   pendingHop: number | null = null;
+  /** Set to -1 or 1 the moment a punch lands, for whatever is on the receiving end. */
+  pendingPunch: number | null = null;
+  /** Clips that read as a hit, best first. Any character that has one can throw it. */
+  private static readonly PUNCHES = ["Punch_Cross", "Punch_Jab", "Sword_Attack"];
+
+  /** A punch clip this character actually has, or null. */
+  private punchClip(): string | null {
+    for (const n of Behavior.PUNCHES) if (this.durations(n) > 0) return n;
+    return null;
+  }
 
   /**
    * Screensaver mode: no one is watching a desk toy stand still, so he barely rests, walks
@@ -215,6 +244,18 @@ export class Behavior {
     if (this.activity.kind === "walk") {
       const arrived = Math.abs(s.x - this.activity.targetX) < 4;
       if (arrived && this.activity.then === "hop" && s.free) this.pendingHop = this.activity.hopTop ?? null;
+      if (arrived && this.activity.then === "punch" && s.free) {
+        const clip = this.punchClip();
+        if (clip) {
+          this.pendingPunch = this.activity.punchDir ?? 1;
+          this.activity = { kind: "fidget", clip: { name: clip, loop: false } };
+          this.activityEnds = s.t + this.durations(clip);
+          this.nextEvent = Infinity;
+          return this.activity;
+        }
+        // No punch clip on this character: leap at it instead, which he can always do.
+        this.pendingHop = this.activity.hopTop ?? null;
+      }
       if (arrived || !s.free) {
         this.activity = { kind: "idle", clip: this.stateClip("idle") };
         this.activityEnds = Infinity;
@@ -258,16 +299,20 @@ export class Behavior {
         this.activityEnds = s.t + this.durations(first);
       });
     }
-    // Showing off: run at a window and throw himself at it. He rarely gets to stand on one,
-    // because most are far taller than he is, but the charge and the crash are the show.
+    // Showing off: run at a window flat out. Half the time he leaps at it and climbs it; the
+    // rest he hits it or barges straight through it and sends it flying.
     if (canWalk && this.energetic && s.charge) {
       const charge = s.charge;
       const speed = (walk!.speed ?? 120) * 2.6;
-      const run = () => {
-        this.activity = { kind: "walk", clip: { name: walk!.clip, loop: true }, targetX: charge.x, speed, then: "hop", hopTop: charge.top };
+      const dir = Math.sign(charge.x - s.x) || 1;
+      const runAt = (then: "hop" | "punch" | "barge") => () => {
+        this.activity = { kind: "walk", clip: { name: walk!.clip, loop: true }, targetX: charge.x, speed, then, hopTop: charge.top, punchDir: dir };
         this.activityEnds = s.t + Math.abs(charge.x - s.x) / speed + 2;
       };
-      for (let i = 0; i < 4; i++) options.push(run);
+      for (let i = 0; i < 2; i++) options.push(runAt("hop"));
+      // A fist when he has a clip for it, a shoulder otherwise.
+      options.push(runAt(this.punchClip() ? "punch" : "barge"));
+      options.push(runAt("barge"));
     }
     if (canWalk && s.climb) {
       // A title bar within reach: stroll under it, jump, grab, pull himself up.

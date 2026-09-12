@@ -79,6 +79,11 @@ const els = {
   personality: $<HTMLSelectElement>("personality"),
   personalityHint: $<HTMLParagraphElement>("personality-hint"),
   chatSttEndpoint: $<HTMLInputElement>("chat-stt-endpoint"),
+  ssSounds: $<HTMLInputElement>("ss-sounds"),
+  ssBackdrop: $<HTMLInputElement>("ss-backdrop"),
+  ssBrowse: $<HTMLButtonElement>("ss-browse"),
+  ssClear: $<HTMLButtonElement>("ss-clear"),
+  ssBackdropStatus: $<HTMLParagraphElement>("ss-backdrop-status"),
   ttsEngine: $<HTMLSelectElement>("tts-engine"),
   voicePreview: $<HTMLButtonElement>("voice-preview"),
   voicePreviewStatus: $<HTMLParagraphElement>("voice-preview-status"),
@@ -431,6 +436,8 @@ function render() {
   els.size.value = String(settings.size);
   els.sizeOut.value = `${Math.round(settings.size * 100)}%`;
   showLightingFor(previewing ?? settings.character);
+  els.ssSounds.checked = settings.screensaverSounds ?? false;
+  els.ssBackdrop.value = settings.screensaverBackdrop ?? "";
   els.paused.checked = settings.paused;
   els.mouse.checked = settings.mouseEnabled;
   els.physics.checked = settings.physicsEnabled;
@@ -709,6 +716,34 @@ function wireVoicePreview() {
   });
 }
 
+/** The screensaver options: its sounds, and another screensaver to play behind it. */
+function wireScreensaver() {
+  els.ssSounds.addEventListener("change", () => void commit({ screensaverSounds: els.ssSounds.checked }));
+  els.ssBackdrop.addEventListener("change", () => void setBackdrop(els.ssBackdrop.value.trim()));
+  els.ssClear.addEventListener("click", () => {
+    els.ssBackdrop.value = "";
+    void setBackdrop("");
+  });
+  els.ssBrowse.addEventListener("click", async () => {
+    try {
+      const picked = await open({ multiple: false, filters: [{ name: "Screensaver", extensions: ["scr", "exe"] }] });
+      if (typeof picked === "string") {
+        els.ssBackdrop.value = picked;
+        await setBackdrop(picked);
+      }
+    } catch (err) {
+      els.ssBackdropStatus.textContent = `Could not open that: ${err}`;
+    }
+  });
+}
+
+async function setBackdrop(path: string) {
+  await commit({ screensaverBackdrop: path });
+  els.ssBackdropStatus.textContent = path
+    ? "It will play behind the screensaver; knock a window aside to see it."
+    : "Plain black behind the screensaver.";
+}
+
 function wireTalk() {
   wireLive();
   els.chatEnabled.addEventListener("change", () => {
@@ -732,6 +767,7 @@ function wireTalk() {
   els.chatLines.addEventListener("change", () => void commit({ chatGenerateLines: els.chatLines.checked }));
   els.chatCap.addEventListener("change", () => void commit({ chatDailyCap: Math.max(0, Math.round(Number(els.chatCap.value) || 0)) }));
   els.chatSttEndpoint.addEventListener("change", () => void commit({ chatSttEndpoint: els.chatSttEndpoint.value.trim() }));
+  wireScreensaver();
   wireVoicePreview();
   els.ttsEngine.addEventListener("change", () => {
     els.piperFields.hidden = els.ttsEngine.value !== "piper";

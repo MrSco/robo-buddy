@@ -6,22 +6,6 @@ use windows::Win32::Graphics::Gdi::{
     BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, GetDC, GetDIBits,
     ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HGDIOBJ, SRCCOPY,
 };
-use windows::Win32::UI::WindowsAndMessaging::{
-    GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
-};
-
-/// The whole virtual screen in physical pixels. The origin can be negative when a monitor sits
-/// left of or above the primary one.
-pub fn virtual_screen() -> (i32, i32, i32, i32) {
-    unsafe {
-        (
-            GetSystemMetrics(SM_XVIRTUALSCREEN),
-            GetSystemMetrics(SM_YVIRTUALSCREEN),
-            GetSystemMetrics(SM_CXVIRTUALSCREEN).max(1),
-            GetSystemMetrics(SM_CYVIRTUALSCREEN).max(1),
-        )
-    }
-}
 
 /// Raw capture: BGRA rows, top down, of the whole virtual screen.
 fn grab(x: i32, y: i32, w: i32, h: i32) -> Result<Vec<u8>, String> {
@@ -180,6 +164,7 @@ fn encode(rgba: &[u8], w: i32, h: i32) -> Result<String, String> {
 /// A window per monitor rather than one giant one, because WebView2 cannot make a surface
 /// spanning several screens and silently renders nothing when asked to.
 #[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct MonitorShot {
     /// Position and size of this monitor in virtual-screen pixels.
     pub x: i32,
@@ -190,6 +175,9 @@ pub struct MonitorShot {
     pub png: String,
     /// Windows that were on this monitor, in coordinates relative to it.
     pub sprites: Vec<Sprite>,
+    /// True when another screensaver is playing underneath, so the holes are left see-through
+    /// instead of being painted black.
+    pub see_through: bool,
 }
 
 /// A window that was on screen when the picture was taken, with its own pixels so it stays
@@ -207,6 +195,10 @@ pub struct Sprite {
 /// The pictures taken when the screensaver started, waiting for their pages to ask for them.
 #[derive(Default)]
 pub struct Shot(pub std::sync::Mutex<Vec<MonitorShot>>);
+
+/// The screensaver playing behind ours, when one was chosen.
+#[derive(Default)]
+pub struct Backdrop(pub std::sync::Mutex<Option<std::process::Child>>);
 
 /// What one screensaver window draws. Taking the pictures when the screensaver starts rather
 /// than in the page matters: by the time a page runs, its own window is covering the screen.
@@ -264,11 +256,52 @@ fn list_windows() -> Vec<(isize, i32, i32, i32, i32)> {
 
 /// The buddy window in virtual-screen pixels, so the screensaver knows what he is walking into.
 #[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Rect {
     pub x: i32,
     pub y: i32,
     pub width: i32,
     pub height: i32,
+    /// Which way the last punch was thrown, -1 or 1.
+    pub punch: i32,
+    /// How many punches he has thrown. There is a page per monitor and all of them poll this,
+    /// so the count is left alone rather than cleared on read: each page acts on a number it
+    /// has not seen before, and only the one he is actually standing on finds anything to hit.
+    pub punch_seq: u32,
+    /// He is running at a window to shove it. Only then does his speed move anything; the rest
+    /// of the time the pages leave what he touches alone, so he can climb it.
+    pub barging: bool,
+}
+
+/// What he is doing to the pieces: the last punch (which way, and how many so far) and
+/// whether he is barging right now.
+#[derive(Default)]
+pub struct Punch(pub std::sync::Mutex<Hits>);
+
+#[derive(Default, Clone, Copy)]
+pub struct Hits {
+    pub punch: i32,
+    pub punch_seq: u32,
+    pub barging: bool,
+}
+
+/// He hit something. The screensaver pages pick this up on their next poll.
+#[tauri::command]
+pub fn buddy_punch(app: tauri::AppHandle, dir: i32) {
+    use tauri::Manager;
+    if let Ok(mut slot) = app.state::<Punch>().0.lock() {
+        slot.punch = dir.signum();
+        slot.punch_seq = slot.punch_seq.wrapping_add(1);
+    }
+}
+
+/// He has started, or finished, running at a window to shove it.
+#[tauri::command]
+pub fn buddy_barge(app: tauri::AppHandle, on: bool) {
+    use tauri::Manager;
+    if let Ok(mut slot) = app.state::<Punch>().0.lock() {
+        slot.barging = on;
+    }
 }
 
 #[tauri::command]
@@ -277,7 +310,19 @@ pub fn buddy_rect(app: tauri::AppHandle) -> Option<Rect> {
     let win = app.get_webview_window("buddy")?;
     let pos = win.outer_position().ok()?;
     let size = win.outer_size().ok()?;
-    Some(Rect { x: pos.x, y: pos.y, width: size.width as i32, height: size.height as i32 })
+    let hits = match app.state::<Punch>().0.lock() {
+        Ok(slot) => *slot,
+        Err(_) => Hits::default(),
+    };
+    Some(Rect {
+        x: pos.x,
+        y: pos.y,
+        width: size.width as i32,
+        height: size.height as i32,
+        punch: hits.punch,
+        punch_seq: hits.punch_seq,
+        barging: hits.barging,
+    })
 }
 
 /// Put a backdrop up on every monitor, behind the buddy, and tell him to play.
@@ -285,12 +330,23 @@ pub fn buddy_rect(app: tauri::AppHandle) -> Option<Rect> {
 pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
     use tauri::{Emitter, Manager};
     if app.get_webview_window("screensaver-0").is_some() {
-        return Ok(());
+        // Already up, or left over from a teardown that did not finish. Either way, clear it
+        // out and start again rather than refusing and leaving the stale ones on screen.
+        let _ = screensaver_stop(app.clone());
     }
     let monitors = app.available_monitors().map_err(|e| e.to_string())?;
     if monitors.is_empty() {
         return Err("no monitors".into());
     }
+    // A screensaver of their choosing plays underneath, seen through the holes where windows
+    // were. Started further down, once the pictures are taken: a plain screen grab copies
+    // whatever is on the glass, so starting it first would photograph it instead of the desktop.
+    let chosen = {
+        let state = app.state::<crate::settings::SettingsState>();
+        let s = state.0.lock().unwrap();
+        s.screensaver_backdrop.trim().to_string()
+    };
+
     // Out of shot: he is about to be standing on this picture, and a frozen copy of him in it
     // looks ridiculous. Hidden, the screen settles, the picture is taken, then he comes back.
     let buddy = app.get_webview_window("buddy");
@@ -301,48 +357,66 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
     // Everything he plays with is cut from these pictures, taken while the desktop is still the
     // desktop; the windows are listed at the same moment for the same reason.
     let windows = list_windows();
-    let mut shots = Vec::new();
-    for m in &monitors {
-        let (mx, my) = (m.position().x, m.position().y);
-        let (mw, mh) = (m.size().width as i32, m.size().height as i32);
-        let shot_rgba = grab_rgba(mx, my, mw, mh)?;
-        let png = encode(&shot_rgba, mw, mh)?;
-        // A window belongs to the monitor its middle sits on, and is clipped to it. Each screen
-        // is then its own playpen, so nothing has to be kept in step across monitors.
-        let sprites = windows
-            .iter()
-            .filter_map(|&(hwnd, wx, wy, ww, wh)| {
-                let (cx, cy) = (wx + ww / 2, wy + wh / 2);
-                if cx < mx || cx >= mx + mw || cy < my || cy >= my + mh {
-                    return None;
-                }
-                // Its own pixels where the window will give them. Otherwise its patch of the
-                // desktop picture, which is right whenever nothing was covering it.
-                if let Some(rgba) = capture_window(hwnd, wx, wy, ww, wh) {
-                    if let Ok(png) = encode(&rgba, ww, wh) {
-                        return Some(Sprite { x: wx - mx, y: wy - my, width: ww, height: wh, png });
+    let taken = (|| -> Result<Vec<MonitorShot>, String> {
+        let mut shots = Vec::new();
+        for m in &monitors {
+            let (mx, my) = (m.position().x, m.position().y);
+            let (mw, mh) = (m.size().width as i32, m.size().height as i32);
+            let shot_rgba = grab_rgba(mx, my, mw, mh)?;
+            let png = encode(&shot_rgba, mw, mh)?;
+            // A window belongs to the monitor its middle sits on, and is clipped to it. Each
+            // screen is then its own playpen, so nothing has to be kept in step across monitors.
+            let sprites = windows
+                .iter()
+                .filter_map(|&(hwnd, wx, wy, ww, wh)| {
+                    let (cx, cy) = (wx + ww / 2, wy + wh / 2);
+                    if cx < mx || cx >= mx + mw || cy < my || cy >= my + mh {
+                        return None;
                     }
-                }
-                let x = wx.max(mx);
-                let y = wy.max(my);
-                let width = (wx + ww).min(mx + mw) - x;
-                let height = (wy + wh).min(my + mh) - y;
-                if width < 120 || height < 90 {
-                    return None;
-                }
-                let rgba = crop(&shot_rgba, mw, x - mx, y - my, width, height);
-                Some(Sprite { x: x - mx, y: y - my, width, height, png: encode(&rgba, width, height).ok()? })
-            })
-            .collect();
-        shots.push(MonitorShot { x: mx, y: my, width: mw, height: mh, png, sprites });
-    }
+                    // Its own pixels where the window will give them. Otherwise its patch of the
+                    // desktop picture, which is right whenever nothing was covering it.
+                    if let Some(rgba) = capture_window(hwnd, wx, wy, ww, wh) {
+                        if let Ok(png) = encode(&rgba, ww, wh) {
+                            return Some(Sprite { x: wx - mx, y: wy - my, width: ww, height: wh, png });
+                        }
+                    }
+                    let x = wx.max(mx);
+                    let y = wy.max(my);
+                    let width = (wx + ww).min(mx + mw) - x;
+                    let height = (wy + wh).min(my + mh) - y;
+                    if width < 120 || height < 90 {
+                        return None;
+                    }
+                    let rgba = crop(&shot_rgba, mw, x - mx, y - my, width, height);
+                    Some(Sprite { x: x - mx, y: y - my, width, height, png: encode(&rgba, width, height).ok()? })
+                })
+                .collect();
+            shots.push(MonitorShot { x: mx, y: my, width: mw, height: mh, png, sprites, see_through: false });
+        }
+        Ok(shots)
+    })();
+    // Whatever happened, he comes back. A grab fails outright while the system's own screen
+    // saver holds the desktop, and giving up with him still hidden left him gone for good.
     if let Some(b) = &buddy {
         let _ = b.show();
     }
+    let mut shots = match taken {
+        Ok(shots) => shots,
+        Err(e) => {
+            crate::chat::append_log(app.clone(), format!("screensaver: could not photograph the desktop: {e}"));
+            return Err(e);
+        }
+    };
     crate::chat::append_log(
         app.clone(),
         format!("screensaver: {} windows, {} per screen", windows.len(), shots.iter().map(|s| s.sprites.len().to_string()).collect::<Vec<_>>().join("/")),
     );
+    // Now the desktop is safely photographed, the one playing underneath can start. Ours are
+    // built after it and are topmost too, so they sit over it; the last one raised wins.
+    let backdrop_running = if chosen.is_empty() { false } else { start_backdrop(&app, &chosen) };
+    for shot in &mut shots {
+        shot.see_through = backdrop_running;
+    }
     if let Ok(mut slot) = app.state::<Shot>().0.lock() {
         *slot = shots.clone();
     }
@@ -353,13 +427,28 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
         // page would 404. The window's own label carries which screen it is.
         let win = tauri::WebviewWindowBuilder::new(&app, &label, tauri::WebviewUrl::App("screensaver.html".into()))
             .title("Robo Buddy Screensaver")
+            // See-through only when something is playing underneath; otherwise an opaque window
+            // is cheaper and avoids any compositing surprises.
+            .transparent(backdrop_running)
             .decorations(false)
             .always_on_top(true)
             .skip_taskbar(true)
             .shadow(false)
+            // Do not steal the foreground. A backdrop .scr run with /s exits the instant it
+            // loses focus, so grabbing focus for these windows killed glmatrix the moment it
+            // appeared. Topmost keeps them in front without being the focused window, and the
+            // screensaver is ended from the global input threads, not from page focus.
+            .focused(false)
             .inner_size(shot.width as f64, shot.height as f64)
-            .build()
-            .map_err(|e| e.to_string())?;
+            .build();
+        let win = match win {
+            Ok(w) => w,
+            // Never leave the one underneath playing with nothing over it.
+            Err(e) => {
+                stop_backdrop(&app);
+                return Err(e.to_string());
+            }
+        };
         // Physical pixels: a monitor left of or above the primary one has a negative origin,
         // and logical coordinates on the builder do not land there.
         let _ = win.set_position(tauri::PhysicalPosition::new(shot.x, shot.y));
@@ -377,7 +466,10 @@ pub fn screensaver_stop(app: tauri::AppHandle) -> Result<(), String> {
     use tauri::{Emitter, Manager};
     for i in 0..16 {
         if let Some(win) = app.get_webview_window(&format!("screensaver-{i}")) {
-            let _ = win.close();
+            // destroy, not close: a close is a polite request that something can refuse or
+            // lose, and these windows cover every screen with the cursor hidden. One that
+            // refuses to go leaves the machine looking hung.
+            let _ = win.destroy();
         }
     }
     // Pictures of someone's desktop are not something to keep around once they are done with.
@@ -387,6 +479,7 @@ pub fn screensaver_stop(app: tauri::AppHandle) -> Result<(), String> {
     if let Ok(mut per_screen) = app.state::<Standable>().0.lock() {
         per_screen.clear();
     }
+    stop_backdrop(&app);
     let _ = app.emit("screensaver", false);
     Ok(())
 }
@@ -409,4 +502,48 @@ pub fn screensaver_surfaces(app: tauri::AppHandle, index: usize, surfaces: Vec<c
         per_screen.values().flatten().cloned().collect::<Vec<_>>()
     };
     let _ = app.emit("surfaces", &merged);
+}
+
+/// Start the chosen screensaver full screen behind ours. Returns whether it actually started.
+fn start_backdrop(app: &tauri::AppHandle, path: &str) -> bool {
+    use tauri::Manager;
+    let exists = std::path::Path::new(path).is_file();
+    if !exists {
+        crate::chat::append_log(app.clone(), format!("screensaver: backdrop not found at {path}"));
+        return false;
+    }
+    // "/s" is the standard "run it" argument every Windows screensaver understands.
+    match std::process::Command::new(path).arg("/s").spawn() {
+        Ok(mut child) => {
+            let pid = child.id();
+            // It needs a moment to put its own window up before ours goes over the top.
+            std::thread::sleep(std::time::Duration::from_millis(700));
+            // If it has already quit, it is one of the screensavers that exits the instant it is
+            // not the foreground: no use pretending it is playing behind us.
+            if let Ok(Some(status)) = child.try_wait() {
+                crate::chat::append_log(app.clone(), format!("screensaver: backdrop pid {pid} exited at once ({status}); black instead"));
+                return false;
+            }
+            crate::chat::append_log(app.clone(), format!("screensaver: backdrop pid {pid} playing behind"));
+            if let Ok(mut slot) = app.state::<Backdrop>().0.lock() {
+                *slot = Some(child);
+            }
+            true
+        }
+        Err(e) => {
+            crate::chat::append_log(app.clone(), format!("screensaver: backdrop would not start: {e}"));
+            false
+        }
+    }
+}
+
+/// Stop the screensaver playing underneath, if one is.
+fn stop_backdrop(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    if let Ok(mut slot) = app.state::<Backdrop>().0.lock() {
+        if let Some(mut child) = slot.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
 }

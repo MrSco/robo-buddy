@@ -569,6 +569,45 @@ desktop itself.
 
 Effort is real: three to five days, most of it in the capture and the sprite physics.
 
+**Built (Sep 12 2026).** One window per monitor rather than one across the virtual screen, which
+WebView2 would not give a surface for. Three layers: black underneath, the desktop photograph
+with a hole cut where each window sat in the middle, and the loose windows on top. Each window
+carries its own pixels, asked for with `PrintWindow`, so a buried one still looks like itself;
+the invisible resize border is cropped off using `GetWindowRect` against the DWM frame. He is
+hidden for the moment the picture is taken so he is not in it. Resting pieces are reported back
+to his physics as things to stand on, front to back.
+
+Getting him *onto* a window took two fixes. The first was the reason he never got on top of
+anything: the page shoved a piece whenever his body overlapped it at speed, and his walk is
+faster than the shove threshold, so every stroll and every leap at a window knocked it loose,
+and a loose piece drops out of the list of things he can stand on. Now nothing moves unless he
+means it: a charge ends in a leap (he climbs it), a punch (`Punch_Cross` / `Punch_Jab`, already
+in the CC0 UAL pack, so no Mixamo trip was needed; the T-800 swings `Sword_Attack`), or a barge
+he announces first, and only the barge lets his speed shove. The second is that he is 660px
+tall, while every window on a normal desktop has its title bar 200-300px from the top of the
+screen, which left him nowhere to stand and no outcome but bumping his head. His weight now
+drags whatever he hangs from downward until there is room, and then he climbs on; the page keeps
+hold of the piece for the whole pull-up so it does not stop halfway. `src/physics.test.ts` runs
+the climb with the drag modelled alongside, on the real monitor layout this was debugged on.
+
+Any input ends it, watched from the Rust cursor and key threads rather than only by the pages,
+so it does not matter which window has the keyboard or what the pointer is parked over. A grab
+that fails (the system's own screen saver holds the desktop, say) shows him again instead of
+leaving him hidden. And he no longer hides *himself*: a backdrop `.scr` goes fullscreen as it
+starts, which the hide-behind-a-fullscreen-app rule read as a game to get out of the way of, so
+he vanished for the whole show; that rule now stands down while the screensaver is his.
+
+Settings on the Window tab cover sound effects during the screensaver, off by default, and an
+optional second screensaver to play underneath: any `.scr`, started after the photograph is
+taken, with our see-through windows built over it so the holes show it playing. Our windows are
+built unfocused (`.focused(false)`): a `.scr` run with `/s` exits the instant it loses the
+foreground, so stealing focus for our windows used to kill it the moment it appeared. Left
+alone, `glmatrix.scr` plays behind for the life of the screensaver and is killed when it ends.
+
+Still open: the desktop and taskbar icons, deliberately deferred. If a particular `.scr` still
+will not stay up behind ours, the fallback is `/p <hwnd>` preview mode parented to our own
+window.
+
 ### 4. Maintainability
 
 - **Tests.** There are none. The bugs that cost the most time all live in pure functions over

@@ -240,7 +240,10 @@ export class WindowPhysics {
    * hugs the top and is never grabbed.
    */
   private worthABump(s: Surface): boolean {
-    return s.top >= this.areaAt((s.left + s.right) / 2, s.top).top + this.h * 0.2;
+    // Roaming, his weight drags whatever he grabs down until there is room to stand, so even a
+    // title bar hugging the top of the screen is worth getting hold of.
+    const margin = this.roam ? 24 : this.h * 0.2;
+    return s.top >= this.areaAt((s.left + s.right) / 2, s.top).top + margin;
   }
 
   private get headTop() {
@@ -363,7 +366,10 @@ export class WindowPhysics {
       // Too tall to stand on: he may still try once and bump his head, then leaves it alone.
       if (!this.headroom(s).fit && (this.bumpedRecently(s.hwnd, 600) || !this.worthABump(s))) continue;
       const dist = Math.abs(tx - cx);
-      if (dist > 900) continue;
+      // On the taskbar he only bothers with what is close by. Roaming, the playground is every
+      // monitor and there may be one window on it, so he will cross a screen to reach it: at
+      // 900px he simply wandered away from the only thing there was to climb.
+      if (dist > (this.roam ? 2400 : 900)) continue;
       if (!best || dist < best.dist) best = { x: tx - this.w / 2, hwnd: s.hwnd, top: s.top, dist };
     }
     return best;
@@ -382,8 +388,11 @@ export class WindowPhysics {
     let best: { x: number; hwnd: number; top: number; dist: number } | null = null;
     for (const s of this.surfaces) {
       if (s.hwnd === this.support) continue;
-      // Aim at the near edge, so he arrives at the window rather than stopping in its middle.
-      const near = cx < (s.left + s.right) / 2 ? s.left : s.right;
+      // Aim just inside the near edge: he arrives at the window rather than in its middle, but
+      // far enough in that a grab is allowed at all, since grabbing is refused within EDGE of
+      // either end. Aimed at the edge itself he could run at a window and never get hold of it.
+      const inset = WindowPhysics.EDGE + 8;
+      const near = cx < (s.left + s.right) / 2 ? Math.min(s.left + inset, s.right - inset) : Math.max(s.right - inset, s.left + inset);
       const tx = Math.max(b.left + this.w / 2, Math.min(b.right - this.w / 2, near));
       const dist = Math.abs(tx - cx);
       if (dist < 60 || dist > 2400) continue;
@@ -392,10 +401,16 @@ export class WindowPhysics {
     return best;
   }
 
-  /** Jump from rest so his hands reach just above `top` (a window edge); tryGrab does the rest. */
+  /** Jump from rest at an edge: high enough to catch it with his hands, or to step onto it. */
   hop(top: number) {
     if (this.mode !== "rest") return;
-    const rise = Math.max(60, this.y + this.h * WindowPhysics.HAND - top + 14);
+    const handY = this.y + this.h * WindowPhysics.HAND;
+    const feetY = this.y + this.h;
+    // An edge above his hands is caught and mantled, so his hands are what has to clear it. An
+    // edge below his hands is a ledge, and his feet are what has to clear it: a much bigger
+    // jump. Measuring the wrong one left him doing a token 60px hop at knee-high windows and
+    // landing back where he started, which is the "he jumps and bumps but never gets up there".
+    const rise = top < handY ? Math.max(60, handY - top + 14) : Math.max(60, feetY - top + 24);
     this.support = null;
     this.mode = "falling";
     this.vy = -Math.min(this.roam ? 2600 : 1900, Math.sqrt(2 * GRAVITY * rise));
