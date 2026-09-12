@@ -91,6 +91,19 @@ fn error_text(status: reqwest::StatusCode, body: &str) -> String {
     format!("{}: {}", status.as_u16(), msg)
 }
 
+/// The account-level error OpenAI reports for a minimal request, if any (billing not active,
+/// insufficient quota, a revoked key); None when the account looks fine or the check itself fails.
+async fn account_problem(client: &reqwest::Client, key: &str) -> Option<String> {
+    let body = serde_json::json!({ "model": "gpt-5.4-nano", "input": "hi", "max_output_tokens": 16 });
+    let resp = client.post("https://api.openai.com/v1/responses").bearer_auth(key).json(&body).send().await.ok()?;
+    if resp.status().is_success() {
+        return None;
+    }
+    let text = resp.text().await.ok()?;
+    let v: serde_json::Value = serde_json::from_str(&text).ok()?;
+    v["error"]["message"].as_str().map(|m| m.to_string())
+}
+
 /// Open a Live session: the browser's SDP offer plus the session config go to OpenAI with the
 /// key; the SDP answer comes back for the browser to finish the WebRTC handshake.
 #[tauri::command]
@@ -106,7 +119,7 @@ pub async fn live_connect(app: AppHandle, sdp: String, session: serde_json::Valu
         .map_err(|e| e.to_string())?;
     let resp = client
         .post(SESSIONS_URL)
-        .bearer_auth(key)
+        .bearer_auth(&key)
         .json(&body)
         .send()
         .await
@@ -114,8 +127,18 @@ pub async fn live_connect(app: AppHandle, sdp: String, session: serde_json::Valu
     let status = resp.status();
     let text = resp.text().await.map_err(|e| e.to_string())?;
     if !status.is_success() {
-        crate::chat::append_log(app.clone(), format!("live connect failed {}", error_text(status, &text)));
-        return Err(error_text(status, &text));
+        let mut msg = error_text(status, &text);
+        // The live endpoint answers a blocked account (no billing, no credit) with a bare 500.
+        // A tiny call to a plain endpoint returns the real message, so ask for that instead.
+        if status.is_server_error() {
+            if let Some(reason) = account_problem(&client, &key).await {
+                msg = format!("OpenAI: {reason}");
+            } else {
+                msg = format!("{msg} (OpenAI's live endpoint gave no details)");
+            }
+        }
+        crate::chat::append_log(app.clone(), format!("live connect failed {msg}"));
+        return Err(msg);
     }
     // JSON with the answer under transport.sdp; tolerate a bare SDP body too.
     if text.trim_start().starts_with("v=") {
