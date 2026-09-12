@@ -254,8 +254,6 @@ function reweightSpanningRods(root: THREE.Object3D): number {
   let changed = 0;
   const notes: string[] = [];
   const v = new THREE.Vector3();
-  const pa = new THREE.Vector3();
-  const pb = new THREE.Vector3();
   const near = (a: THREE.Object3D, b: THREE.Object3D) => {
     if (a === b || a.parent === b.parent) return true;
     for (let p = a.parent, i = 0; p && i < 2; p = p.parent, i++) if (p === b) return true;
@@ -305,33 +303,131 @@ function reweightSpanningRods(root: THREE.Object3D): number {
       const sd = Math.sqrt(Math.max(0, st.sq / st.n - mean * mean));
       return mean >= 0.2 && sd < 0.045;
     };
-    let touched = false;
+    // Second pass: which vertices are rod vertices, and which bone each would go to alone.
+    const rod = new Uint8Array(pos.count);
+    const alone = new Int32Array(pos.count).fill(-1);
     for (let i = 0; i < pos.count; i++) {
-      // The two strongest influences, when both are real.
       const [a, b, wb] = top2(i);
       if (a < 0 || b < 0 || !bones[a] || !bones[b]) continue;
       const unrelated = wb >= 0.25 && !near(bones[a], bones[b]);
       if (!unrelated && !(wb >= 0.15 && rigidPair(a, b))) continue;
       v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
-      pa.copy(bindPos[a]);
-      pb.copy(bindPos[b]);
-      const keep = v.distanceTo(pa) <= v.distanceTo(pb) ? a : b;
-      if (notes.length < 3) {
-        const before = [0, 1, 2, 3].map((k) => `${si.getComponent(i, k)}:${sw.getComponent(i, k).toFixed(2)}`).join(" ");
-        notes.push(`v${i} ${before} -> keep ${keep}(${bones[keep].name}) v=${v.x.toFixed(2)}/${v.y.toFixed(2)}/${v.z.toFixed(2)} a=${pa.y.toFixed(2)} b=${pb.y.toFixed(2)} sw=${sw.constructor.name}/${sw.array.constructor.name}/${sw.normalized}`);
-      }
-      // Only the first slot naming the kept bone gets the weight: exporters sometimes list a
-      // bone twice in one vertex, and two full weights would double the transform.
+      rod[i] = 1;
+      alone[i] = v.distanceTo(bindPos[a]) <= v.distanceTo(bindPos[b]) ? a : b;
+    }
+    // Rods are usually their own little mesh islands (a piston with its end caps). Give each
+    // such island wholly to the bone that already carries most of its weight, so the whole
+    // piece stays rigid: splitting a rod vertex by vertex leaves a seam of triangles that
+    // stretch into a thin spike when the bones part. Big welded islands are split per vertex.
+    const give = (i: number, keep: number) => {
       let given = false;
       for (let k = 0; k < 4; k++) {
         const hit = !given && si.getComponent(i, k) === keep;
         sw.setComponent(i, k, hit ? 1 : 0);
         if (hit) given = true;
       }
-      if (notes.length <= 3 && notes.length > 0 && notes[notes.length - 1].startsWith(`v${i} `)) notes[notes.length - 1] += ` after=${[0, 1, 2, 3].map((k) => sw.getComponent(i, k).toFixed(2)).join(",")}`;
-      // If the kept bone was not in a slot (cannot happen: it came from one), nothing changes.
+      if (!given) {
+        // The bone is not in this vertex's slots: put it in the first one.
+        si.setComponent(i, 0, keep);
+        sw.setComponent(i, 0, 1);
+        for (let k = 1; k < 4; k++) sw.setComponent(i, k, 0);
+        (si as THREE.BufferAttribute).needsUpdate = true;
+      }
       changed++;
-      touched = true;
+    };
+    let touched = false;
+    const index = m.geometry.index;
+    if (index && pos.count < 400_000) {
+      const parent = new Int32Array(pos.count);
+      for (let i = 0; i < pos.count; i++) parent[i] = i;
+      const find = (x: number) => {
+        while (parent[x] !== x) {
+          parent[x] = parent[parent[x]];
+          x = parent[x];
+        }
+        return x;
+      };
+      for (let t = 0; t + 2 < index.count; t += 3) {
+        const r0 = find(index.getX(t));
+        parent[find(index.getX(t + 1))] = r0;
+        parent[find(index.getX(t + 2))] = r0;
+      }
+      const size = new Map<number, number>();
+      const hasRod = new Set<number>();
+      for (let i = 0; i < pos.count; i++) {
+        const r = find(i);
+        size.set(r, (size.get(r) ?? 0) + 1);
+        if (rod[i]) hasRod.add(r);
+      }
+      // Weight per bone within each rod-bearing small island.
+      const tally = new Map<number, Map<number, number>>();
+      for (let i = 0; i < pos.count; i++) {
+        const r = find(i);
+        if (!hasRod.has(r) || (size.get(r) ?? 0) > 600) continue;
+        let tm = tally.get(r);
+        if (!tm) tally.set(r, (tm = new Map()));
+        for (let k = 0; k < 4; k++) {
+          const w = sw.getComponent(i, k);
+          if (w > 0) tm.set(si.getComponent(i, k), (tm.get(si.getComponent(i, k)) ?? 0) + w);
+        }
+      }
+      const winner = new Map<number, number>();
+      for (const [r, tm] of tally) {
+        let best = -1, bw = -1;
+        for (const [jn, w] of tm) if (w > bw) { bw = w; best = jn; }
+        if (best >= 0) winner.set(r, best);
+      }
+      for (let i = 0; i < pos.count; i++) {
+        const r = find(i);
+        const w = winner.get(r);
+        if (w !== undefined) {
+          give(i, w);
+          touched = true;
+        } else if (rod[i]) {
+          give(i, alone[i]);
+          touched = true;
+        }
+      }
+      // Stray weights: a vertex whose dominant bone agrees with none of its neighbours, while
+      // they agree among themselves, is a file error (one chest vertex bound to a foot) and
+      // draws a triangle right across the body when the two bones move apart. It takes the
+      // neighbours' bone. Two passes catch a stray pair.
+      const dominant = (i: number) => {
+        let best = -1, bw = -1;
+        for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k); if (w > bw) { bw = w; best = si.getComponent(i, k); } }
+        return best;
+      };
+      const neighbours: Array<number[] | undefined> = new Array(pos.count);
+      const link = (a: number, b: number) => { (neighbours[a] ??= []).push(b); (neighbours[b] ??= []).push(a); };
+      for (let t = 0; t + 2 < index.count; t += 3) {
+        const a = index.getX(t), b = index.getX(t + 1), cc = index.getX(t + 2);
+        link(a, b); link(b, cc); link(cc, a);
+      }
+      for (let pass = 0; pass < 2; pass++) {
+        const dom = new Int32Array(pos.count);
+        for (let i = 0; i < pos.count; i++) dom[i] = dominant(i);
+        for (let i = 0; i < pos.count; i++) {
+          const nb = neighbours[i];
+          if (!nb || nb.length < 2) continue;
+          const votes = new Map<number, number>();
+          let same = 0;
+          for (const n of nb) {
+            if (dom[n] === dom[i]) same++;
+            else votes.set(dom[n], (votes.get(dom[n]) ?? 0) + 1);
+          }
+          if (same > 0) continue;
+          let best = -1, bv = 0;
+          for (const [jn, c] of votes) if (c > bv) { bv = c; best = jn; }
+          // Three or more neighbours: four in five agreeing is enough; with only two, both must.
+          const enough = nb.length >= 3 ? bv >= nb.length * 0.8 : bv === nb.length;
+          if (best >= 0 && enough && !near(bones[best], bones[dom[i]])) {
+            give(i, best);
+            touched = true;
+          }
+        }
+      }
+    } else {
+      for (let i = 0; i < pos.count; i++) if (rod[i]) { give(i, alone[i]); touched = true; }
     }
     if (touched) sw.needsUpdate = true;
   });

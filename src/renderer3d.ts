@@ -492,7 +492,37 @@ export class Renderer3D implements Renderer {
         }
       }
     });
-    return worst.map((w) => `${w.name}:${w.d.toFixed(2)}`).join(",");
+    // Triangle stretch: edges that grew most since bind, with the dominant bone at each end.
+    const e0 = new THREE.Vector3();
+    const e1 = new THREE.Vector3();
+    const stretched: Array<{ label: string; r: number }> = [];
+    c.root.traverse((o) => {
+      const m = o as THREE.SkinnedMesh;
+      if (!m.isSkinnedMesh || !m.skeleton || !m.geometry.index) return;
+      const pos = m.geometry.getAttribute("position");
+      const si = m.geometry.getAttribute("skinIndex");
+      const sw = m.geometry.getAttribute("skinWeight");
+      const idx = m.geometry.index;
+      const topBone = (i: number) => {
+        let best = 0, bw = -1;
+        for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k); if (w > bw) { bw = w; best = si.getComponent(i, k); } }
+        return m.skeleton.bones[best]?.name ?? "?";
+      };
+      for (let t = 0; t + 2 < idx.count; t += 3 * 7) {
+        const ia = idx.getX(t), ib = idx.getX(t + 1);
+        e0.fromBufferAttribute(pos, ia); e1.fromBufferAttribute(pos, ib);
+        const bindLen = e0.distanceTo(e1);
+        if (bindLen < 1e-6) continue;
+        m.getVertexPosition(ia, e0); m.getVertexPosition(ib, e1);
+        const r = e0.distanceTo(e1) / bindLen;
+        if (r > 2 && (stretched.length < 3 || r > stretched[stretched.length - 1].r)) {
+          stretched.push({ label: `${topBone(ia)}>${topBone(ib)}`, r });
+          stretched.sort((a, b) => b.r - a.r);
+          if (stretched.length > 3) stretched.pop();
+        }
+      }
+    });
+    return worst.map((w) => `${w.name}:${w.d.toFixed(2)}`).join(",") + " edges=" + stretched.map((s) => `${s.label}x${s.r.toFixed(0)}`).join(",");
   }
   private probeCalls = 0;
   private lastSpike = "";
