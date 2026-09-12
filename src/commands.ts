@@ -51,8 +51,9 @@ export function parseCommand(text: string, dances: string[], clips: string[]): C
   if (namedDance || /\b(dance|bust a move|groove|boogie|shake it|show me your moves)\b/.test(t)) {
     const m = t.match(/(\d+)\s*(s|sec|second|seconds|min|minute|minutes)\b/);
     let seconds = m ? Number(m[1]) * (m[2].startsWith("min") ? 60 : 1) : undefined;
-    if (!seconds && /\b(a|one) minute\b/.test(t)) seconds = 60;
+    // "half a minute" contains "a minute", so the narrower phrase has to be tested first.
     if (!seconds && /\bhalf a minute\b/.test(t)) seconds = 30;
+    if (!seconds && /\b(a|one) minute\b/.test(t)) seconds = 60;
     return { kind: "dance", name: namedDance, seconds };
   }
   if (/\b(climb)\b/.test(t)) return { kind: "climb" };

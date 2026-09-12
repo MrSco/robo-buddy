@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^1.0.1",
@@ -21,6 +23,7 @@
     "@tauri-apps/cli": "^2",
     "@types/three": "^0.180.0",
     "typescript": "^5.6",
-    "vite": "^6"
+    "vite": "^6",
+    "vitest": "^2"
   }
 }
