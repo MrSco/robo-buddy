@@ -180,7 +180,10 @@ impl Analyzer {
             self.beat_pending = true;
         }
 
-        if self.hops % (HOPS_PER_SEC * 0.5) as u64 == 0 {
+        // Four times a second. The autocorrelation still looks back over 8 s, so the figure stays
+        // steady, but it is refreshed often enough to follow a tempo change (or the next track)
+        // while he is already in the middle of a dance rather than waiting out the current one.
+        if self.hops % (HOPS_PER_SEC * 0.25) as u64 == 0 {
             self.estimate_bpm();
         }
 

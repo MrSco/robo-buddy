@@ -41,6 +41,7 @@ const els = {
   meterFill: $<HTMLDivElement>("meter-fill"),
   meterMark: $<HTMLDivElement>("meter-mark"),
   meterTxt: $<HTMLSpanElement>("meter-txt"),
+  meterBpm: $<HTMLSpanElement>("meter-bpm"),
   tempo: $<HTMLInputElement>("tempo"),
   clickthrough: $<HTMLSelectElement>("clickthrough"),
   autostart: $<HTMLInputElement>("autostart"),
@@ -529,8 +530,13 @@ function startMeter() {
     els.meterFill.classList.toggle("on", on);
     els.meterMark.style.left = `${Math.round(threshold * 100)}%`;
     els.meterTxt.textContent = silent ? "silent" : on ? "dancing" : "too quiet";
+    // Straight from the analyser rather than the buddy's smoothed copy, so it keeps moving while
+    // he is mid-dance and shows the tempo actually being picked out of the audio right now.
+    const bpm = Math.round(e.payload.bpm);
+    els.meterBpm.textContent = bpm > 0 ? `${bpm} bpm` : "— bpm";
   }).catch(() => {
     els.meterTxt.textContent = "";
+    els.meterBpm.textContent = "";
   });
 }
 

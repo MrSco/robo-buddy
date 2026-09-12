@@ -344,9 +344,11 @@ export class Behavior {
     // Just after a descent he is crossing the desk, so he climbs and charges nothing until he
     // has cleared the screen he was stuck on.
     const traveling = this.energetic && s.t < this.travelUntil;
-    // Showing off: run at a window flat out. Only from the floor, and not while crossing the
-    // desk; up on a window his job is to get off it, not to hop about on it.
-    if (canWalk && this.energetic && !s.onSurface && !traveling && s.charge && !stale(s.charge.hwnd)) {
+    // Showing off: run at a window flat out. Only from the floor; up on a window his job is to
+    // get off it, not to hop about on it. Crossing the desk he will still shoulder one out of
+    // the way as he passes, just not stop to climb it: a barge leaves him running, so it cannot
+    // strand him orbiting the same window, which is the whole reason travelling blocks the rest.
+    if (canWalk && this.energetic && !s.onSurface && s.charge && !stale(s.charge.hwnd)) {
       const charge = s.charge;
       const speed = (walk!.speed ?? 120) * 2.6;
       const dir = Math.sign(charge.x - s.x) || 1;
@@ -354,12 +356,16 @@ export class Behavior {
         this.activity = { kind: "walk", clip: { name: walk!.clip, loop: true }, targetX: charge.x, speed, then, hopTop: charge.top, punchDir: dir };
         this.activityEnds = s.t + Math.abs(charge.x - s.x) / speed + 2;
       };
-      for (let i = 0; i < 2; i++) options.push(runAt("hop"));
-      // Mostly he knocks the window clean away: a fist when he has the clip for it, a shoulder
-      // barge either way. Weighted heavily, since sending windows flying is the point of it.
-      const hit = this.punchClip() ? "punch" : "barge";
-      for (let i = 0; i < 2; i++) options.push(runAt(hit));
-      for (let i = 0; i < 3; i++) options.push(runAt("barge"));
+      if (traveling) {
+        for (let i = 0; i < 4; i++) options.push(runAt("barge"));
+      } else {
+        for (let i = 0; i < 2; i++) options.push(runAt("hop"));
+        // Mostly he knocks the window clean away: a fist when he has the clip for it, a shoulder
+        // barge either way. Weighted heavily, since sending windows flying is the point of it.
+        const hit = this.punchClip() ? "punch" : "barge";
+        for (let i = 0; i < 3; i++) options.push(runAt(hit));
+        for (let i = 0; i < 4; i++) options.push(runAt("barge"));
+      }
     }
     // He turns where he stands and drives a fist into the glass behind him, shattering the
     // desktop there. This, far more than the slow timer, is what tears the screen apart.
