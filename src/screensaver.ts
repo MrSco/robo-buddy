@@ -57,6 +57,12 @@ const ctx = canvas.getContext("2d", { alpha: false })!;
 const loading = document.getElementById("loading") as HTMLParagraphElement;
 
 let sprites: Sprite[] = [];
+/**
+ * The desktop as it was, with a hole cut where each window sat. Three layers make the picture:
+ * black underneath, this in the middle, and the loose windows on top. Knock one away and you
+ * see straight through its hole to the black.
+ */
+let backdrop: ImageBitmap | null = null;
 let screen: MonitorShot | null = null;
 /** Device pixels per CSS pixel for the canvas backing store. */
 let dpr = 1;
@@ -78,6 +84,17 @@ async function start() {
   // The window is labelled "screensaver-<n>", one per monitor.
   const index = Number(/(\d+)$/.exec(getCurrentWindow().label)?.[1] ?? 0);
   screen = await invoke<MonitorShot>("capture_desktop", { index });
+  const full = await createImageBitmap(await (await fetch(`data:image/png;base64,${screen.png}`)).blob());
+  // Punch the windows out of the desktop picture once, here, rather than every frame.
+  const holes = document.createElement("canvas");
+  holes.width = screen.width;
+  holes.height = screen.height;
+  const hctx = holes.getContext("2d")!;
+  hctx.drawImage(full, 0, 0);
+  for (const r of screen.sprites) hctx.clearRect(r.x, r.y, r.width, r.height);
+  backdrop = await createImageBitmap(holes);
+  full.close();
+
   // Back to front, so the sprite drawn last is the one that was on top. Each carries its own
   // picture, so a window that was buried still looks like itself once he knocks it loose.
   for (const r of screen.sprites.slice().reverse()) {
@@ -194,11 +211,12 @@ function frame(now: number) {
 
   if (screen) {
     const scale = canvas.width / screen.width;
-    // A black stage. Showing the desktop behind the pieces made it unclear what was loose and
-    // what was scenery, and left him climbing windows that were only part of the backdrop.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // Black underneath, so a hole with nothing in it reads as empty rather than as wallpaper.
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // The desktop, minus the windows: wallpaper and icons stay, their windows are holes.
+    if (backdrop) ctx.drawImage(backdrop, 0, 0, canvas.width, canvas.height);
 
     const floor = screen.height;
     for (const s of sprites) {
