@@ -133,14 +133,6 @@ fn settings_path(app: &AppHandle) -> Option<PathBuf> {
     Some(dir.join("settings.json"))
 }
 
-#[allow(dead_code)]
-pub fn load(app: &AppHandle) -> Settings {
-    settings_path(app)
-        .and_then(|p| fs::read_to_string(p).ok())
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default()
-}
-
 /// Load before the app exists. Windows from the config are created before `setup` runs and
 /// the buddy asks for its settings immediately, so the store must be managed on the Builder.
 /// Mirrors Tauri's app_config_dir on Windows: %APPDATA%\<identifier>.
