@@ -131,9 +131,17 @@ fn foreground_is_fullscreen() -> bool {
     use windows::Win32::Foundation::RECT;
     use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST};
     use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowRect, GetShellWindow, GetDesktopWindow};
+    use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
     unsafe {
         let hwnd = GetForegroundWindow();
         if hwnd.0.is_null() || hwnd == GetShellWindow() || hwnd == GetDesktopWindow() {
+            return false;
+        }
+        // Our own screensaver covers the screen on purpose; hiding from it would hide the buddy
+        // from the very thing he is meant to be playing in.
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == std::process::id() {
             return false;
         }
         let mut r = RECT::default();
@@ -215,7 +223,7 @@ pub struct Surface {
 }
 
 #[cfg(windows)]
-fn list_surfaces() -> Vec<Surface> {
+pub(crate) fn list_surfaces() -> Vec<Surface> {
     use windows::core::BOOL;
     use windows::Win32::Foundation::{HWND, LPARAM, RECT};
     use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS};
@@ -266,7 +274,7 @@ fn list_surfaces() -> Vec<Surface> {
 }
 
 #[cfg(not(windows))]
-fn list_surfaces() -> Vec<Surface> {
+pub(crate) fn list_surfaces() -> Vec<Surface> {
     Vec::new()
 }
 

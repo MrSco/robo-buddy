@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Robo Buddy Screensaver</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #000;
+        cursor: none;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      /* Shown only while the screenshot is being taken, then never again. */
+      #loading {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        margin: 0;
+        color: #64748b;
+        font: 13px system-ui, sans-serif;
+      }
+      #loading[hidden] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <p id="loading">Taking a picture of your desktop…</p>
+    <script type="module" src="/src/screensaver.ts"></script>
+  </body>
+</html>

@@ -3260,8 +3260,10 @@ dependencies = [
 name = "robo-buddy"
 version = "0.3.0"
 dependencies = [
+ "base64 0.22.1",
  "keyring",
  "log",
+ "png 0.17.16",
  "reqwest",
  "rustfft",
  "serde",

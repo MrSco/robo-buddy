@@ -11,6 +11,7 @@ mod live;
 mod input;
 mod piper;
 mod packs;
+mod screen;
 mod settings;
 
 /// The tab the settings window should open on, left here until the page asks for it.
@@ -22,6 +23,36 @@ struct PendingTab(std::sync::Mutex<Option<String>>);
 #[tauri::command]
 fn take_settings_tab(state: tauri::State<PendingTab>) -> Option<String> {
     state.0.lock().ok().and_then(|mut t| t.take())
+}
+
+/// What Windows asked for when it launched us as a screensaver.
+enum ScreensaverArg {
+    /// `/s`: run it.
+    Show,
+    /// `/c` or `/c:<hwnd>`: show the settings for it.
+    Configure,
+    /// `/p <hwnd>`: draw the little preview in the screensaver dialog. Not supported; ignored.
+    Preview,
+}
+
+/// Reads the screensaver convention: a single letter after a slash or a dash, so `/s`, `-s`
+/// and `--screensaver` all work. Returns None for an ordinary launch.
+fn screensaver_arg(args: &[String]) -> Option<ScreensaverArg> {
+    for a in args.iter().skip(1) {
+        let flag = a.trim_start_matches(['/', '-']).to_ascii_lowercase();
+        let letter = flag.chars().next()?;
+        match letter {
+            's' if flag == "s" || flag.starts_with("screensaver") => return Some(ScreensaverArg::Show),
+            'c' if flag == "c" || flag.starts_with("c:") || flag.starts_with("configure") => {
+                return Some(ScreensaverArg::Configure)
+            }
+            'p' if flag == "p" || flag.starts_with("p:") || flag.starts_with("preview") => {
+                return Some(ScreensaverArg::Preview)
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 fn show_settings(app: &tauri::AppHandle) {
@@ -95,9 +126,17 @@ pub fn run() {
     let context = tauri::generate_context!();
     let initial = settings::load_early(&context.config().identifier);
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            // A second launch just summons the existing buddy.
-            input::bring_here(app.clone());
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // Windows launches a screensaver by running it again with /s, which lands here
+            // because the buddy is already running. Anything else just summons him.
+            match screensaver_arg(&args) {
+                Some(ScreensaverArg::Show) => {
+                    let _ = screen::screensaver_start(app.clone());
+                }
+                Some(ScreensaverArg::Configure) => show_settings(app),
+                Some(ScreensaverArg::Preview) => {}
+                None => input::bring_here(app.clone()),
+            }
         }))
         // Managed before any window exists: the buddy window calls get_settings on load.
         .manage(settings::SettingsState(std::sync::Mutex::new(initial.clone())))
@@ -113,7 +152,17 @@ pub fn run() {
             None,
         ))
         .manage(PendingTab::default())
+        .manage(screen::Shot::default())
         .setup(move |app| {
+            // Launched as a screensaver with nothing else running: go straight into it.
+            if let Some(ScreensaverArg::Show) = screensaver_arg(&std::env::args().collect::<Vec<_>>()) {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    // Let the buddy window finish loading first, or he blinks in afterwards.
+                    std::thread::sleep(std::time::Duration::from_millis(1200));
+                    let _ = screen::screensaver_start(handle);
+                });
+            }
             let bring_item = MenuItem::with_id(app, "bring", "Bring buddy here", true, None::<&str>)?;
             let settings_item = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
             let pause_item = CheckMenuItem::with_id(app, "pause", "Pause reactions", true, initial.paused, None::<&str>)?;
@@ -204,6 +253,10 @@ pub fn run() {
             piper::piper_delete_voice,
             packs::save_user_clip,
             open_settings,
+            screen::capture_desktop,
+            screen::buddy_rect,
+            screen::screensaver_start,
+            screen::screensaver_stop,
             take_settings_tab,
             context_menu,
             chat::set_chat_key,

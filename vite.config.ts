@@ -25,6 +25,7 @@ export default defineConfig({
       input: {
         buddy: resolve(__dirname, "index.html"),
         settings: resolve(__dirname, "settings.html"),
+        screensaver: resolve(__dirname, "screensaver.html"),
       },
     },
   },
