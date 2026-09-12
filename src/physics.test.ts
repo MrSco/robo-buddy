@@ -74,6 +74,21 @@ function climb(p: WindowPhysics, area: WorkArea, surfaces: Surface[], hwnd: numb
 }
 
 describe("climbing a window during the screensaver", () => {
+  it("leaves even a monitor-wide window and returns to the roaming floor", () => {
+    const p = buddyOn(AREAS[0], -1900);
+    const win = { hwnd: 902001, left: -2560, right: 0, top: 560, bottom: 1306 };
+    p.surfaces = [win];
+    p.support = win.hwnd;
+    p.y = win.top - H;
+    expect(p.deskBounds).toEqual({ left: -2560, right: 5120 });
+    p.leapOff(1);
+    for (let frame = 0; frame < 600; frame++) p.step(1 / 60);
+    expect(p.support).toBeNull();
+    expect(p.mode).toBe("rest");
+    for (let frame = 0; frame < 240; frame++) p.nudge(10);
+    expect(p.x + p.w / 2).toBeGreaterThan(win.right);
+  });
+
   it("hangs from a title bar high up the screen, pulls it down, and stands on it", () => {
     const area = AREAS[1];
     const win: Surface = { hwnd: 900001, left: 400, top: 250, right: 1900, bottom: 1200 };

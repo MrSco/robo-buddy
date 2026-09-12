@@ -166,6 +166,7 @@ fn encode(rgba: &[u8], w: i32, h: i32) -> Result<String, String> {
 #[derive(serde::Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct MonitorShot {
+    pub virtual_desktop: DesktopRect,
     /// Position and size of this monitor in virtual-screen pixels.
     pub x: i32,
     pub y: i32,
@@ -179,6 +180,24 @@ pub struct MonitorShot {
     /// instead of being painted black.
     pub see_through: bool,
 }
+
+#[derive(serde::Serialize, Clone)]
+pub struct DesktopRect {
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+#[derive(serde::Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CrtCycle {
+    pub started_at: u64,
+    pub void_seconds: f64,
+}
+
+#[derive(Default)]
+pub struct Cycle(pub std::sync::Mutex<Option<CrtCycle>>);
 
 /// A window that was on screen when the picture was taken, with its own pixels so it stays
 /// itself even when something was sitting on top of it.
@@ -338,6 +357,12 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
     if monitors.is_empty() {
         return Err("no monitors".into());
     }
+    *app.state::<Cycle>().0.lock().map_err(|e| e.to_string())? = None;
+    let left = monitors.iter().map(|m| m.position().x).min().unwrap();
+    let top = monitors.iter().map(|m| m.position().y).min().unwrap();
+    let right = monitors.iter().map(|m| m.position().x + m.size().width as i32).max().unwrap();
+    let bottom = monitors.iter().map(|m| m.position().y + m.size().height as i32).max().unwrap();
+    let virtual_desktop = DesktopRect { x: left, y: top, width: right - left, height: bottom - top };
     // A screensaver of their choosing plays underneath, seen through the holes where windows
     // were. Started further down, once the pictures are taken: a plain screen grab copies
     // whatever is on the glass, so starting it first would photograph it instead of the desktop.
@@ -391,7 +416,7 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
                     Some(Sprite { x: x - mx, y: y - my, width, height, png: encode(&rgba, width, height).ok()? })
                 })
                 .collect();
-            shots.push(MonitorShot { x: mx, y: my, width: mw, height: mh, png, sprites, see_through: false });
+            shots.push(MonitorShot { virtual_desktop: virtual_desktop.clone(), x: mx, y: my, width: mw, height: mh, png, sprites, see_through: false });
         }
         Ok(shots)
     })();
@@ -502,6 +527,140 @@ pub fn screensaver_surfaces(app: tauri::AppHandle, index: usize, surfaces: Vec<c
         per_screen.values().flatten().cloned().collect::<Vec<_>>()
     };
     let _ = app.emit("surfaces", &merged);
+}
+
+/// The registry value we tuck the user's previous screen saver into, so "restore" can put it
+/// back. Windows ignores value names it does not know, so it is safe to keep it here.
+#[cfg(windows)]
+const PREV_SAVER: &str = "SCRNSAVE.EXE.RoboBuddyPrev";
+
+/// Where our screen-saver copy lives: a `.scr` beside the running exe. Windows only launches
+/// files ending in `.scr` as screen savers, so we cannot point it straight at the `.exe`.
+#[cfg(windows)]
+fn scr_path() -> Result<std::path::PathBuf, String> {
+    let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+    Ok(exe.with_file_name("robo-buddy.scr"))
+}
+
+/// Whether a registered screen-saver path is our own `.scr` (compared by file name).
+#[cfg(windows)]
+fn is_our_scr(path: &str, scr: &std::path::Path) -> bool {
+    if path.trim().is_empty() {
+        return false;
+    }
+    std::path::Path::new(path)
+        .file_name()
+        .zip(scr.file_name())
+        .map(|(a, b)| a.eq_ignore_ascii_case(b))
+        .unwrap_or(false)
+}
+
+/// True when Robo Buddy is the user's current Windows screen saver.
+#[tauri::command]
+pub fn windows_screensaver_status() -> bool {
+    #[cfg(windows)]
+    {
+        use winreg::enums::HKEY_CURRENT_USER;
+        use winreg::RegKey;
+        let Ok(scr) = scr_path() else { return false };
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let Ok(desktop) = hkcu.open_subkey(r"Control Panel\Desktop") else { return false };
+        let cur: String = desktop.get_value("SCRNSAVE.EXE").unwrap_or_default();
+        is_our_scr(&cur, &scr)
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+/// Register Robo Buddy as the Windows screen saver, or put the previous one back. Enabling copies
+/// the running exe to a `.scr` beside it and points the user's screen-saver setting at it,
+/// remembering whatever was there first; Windows then launches us with `/s` on idle, which the
+/// running buddy picks up and turns into the layered screensaver.
+#[tauri::command]
+pub fn set_windows_screensaver(enable: bool) -> Result<String, String> {
+    #[cfg(windows)]
+    {
+        use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
+        use winreg::RegKey;
+        let scr = scr_path()?;
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let desktop = hkcu
+            .open_subkey_with_flags(r"Control Panel\Desktop", KEY_READ | KEY_WRITE)
+            .map_err(|e| e.to_string())?;
+        if enable {
+            let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+            std::fs::copy(&exe, &scr).map_err(|e| format!("could not write {}: {e}", scr.display()))?;
+            let cur: String = desktop.get_value("SCRNSAVE.EXE").unwrap_or_default();
+            // Remember the previous saver, unless it was already ours (do not overwrite the backup
+            // with our own path when the user clicks twice).
+            if !is_our_scr(&cur, &scr) {
+                let _ = desktop.set_value(PREV_SAVER, &cur);
+            }
+            desktop
+                .set_value("SCRNSAVE.EXE", &scr.to_string_lossy().to_string())
+                .map_err(|e| e.to_string())?;
+            desktop.set_value("ScreenSaveActive", &"1".to_string()).map_err(|e| e.to_string())?;
+            // Without a timeout the screen saver never actually starts on idle; give it one only
+            // if the user has none set, so we do not stamp over their own choice.
+            let timeout: String = desktop.get_value("ScreenSaveTimeOut").unwrap_or_default();
+            if timeout.trim().is_empty() || timeout.trim() == "0" {
+                let _ = desktop.set_value("ScreenSaveTimeOut", &"300".to_string());
+            }
+            apply_screensaver_active(true);
+            Ok("Robo Buddy is now your Windows screen saver.".into())
+        } else {
+            let prev: String = desktop.get_value(PREV_SAVER).unwrap_or_default();
+            desktop.set_value("SCRNSAVE.EXE", &prev).map_err(|e| e.to_string())?;
+            let _ = desktop.delete_value(PREV_SAVER);
+            apply_screensaver_active(!prev.trim().is_empty());
+            Ok(if prev.trim().is_empty() {
+                "Robo Buddy is no longer your Windows screen saver.".into()
+            } else {
+                "Put your previous Windows screen saver back.".into()
+            })
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = enable;
+        Err("Windows only".into())
+    }
+}
+
+/// Tell Windows the screen-saver-active flag changed, so it takes effect without a sign-out.
+#[cfg(windows)]
+fn apply_screensaver_active(active: bool) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SystemParametersInfoW, SPIF_SENDCHANGE, SPIF_UPDATEINIFILE, SPI_SETSCREENSAVEACTIVE,
+    };
+    // SAFETY: no pointer is passed; this only flips the user's screen-saver-active flag.
+    unsafe {
+        let _ = SystemParametersInfoW(SPI_SETSCREENSAVEACTIVE, active as u32, None, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
+    }
+}
+
+/// One monitor's page has eroded away: tell every page to run the tube-off collapse together,
+/// so the whole desk powers down at once rather than each screen doing its own thing at its own
+/// time. Whichever screen finishes first calls this; the rest follow.
+#[tauri::command]
+pub fn screensaver_crt(app: tauri::AppHandle) -> Result<CrtCycle, String> {
+    use tauri::{Emitter, Manager};
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_err(|e| e.to_string())?.as_millis() as u64;
+    let state = app.state::<Cycle>();
+    let mut active = state.0.lock().map_err(|e| e.to_string())?;
+    if let Some(cycle) = active.as_ref() {
+        if now < cycle.started_at + 1350 + (cycle.void_seconds * 1000.0) as u64 + 200 {
+            return Ok(cycle.clone());
+        }
+    }
+    let settings = app.state::<crate::settings::SettingsState>();
+    let hold = settings.0.lock().map_err(|e| e.to_string())?.screensaver_void_seconds;
+    let cycle = CrtCycle { started_at: now + 150, void_seconds: if hold.is_finite() { hold.clamp(0.0, 120.0) } else { 6.0 } };
+    app.emit("screensaver-crt", &cycle).map_err(|e| e.to_string())?;
+    *active = Some(cycle.clone());
+    Ok(cycle)
 }
 
 /// Start the chosen screensaver full screen behind ours. Returns whether it actually started.

@@ -218,6 +218,13 @@ export class WindowPhysics {
     return this.roam ? this.allScreens : { left: this.area.left, right: this.area.right };
   }
 
+  /** The whole floor he may walk on, ignoring any window he happens to be standing on: every
+   * screen while roaming, else the work area. Lets the behaviour tell where the real edges are
+   * even from up on a window, so it does not walk him off the end of the desk into nothing. */
+  get deskBounds() {
+    return this.roam ? this.allScreens : { left: this.area.left, right: this.area.right };
+  }
+
   private static readonly EDGE = 28;
   /** This much of the window (with his head in it) may poke above the screen before it counts. */
   private static readonly SLACK = 0.04;
@@ -227,6 +234,8 @@ export class WindowPhysics {
   private bumped = new Map<number, number>();
   /** Seconds left in which the ceiling does not push him back down: he is falling away from it after a bump. */
   private ceilingFree = 0;
+  /** Ignore the departed ledge until this leap has settled on the floor or another surface. */
+  private departedSurface: number | null = null;
   /** The edge he last bumped on: others at the same height are left alone for a moment too. */
   private lastBump = { top: NaN, at: -Infinity };
 
@@ -309,6 +318,7 @@ export class WindowPhysics {
     const hi = this.y + this.h - 4;
     for (let i = 0; i < this.surfaces.length; i++) {
       const s = this.surfaces[i];
+      if (s.hwnd === this.departedSurface) continue;
       if (s.top < lo || s.top > hi) continue;
       if (cx < s.left + WindowPhysics.EDGE || cx > s.right - WindowPhysics.EDGE) continue;
       if (this.occluded(i, cx)) continue;
@@ -332,6 +342,7 @@ export class WindowPhysics {
     const hi = this.y + this.h * 0.42;
     for (let i = 0; i < this.surfaces.length; i++) {
       const s = this.surfaces[i];
+      if (s.hwnd === this.departedSurface) continue;
       if (s.top < lo || s.top > hi) continue;
       if (cx < s.left + WindowPhysics.EDGE || cx > s.right - WindowPhysics.EDGE) continue;
       if (this.occluded(i, cx)) continue;
@@ -435,6 +446,7 @@ export class WindowPhysics {
     let hwnd: number | null = null;
     for (let i = 0; i < this.surfaces.length; i++) {
       const s = this.surfaces[i];
+      if (s.hwnd === this.departedSurface) continue;
       if (cx < s.left + WindowPhysics.EDGE || cx > s.right - WindowPhysics.EDGE) continue;
       const fy = s.top - this.h;
       if (fy < this.y - 4) continue; // its top edge is above his feet already
@@ -455,6 +467,22 @@ export class WindowPhysics {
 
   get workArea() {
     return this.area;
+  }
+
+  /**
+   * Leap clean off the window he stands on, toward `dir` (-1 left, 1 right), with a real sideways
+   * launch. Walking off an edge drops him straight down and he lands back on the same window a
+   * few pixels short of the brink; a leap arcs him well past it onto the floor (or the next
+   * screen), which is how he finally gets off a window and crosses monitors. Roaming only.
+   */
+  leapOff(dir: number) {
+    if (this.mode !== "rest") return;
+    this.departedSurface = this.support;
+    this.support = null;
+    this.mode = "falling";
+    this.vy = -600;
+    this.vx = (dir >= 0 ? 1 : -1) * 1500;
+    this.spin = 0;
   }
 
   /** Jump to a new spot (and work area) and let gravity settle him. */
@@ -518,6 +546,7 @@ export class WindowPhysics {
   step(dt: number) {
     dt = Math.min(dt, 0.05);
     this.trackAccel(dt);
+    if (this.mode === "rest" || this.mode === "held") this.departedSurface = null;
     if (this.mode === "held") {
       this.x = cursor.x - this.grabDx;
       this.y = cursor.y - this.grabDy;
@@ -531,6 +560,7 @@ export class WindowPhysics {
       this.vy += GRAVITY * dt;
       this.x += this.vx * dt;
       this.y += this.vy * dt;
+      if (this.roam) this.area = this.areaAt(this.x + this.w / 2, this.y + this.h / 2);
       // Descending past a title bar within reach: grab it instead of falling on by.
       if (this.vy >= 0 && this.surfaces.length && (this.tryGrab() || this.tryStepUp())) {
         this.apply();
@@ -539,8 +569,9 @@ export class WindowPhysics {
       const landing = this.landingFloor();
       const floor = landing.y;
       if (this.y >= floor) this.support = landing.hwnd;
-      const left = this.area.left;
-      const right = this.area.right - this.w;
+      const flightBounds = this.roam ? this.allScreens : this.area;
+      const left = flightBounds.left;
+      const right = flightBounds.right - this.w;
       if (this.y >= floor) {
         this.y = floor;
         // Whatever spin he had ends at the first contact; the renderer springs him upright.
@@ -618,7 +649,15 @@ export class WindowPhysics {
       const cx = this.x + this.w / 2;
       const idx = s ? this.surfaces.indexOf(s) : -1;
       if (this.support !== null && (!s || cx < s.left + WindowPhysics.EDGE || cx > s.right - WindowPhysics.EDGE || this.occluded(idx, cx))) {
-        // The window he stood on closed, minimised or slid away: fall to whatever is below.
+        // He walked off an edge: carry him clear of it as he drops. Support falls away the moment
+        // his centre reaches the brink, but his centre is still over the window's landing zone
+        // then, so without a shove he drops straight down and lands right back on the same window
+        // a few pixels short of the edge, over and over. A push in the way he was heading arcs
+        // him past it onto whatever is beyond (the floor, the next screen).
+        if (s && this.roam) {
+          if (cx > s.right - WindowPhysics.EDGE) this.vx = Math.max(this.vx, 900);
+          else if (cx < s.left + WindowPhysics.EDGE) this.vx = Math.min(this.vx, -900);
+        }
         this.support = null;
         if (this.opts.gravity) this.mode = "falling";
       } else if (s && !this.headroom(s).fit && this.y + this.crownNow < this.areaAt((s.left + s.right) / 2, s.top).top - this.h * WindowPhysics.SLACK) {

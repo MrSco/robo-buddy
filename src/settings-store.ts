@@ -29,6 +29,9 @@ export interface Settings {
    * than plain black. Blank for black.
    */
   screensaverBackdrop: string;
+  screensaverErosionStyle: "tiles" | "cracks";
+  screensaverErosionSpeed: number;
+  screensaverVoidSeconds: number;
   bubblesEnabled: boolean;
   /** Wander along the floor when idle. */
   wanderEnabled: boolean;
@@ -89,6 +92,9 @@ export const DEFAULT_SETTINGS: Settings = {
   soundsEnabled: true,
   screensaverSounds: false,
   screensaverBackdrop: "",
+  screensaverErosionStyle: "tiles",
+  screensaverErosionSpeed: 20,
+  screensaverVoidSeconds: 6,
   bubblesEnabled: true,
   wanderEnabled: true,
   danceMode: "random",

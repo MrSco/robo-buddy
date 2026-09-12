@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "screensaver",
+  "description": "The per-monitor screensaver backdrops. They only need to hear events: every screen has to start the tube-off collapse on the same tick, which is broadcast as 'screensaver-crt'. Everything else they do goes through this app's own commands, which are not gated here. Deliberately not given window, dialog or autostart permissions.",
+  "windows": [
+    "screensaver-*"
+  ],
+  "permissions": [
+    "core:event:default"
+  ]
+}

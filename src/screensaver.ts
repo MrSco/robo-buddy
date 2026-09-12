@@ -1,3 +1,5 @@
+import { cyclePhase, drawCrtSlice, erosionSeconds, type CrtCycle, type DesktopRect } from "./screensaver-cycle";
+import { loadCrackTextures, type CrackTexture } from "./screensaver-cracks";
 /**
  * Screensaver backdrop. It takes one picture of the desktop, dims it, and cuts a sprite out of
  * that picture for every window that was on screen. He then shoves those sprites around while
@@ -7,7 +9,9 @@
  * The buddy stays in his own window on top of this one, so his physics, poses and clips are
  * exactly what they are on the taskbar; this page only needs to know where he is.
  */
+import { getSettings } from "./settings-store";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface SpriteRect {
@@ -21,6 +25,7 @@ interface SpriteRect {
 
 /** One monitor: its picture, where it sits, and the windows that were on it. */
 interface MonitorShot {
+  virtualDesktop: DesktopRect;
   x: number;
   y: number;
   width: number;
@@ -49,6 +54,9 @@ interface Sprite {
   spin: number;
   /** Rests once it has settled on the floor, so a tidy pile stops jittering. */
   asleep: boolean;
+  /** How much of it has broken away, 0..1: set as the erosion grid eats its cells, so his
+   * physics stops treating a window that is mostly gone as something to stand on. */
+  reveal: number;
 }
 
 const GRAVITY = 1900; // px/s^2
@@ -62,11 +70,15 @@ const loading = document.getElementById("loading") as HTMLParagraphElement;
 
 let sprites: Sprite[] = [];
 /**
- * The desktop as it was, with a hole cut where each window sat. Three layers make the picture:
- * black underneath, this in the middle, and the loose windows on top. Knock one away and you
- * see straight through its hole to the black.
+ * The desktop as it was, with a hole cut where each window sat, kept whole so eroded cells can
+ * be painted back when the picture grows again. Three layers make the scene: black (or the
+ * screensaver playing behind) underneath, the desktop in the middle, and the loose windows on
+ * top. Break a cell of the desktop and you see straight through to whatever is underneath.
  */
-let backdrop: ImageBitmap | null = null;
+let desktopSrc: HTMLCanvasElement | null = null;
+/** The working desktop actually drawn: cells cleared from it reveal the layer behind. */
+let eroded: HTMLCanvasElement | null = null;
+let erodedCtx: CanvasRenderingContext2D | null = null;
 /** Which monitor this window covers; the backend keeps each screen's pieces apart by it. */
 let screenIndex = 0;
 let screen: MonitorShot | null = null;
@@ -100,22 +112,42 @@ async function start() {
   // The window is labelled "screensaver-<n>", one per monitor.
   screenIndex = Number(/(\d+)$/.exec(getCurrentWindow().label)?.[1] ?? 0);
   screen = await invoke<MonitorShot>("capture_desktop", { index: screenIndex });
-  // The page's own black would sit in front of anything playing underneath, so it is dropped
-  // when there is something to see. The canvas paints the black itself otherwise.
-  if (screen.seeThrough) {
-    document.documentElement.style.background = "transparent";
-    document.body.style.background = "transparent";
-  }
+  // The layer behind the desktop shows through wherever a cell is broken away: black when there
+  // is nothing underneath, or see-through to the screensaver playing under us. Making it the
+  // page's own background means a hole is just a cleared pixel, the same for the desktop and for
+  // the windows, in either mode.
+  const behind = screen.seeThrough ? "transparent" : "#000";
+  document.documentElement.style.background = behind;
+  document.body.style.background = behind;
   const full = await createImageBitmap(await (await fetch(`data:image/png;base64,${screen.png}`)).blob());
-  // Punch the windows out of the desktop picture once, here, rather than every frame.
-  const holes = document.createElement("canvas");
-  holes.width = screen.width;
-  holes.height = screen.height;
-  const hctx = holes.getContext("2d")!;
+  // Punch the windows out of the desktop picture once, here, rather than every frame. This is
+  // kept whole, and a working copy is what actually gets drawn and eroded.
+  desktopSrc = document.createElement("canvas");
+  desktopSrc.width = screen.width;
+  desktopSrc.height = screen.height;
+  const hctx = desktopSrc.getContext("2d")!;
   hctx.drawImage(full, 0, 0);
   for (const r of screen.sprites) hctx.clearRect(r.x, r.y, r.width, r.height);
-  backdrop = await createImageBitmap(holes);
   full.close();
+  eroded = document.createElement("canvas");
+  eroded.width = screen.width;
+  eroded.height = screen.height;
+  erodedCtx = eroded.getContext("2d")!;
+  erodedCtx.drawImage(desktopSrc, 0, 0);
+  const settings = await getSettings();
+  erosionStyle = settings.screensaverErosionStyle;
+  ambientSeconds = erosionSeconds(settings.screensaverErosionSpeed);
+  // Every screen has to collapse on the same tick, which is what this event carries. It is not
+  // worth the whole screensaver if it cannot be heard: without it each screen just runs its own
+  // cycle. This threw once because the backdrop windows had no event permission, and the throw
+  // took the rest of start() with it, leaving nothing on screen but the error.
+  try {
+    await listen<CrtCycle>("screensaver-crt", (event) => beginCycle(event.payload));
+  } catch (err) {
+    log(`no crt sync: ${String(err).slice(0, 120)}`);
+  }
+  if (erosionStyle === "cracks") crackTextures = await loadCrackTextures();
+  initErosion(screen.width, screen.height);
 
   // Back to front, so the sprite drawn last is the one that was on top. Each carries its own
   // picture, so a window that was buried still looks like itself once he knocks it loose.
@@ -135,6 +167,7 @@ async function start() {
       angle: 0,
       spin: 0,
       asleep: true,
+      reveal: 0,
     });
   }
   log(`drew ${sprites.length} sprites for ${screen.width}x${screen.height}`);
@@ -196,8 +229,8 @@ function sendSurfaces() {
   // Front to back: the occlusion test treats the first entry as the one on top, and `sprites`
   // is stored back to front for drawing. Sent the wrong way round, the rearmost window shadows
   // every other one and he finds nothing he can climb.
-  const list = sprites
-    .filter((s) => s.asleep)
+  const list = (phase === "erode" ? sprites : [])
+    .filter((s) => s.asleep && s.reveal < 0.6)
     .reverse()
     .map((s) => ({
       // Its own id, not its place in this list: pieces drop out of the list the moment they are
@@ -290,22 +323,25 @@ function shove(s: Sprite, dt: number) {
   if (speed < SHOVE_SPEED) return;
   // He pushes it the way he is going, hard enough that a real run sends it properly.
   const dir = Math.abs(buddyVx) > 40 ? Math.sign(buddyVx) : bx + bw / 2 < s.x + s.w / 2 ? 1 : -1;
-  const push = Math.min(3, speed / 320);
-  s.vx += dir * 900 * push * dt * 6;
+  const push = Math.min(3.2, speed / 300);
+  s.vx += dir * 1100 * push * dt * 6;
   // Dropping onto something drives it down; running into it lifts it a little.
-  s.vy += (buddyVy > 200 ? 260 : -180) * push * dt * 6;
-  s.spin += dir * 2.4 * push * dt * 6;
+  s.vy += (buddyVy > 200 ? 300 : -220) * push * dt * 6;
+  s.spin += dir * 2.8 * push * dt * 6;
   s.asleep = false;
 }
 
 /**
- * He has thrown a punch, facing `dir`. Whatever is in front of his fist goes flying: far harder
- * than a shoulder-barge, because a punch is meant to be the big one.
+ * He has thrown a punch, facing `dir`. His fist tears a chunk out of the desktop wherever it
+ * lands, and whatever window is in front of it goes flying: far harder than a shoulder-barge,
+ * because a punch is meant to be the big one.
  */
 function punched(dir: number) {
   if (!buddy) return;
   const fistX = buddy.x + buddy.w / 2 + dir * buddy.w * 0.3;
   const fistY = buddy.y + buddy.h * 0.45;
+  // A fist through the glass shatters a good patch of it, so he is plainly the one wrecking it.
+  breakAt(fistX, fistY, 360);
   let hit: Sprite | null = null;
   let nearest = Infinity;
   // Front-most first, so the one he can actually see takes the hit.
@@ -325,10 +361,200 @@ function punched(dir: number) {
     }
   }
   if (!hit) return;
-  hit.vx += dir * 1500;
-  hit.vy -= 520;
-  hit.spin += dir * 3.2;
+  hit.vx += dir * 1800;
+  hit.vy -= 620;
+  hit.spin += dir * 3.6;
   hit.asleep = false;
+}
+
+// ---- Breaking the desktop, so no patch of it stands still long enough to burn in ----
+// The desktop picture is a grid of cells. Over ERODE_SECONDS every cell breaks away in turn to
+// reveal the moving layer behind (the screensaver playing under us, or plain black); once the
+// whole screen is gone it grows back the same way and the cycle repeats, so there is always
+// motion everywhere and no pixel is left lit and still. His fists and his charges break the
+// cells they strike at once, so the destruction reads as his doing rather than a timer's.
+const CELL = 240; // px of the capture per grid cell: each one shatters as a single glass crack
+// Left to itself the desktop erodes very slowly, over minutes; the buddy is what really tears it
+// apart, so most of the damage follows his fists rather than a timer.
+let ambientSeconds = erosionSeconds(20);
+const BREAK_RATE = 2.4; // how fast one cell shatters once it starts, per second
+let cols = 0;
+let rows = 0;
+/** Per cell: 0 intact, 1 fully broken (revealing behind); between is a growing fracture. */
+let reveal: Float32Array = new Float32Array(0);
+let erosionStyle: "tiles" | "cracks" = "tiles";
+interface Tile { img: HTMLCanvasElement; x: number; y: number; vx: number; vy: number; angle: number; spin: number }
+let tiles: Tile[] = [];
+let crackSeed: number[] = [];
+let crackTextures: CrackTexture[] = [];
+/** Cells whose reveal is changing right now, so only these are repainted each frame. */
+const active = new Set<number>();
+/** The order cells break in: a shuffle, so it does not sweep away in obvious rows. */
+let order: number[] = [];
+let orderPtr = 0;
+let carry = 0;
+/** "erode": desktop and windows breaking away. "crtOff": the tube-TV collapse before it all
+ * snaps back whole and erodes again. */
+let phase: "erode" | "crtOff" | "void" = "erode";
+let crtCycle: CrtCycle | null = null;
+let crtRequested = false;
+
+function shuffledCells(): number[] {
+  const a = Array.from({ length: cols * rows }, (_, i) => i);
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function initErosion(w: number, h: number) {
+  cols = Math.ceil(w / CELL);
+  rows = Math.ceil(h / CELL);
+  reveal = new Float32Array(cols * rows);
+  crackSeed = Array.from({ length: cols * rows }, () => Math.random() * 1000);
+  tiles = [];
+  active.clear();
+  order = shuffledCells();
+  orderPtr = 0;
+  carry = 0;
+  phase = "erode";
+  crtCycle = null;
+  crtRequested = false;
+}
+
+/** Everything back to the snapshot, whole: the desktop repainted, every window returned to
+ * where it was cut from, resting and solid. Called the instant the tube-off collapse finishes. */
+function restoreDesktop() {
+  if (erodedCtx && eroded && desktopSrc) {
+    erodedCtx.clearRect(0, 0, eroded.width, eroded.height);
+    erodedCtx.drawImage(desktopSrc, 0, 0);
+  }
+  reveal.fill(0);
+  crackSeed = Array.from({ length: cols * rows }, () => Math.random() * 1000);
+  crtCycle = null;
+  crtRequested = false;
+  held = null;
+  tiles = [];
+  active.clear();
+  order = shuffledCells();
+  orderPtr = 0;
+  carry = 0;
+  for (const s of sprites) {
+    s.reveal = 0;
+    s.x = s.homeX;
+    s.y = s.homeY;
+    s.vx = 0;
+    s.vy = 0;
+    s.angle = 0;
+    s.spin = 0;
+    s.asleep = true;
+  }
+}
+
+/** Apply the supplied artwork at a fixed size: a hole plus its original glass detail. */
+function drawCrack(target: CanvasRenderingContext2D, i: number, glass: boolean) {
+  if (!crackTextures.length || reveal[i] <= 0) return;
+  const seed = crackSeed[i];
+  const texture = crackTextures[Math.floor(seed) % crackTextures.length];
+  const x = (i % cols) * CELL + CELL * (0.5 + Math.sin(seed) * 0.22);
+  const y = Math.floor(i / cols) * CELL + CELL * (0.5 + Math.cos(seed * 7) * 0.22);
+  target.save();
+  target.translate(x, y); target.rotate(seed);
+  const scale = 1.15 + (seed % 1) * 0.4;
+  target.scale(scale, scale);
+  target.globalCompositeOperation = glass ? "source-over" : "destination-out";
+  // Only the appearance advances; the source silhouette never balloons into a grid cell.
+  target.globalAlpha = Math.min(1, reveal[i] * 4);
+  target.drawImage(glass ? texture.glass : texture.hole, -texture.cx, -texture.cy);
+  target.restore();
+}
+function cutCell(target: CanvasRenderingContext2D, i: number) {
+  if (reveal[i] <= 0) return;
+  if (erosionStyle === "cracks") { drawCrack(target, i, false); return; }
+  target.save();
+  target.globalCompositeOperation = "destination-out";
+  target.fillStyle = "#000";
+  target.fillRect((i % cols) * CELL, Math.floor(i / cols) * CELL, CELL, CELL);
+  target.restore();
+}
+// Glass is composited once over the complete desktop/window scene to avoid accumulating alpha.
+function paintCell(i: number) { if (erodedCtx && erosionStyle === "tiles") cutCell(erodedCtx, i); }
+function nudgeCell(i: number) {
+  if (reveal[i] > 0 || active.has(i)) return;
+  if (erosionStyle === "tiles" && desktopSrc && screen) {
+    const x = (i % cols) * CELL, y = Math.floor(i / cols) * CELL;
+    const img = document.createElement("canvas");
+    img.width = Math.min(CELL, screen.width - x); img.height = Math.min(CELL, screen.height - y);
+    const tc = img.getContext("2d")!; tc.translate(-x, -y); tc.drawImage(desktopSrc, 0, 0);
+    for (const sp of sprites) {
+      tc.save(); tc.translate(sp.x + sp.w / 2, sp.y + sp.h / 2); tc.rotate(sp.angle);
+      tc.drawImage(sp.img, -sp.w / 2, -sp.h / 2, sp.w, sp.h); tc.restore();
+    }
+    tiles.push({ img, x: x + img.width / 2, y: y + img.height / 2, vx: (Math.random() - 0.5) * 150, vy: -60, angle: 0, spin: (Math.random() - 0.5) * 1.8 });
+  }
+  active.add(i);
+}
+
+/** Break every cell within `radius` px of a point at once: his fist or shoulder hit there. */
+function breakAt(px: number, py: number, radius: number) {
+  if (!cols || phase !== "erode") return;
+  const c0 = Math.max(0, Math.floor((px - radius) / CELL));
+  const c1 = Math.min(cols - 1, Math.floor((px + radius) / CELL));
+  const r0 = Math.max(0, Math.floor((py - radius) / CELL));
+  const r1 = Math.min(rows - 1, Math.floor((py + radius) / CELL));
+  for (let r = r0; r <= r1; r++) {
+    for (let c = c0; c <= c1; c++) nudgeCell(r * cols + c);
+  }
+}
+
+/**
+ * Erode a resting window in the very same grid pieces as the desktop around it: wherever a cell
+ * has broken away, that patch of the window is cleared too, so it comes apart in chunks rather
+ * than fading out whole. Also records how much of it has gone, for the standable test.
+ */
+function punchSprite(s: Sprite) {
+  if (!cols || s.reveal >= 1) return;
+  const c0 = Math.max(0, Math.floor(s.x / CELL));
+  const c1 = Math.min(cols - 1, Math.floor((s.x + s.w - 1) / CELL));
+  const r0 = Math.max(0, Math.floor(s.y / CELL));
+  const r1 = Math.min(rows - 1, Math.floor((s.y + s.h - 1) / CELL));
+  let total = 0;
+  let gone = 0;
+  for (let r = r0; r <= r1; r++) {
+    for (let c = c0; c <= c1; c++) {
+      total++;
+      gone += erosionStyle === "tiles" ? Number(reveal[r * cols + c] > 0) : reveal[r * cols + c];
+    }
+  }
+  s.reveal = total ? gone / total : 0;
+}
+
+function updateErosion(dt: number) {
+  if (!cols) return;
+  if (phase !== "erode") return; // during the collapse the grid is left frozen.
+  // Feed new cells into the erosion from the shuffled order, at a steady rate.
+  carry += ((cols * rows) / ambientSeconds) * dt;
+  while (carry >= 1 && orderPtr < order.length) {
+    nudgeCell(order[orderPtr++]);
+    carry -= 1;
+  }
+  // Advance every breaking cell and repaint it; drop it once it is fully gone.
+  for (const i of active) {
+    reveal[i] = Math.min(1, reveal[i] + BREAK_RATE * dt);
+    paintCell(i);
+    if (reveal[i] >= 1) active.delete(i);
+  }
+  // Whole desktop gone and settled: pull the plug. Tell every screen to collapse at the same
+  // moment (this one included, via the event), so the whole desk powers off as one.
+  if (!crtRequested && reveal.every(value => value >= 1) && active.size === 0 && tiles.length === 0) {
+    crtRequested = true;
+    void invoke<CrtCycle>("screensaver_crt").then(beginCycle).catch(() => { crtRequested = false; });
+  }
+}
+
+function beginCycle(cycle: CrtCycle) {
+  if (!crtCycle || cycle.startedAt > crtCycle.startedAt) crtCycle = cycle;
 }
 
 let last = performance.now();
@@ -339,18 +565,37 @@ function frame(now: number) {
 
   held = gripped();
 
+  if (crtCycle && screen) {
+    const next = cyclePhase(crtCycle, Date.now());
+    if (next === "erode") {
+      restoreDesktop();
+      phase = "erode";
+      sendSurfaces();
+    } else if (next !== "waiting") {
+      if (phase === "erode") {
+        phase = "crtOff";
+        held = null;
+        sendSurfaces();
+      }
+      phase = next;
+      drawCrtSlice(ctx, screen, screen.virtualDesktop, (Date.now() - crtCycle.startedAt) / 1000);
+      requestAnimationFrame(frame);
+      return;
+    }
+  }
+
   if (screen) {
     const scale = canvas.width / screen.width;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    // With something playing underneath the holes stay see-through; otherwise they are black,
-    // so an emptied hole reads as empty rather than as wallpaper.
+    // A cleared pixel shows the page background behind: black, or see-through to the screensaver
+    // playing underneath. Broken cells of the desktop and of the windows both read as that.
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (!screen.seeThrough) {
-      ctx.fillStyle = "#000";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-    // The desktop, minus the windows: wallpaper and icons stay, their windows are holes.
-    if (backdrop) ctx.drawImage(backdrop, 0, 0, canvas.width, canvas.height);
+    // The desktop, minus the windows and minus whatever has broken away: wallpaper and icons
+    // stay until a cell of them is torn out to show the moving layer behind. His charges tear a
+    // path through it as he barges along; the timed erosion takes care of the rest.
+    if (barging && buddy) breakAt(buddy.x + buddy.w / 2, buddy.y + buddy.h * 0.55, 200);
+    updateErosion(dt);
+    if (eroded) ctx.drawImage(eroded, 0, 0, canvas.width, canvas.height);
 
     const floor = screen.height;
     for (const s of sprites) {
@@ -403,8 +648,22 @@ function frame(now: number) {
       ctx.rotate(s.angle);
       ctx.drawImage(s.img, -s.w / 2, -s.h / 2, s.w, s.h);
       ctx.restore();
+      // A resting window breaks up in the same pieces as the desktop; one in flight stays whole.
+      if (s.asleep && s.angle === 0) punchSprite(s);
     }
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    for (let i = 0; i < reveal.length; i++) cutCell(ctx, i);
+    if (erosionStyle === "cracks") {
+      for (let i = 0; i < reveal.length; i++) drawCrack(ctx, i, true);
+    }
+    for (const tile of tiles) {
+      tile.vy += GRAVITY * dt; tile.x += tile.vx * dt; tile.y += tile.vy * dt; tile.angle += tile.spin * dt;
+      ctx.save(); ctx.translate(tile.x, tile.y); ctx.rotate(tile.angle);
+      ctx.drawImage(tile.img, -tile.img.width / 2, -tile.img.height / 2); ctx.restore();
+    }
+    tiles = tiles.filter(tile => tile.y - CELL <= screen!.height);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
   }
   requestAnimationFrame(frame);
 }

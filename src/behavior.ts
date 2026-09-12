@@ -57,6 +57,12 @@ interface Status {
    */
   charge: { x: number; hwnd: number; top: number } | null;
   onSurface: boolean;
+  /** The window he is standing on, or null; so roaming he does not fixate on re-climbing it. */
+  support: number | null;
+  /** The whole floor's edges (every screen while roaming), even when he is up on a window, so
+   * he steps off toward the desk rather than off the outer edge of it into nothing. */
+  deskLeft: number;
+  deskRight: number;
 }
 
 const MIN_WANDER = 160;
@@ -197,6 +203,8 @@ export class Behavior {
 
   /** Set when a walk that was heading for a climb arrives; main performs the hop. */
   pendingHop: number | null = null;
+  /** Set to the direction (-1/1) he should leap off the window he is on; main performs the leap. */
+  pendingLeave: number | null = null;
   /** Set to -1 or 1 the moment a punch lands, for whatever is on the receiving end. */
   pendingPunch: number | null = null;
   /** Clips that read as a hit, best first. Any character that has one can throw it. */
@@ -213,6 +221,18 @@ export class Behavior {
    * further and faster, climbs whatever he can reach and jumps for the sake of it.
    */
   energetic = false;
+  /** Screensaver roaming: he marches this way across every screen, turning at the far ends. */
+  private roamDir: 1 | -1 = 1;
+  /** When he last climbed onto a window while roaming, so he is moved along before he settles. */
+  private perchedSince = -1;
+  /** The window he was last standing on, and when he stepped off it, so he does not turn round
+   * and climb the very same one over and over instead of crossing to the next screen. */
+  private lastPerchHwnd: number | null = null;
+  private lastPerchAt = -Infinity;
+  /** While travelling he runs to the far end climbing nothing, so he crosses to another screen
+   * rather than orbiting one; between travels he knocks the windows about where he is. */
+  private travelUntil = -Infinity;
+  private nextTravel = 0;
 
   /** Seconds to wait before the next idea, squeezed hard while he is being energetic. */
   private gap(base: number, spread: number): number {
@@ -228,6 +248,25 @@ export class Behavior {
   update(s: Status): Activity {
     const m = this.manifest;
     if (!m) return this.activity;
+
+    // Roaming, he does not linger on any one window: note when he got up so he can be moved
+    // along, remember which window it was so he does not climb straight back onto it, and now
+    // and then set off across the desk so every screen gets its turn.
+    if (this.energetic) {
+      if (s.onSurface) {
+        if (this.perchedSince < 0) this.perchedSince = s.t;
+        if (s.support !== null) this.lastPerchHwnd = s.support;
+      } else {
+        if (this.perchedSince >= 0) this.lastPerchAt = s.t;
+        this.perchedSince = -1;
+        if (s.t > this.nextTravel) {
+          this.travelUntil = s.t + 4;
+          this.nextTravel = s.t + 12 + Math.random() * 6;
+        }
+      }
+    } else {
+      this.perchedSince = -1;
+    }
 
     // Finish timed activities.
     if (s.t >= this.activityEnds) {
@@ -299,9 +338,15 @@ export class Behavior {
         this.activityEnds = s.t + this.durations(first);
       });
     }
-    // Showing off: run at a window flat out. Half the time he leaps at it and climbs it; the
-    // rest he hits it or barges straight through it and sends it flying.
-    if (canWalk && this.energetic && s.charge) {
+    // The window he just stepped off, for a few seconds, so he does not spin round and climb or
+    // charge it again the instant he lands and never gets anywhere.
+    const stale = (hwnd: number) => this.energetic && hwnd === this.lastPerchHwnd && s.t - this.lastPerchAt < 4;
+    // Just after a descent he is crossing the desk, so he climbs and charges nothing until he
+    // has cleared the screen he was stuck on.
+    const traveling = this.energetic && s.t < this.travelUntil;
+    // Showing off: run at a window flat out. Only from the floor, and not while crossing the
+    // desk; up on a window his job is to get off it, not to hop about on it.
+    if (canWalk && this.energetic && !s.onSurface && !traveling && s.charge && !stale(s.charge.hwnd)) {
       const charge = s.charge;
       const speed = (walk!.speed ?? 120) * 2.6;
       const dir = Math.sign(charge.x - s.x) || 1;
@@ -310,11 +355,25 @@ export class Behavior {
         this.activityEnds = s.t + Math.abs(charge.x - s.x) / speed + 2;
       };
       for (let i = 0; i < 2; i++) options.push(runAt("hop"));
-      // A fist when he has a clip for it, a shoulder otherwise.
-      options.push(runAt(this.punchClip() ? "punch" : "barge"));
-      options.push(runAt("barge"));
+      // Mostly he knocks the window clean away: a fist when he has the clip for it, a shoulder
+      // barge either way. Weighted heavily, since sending windows flying is the point of it.
+      const hit = this.punchClip() ? "punch" : "barge";
+      for (let i = 0; i < 2; i++) options.push(runAt(hit));
+      for (let i = 0; i < 3; i++) options.push(runAt("barge"));
     }
-    if (canWalk && s.climb) {
+    // He turns where he stands and drives a fist into the glass behind him, shattering the
+    // desktop there. This, far more than the slow timer, is what tears the screen apart.
+    if (this.energetic && !s.onSurface && !traveling && this.punchClip()) {
+      const clip = this.punchClip()!;
+      const punch = () => {
+        this.pendingPunch = Math.random() < 0.5 ? -1 : 1;
+        this.activity = { kind: "fidget", clip: { name: clip, loop: false } };
+        this.activityEnds = s.t + this.durations(clip);
+        this.nextEvent = Infinity;
+      };
+      for (let i = 0; i < 4; i++) options.push(punch);
+    }
+    if (canWalk && s.climb && !stale(s.climb.hwnd) && !traveling) {
       // A title bar within reach: stroll under it, jump, grab, pull himself up.
       const climb = s.climb;
       const speed = walk!.speed ?? 120;
@@ -323,10 +382,14 @@ export class Behavior {
         this.activityEnds = s.t + Math.abs(climb.x - s.x) / speed + 2;
       });
       options.push(options[options.length - 1]); // twice as likely as any single other option
-      if (this.energetic) for (let i = 0; i < 3; i++) options.push(options[options.length - 1]);
+      // In the screensaver he climbs eagerly, but the roaming march below still has to lead, or
+      // he clambers up the same window over and over and never crosses the desk.
+      if (this.energetic) options.push(options[options.length - 1]);
     }
-    // Stuck on a perch too small to stroll along: leaving is the only thing left to do.
-    if (canWalk && s.onSurface && (!roomToWander || Math.random() < 0.35)) {
+    // On the taskbar he wanders his own monitor; up on a window he steps off when it is too
+    // narrow to stroll, or now and then. In the screensaver he does neither of these: he sweeps
+    // the whole desk instead (below), so these only run when no one is being shown off to.
+    if (canWalk && !this.energetic && s.onSurface && (!roomToWander || Math.random() < 0.35)) {
       // Been up here a while: walk off the edge and drop back down.
       const speed = walk!.speed ?? 120;
       const goLeft = s.x - s.left < s.right - (s.x + s.w);
@@ -336,7 +399,7 @@ export class Behavior {
         this.activityEnds = s.t + Math.abs(target - s.x) / speed + 2;
       });
     }
-    if (canWalk && roomToWander) {
+    if (canWalk && !this.energetic && roomToWander) {
       options.push(() => {
         const minX = s.left;
         const maxX = s.right - s.w;
@@ -345,15 +408,64 @@ export class Behavior {
           target = minX + Math.random() * (maxX - minX);
         }
         target = Math.max(minX, Math.min(maxX, target));
-        const speed = (walk!.speed ?? 120) * (this.energetic ? 2.2 : 1);
+        const speed = walk!.speed ?? 120;
         this.activity = { kind: "walk", clip: { name: walk!.clip, loop: true }, targetX: target, speed };
         this.activityEnds = s.t + Math.abs(target - s.x) / speed + 1.5; // safety timeout
       });
+    }
+    // Screensaver: he settles on no window and no screen, both so the show keeps moving and so
+    // no corner of the desk is left standing still long enough to burn in. Up on a window he
+    // drops off the roaming edge, the sooner the longer he has been up; on the floor he marches
+    // across every screen, turning round at the far ends. Charge and climb fire in between, so
+    // he knocks a window or clambers onto one as he passes, then is moved along again.
+    if (canWalk && this.energetic) {
+      const clip = walk!.clip;
+      // Turn round well before the far wall of the desk, or he inches into it a step at a time,
+      // decision after decision, trying to walk off the edge and never getting anywhere.
+      if (s.x <= s.deskLeft + 150) this.roamDir = 1;
+      else if (s.x + s.w >= s.deskRight - 150) this.roamDir = -1;
+      if (s.onSurface) {
+        // Leap off toward the middle of the desk, never off its outer edge: on a window his
+        // bounds are the window, so a blind step "left" off a far-left window walked him clean
+        // off the end of the desk, and walking off any edge dropped him straight back onto the
+        // same window a few pixels short of the brink. A real sideways leap toward the centre
+        // clears the window outright and lands him on floor that exists.
+        const deskMid = (s.deskLeft + s.deskRight) / 2;
+        const dir = s.x + s.w / 2 < deskMid ? 1 : -1;
+        const leap = () => {
+          this.pendingLeave = dir;
+          this.activity = { kind: "idle", clip: this.stateClip("idle") };
+          this.activityEnds = Infinity;
+          this.nextEvent = s.t + this.gap(2, 2);
+        };
+        // The longer he has been perched, the more surely he leaves rather than knocks about.
+        const weight = s.t - this.perchedSince > 3 ? 8 : 3;
+        for (let i = 0; i < weight; i++) options.push(leap);
+      } else {
+        const speed = (walk!.speed ?? 120) * 2.2;
+        // A bounded stride in his roaming direction: about a monitor when travelling to the next
+        // screen, a shorter hop otherwise. Never the whole desk at once, or one long march eats
+        // the time he should be spending knocking windows about, and he pins himself at the far
+        // wall trying to reach an end he is already at.
+        const stride = traveling ? 2600 : 1200 * (0.7 + Math.random() * 0.6);
+        const target = Math.max(s.left, Math.min(s.right - s.w, s.x + this.roamDir * stride));
+        const sweep = () => {
+          this.activity = { kind: "walk", clip: { name: clip, loop: true }, targetX: target, speed };
+          this.activityEnds = s.t + Math.abs(target - s.x) / speed + 1.5;
+        };
+        // While travelling the sweep leads; otherwise it is just filler between window-knocks,
+        // so it is light and the charges (above) dominate.
+        for (let i = 0; i < (traveling ? 6 : 3); i++) options.push(sweep);
+      }
     }
     if (options.length) {
       options[Math.floor(Math.random() * options.length)]();
       // The activity's end (or the walk's arrival) schedules the next event.
       this.nextEvent = Infinity;
+      // A leap is the exception: it just launches him into the air with no arrival to wake him,
+      // so without this he lands and sits idle on the window forever, never deciding to leave
+      // again. Give him a fresh decision shortly after he comes down.
+      if (this.pendingLeave !== null) this.nextEvent = s.t + this.gap(3, 3);
     } else this.nextEvent = s.t + 20;
     return this.activity;
   }

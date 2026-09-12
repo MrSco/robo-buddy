@@ -154,6 +154,7 @@ pub fn run() {
         ))
         .manage(PendingTab::default())
         .manage(screen::Shot::default())
+        .manage(screen::Cycle::default())
         .manage(screen::Standable::default())
         .manage(screen::Backdrop::default())
         .manage(screen::Punch::default())
@@ -268,6 +269,9 @@ pub fn run() {
             screen::screensaver_start,
             screen::screensaver_stop,
             screen::screensaver_surfaces,
+            screen::screensaver_crt,
+            screen::set_windows_screensaver,
+            screen::windows_screensaver_status,
             take_settings_tab,
             context_menu,
             chat::set_chat_key,

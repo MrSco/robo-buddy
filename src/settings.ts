@@ -79,11 +79,18 @@ const els = {
   personality: $<HTMLSelectElement>("personality"),
   personalityHint: $<HTMLParagraphElement>("personality-hint"),
   chatSttEndpoint: $<HTMLInputElement>("chat-stt-endpoint"),
+  ssSpeed: $<HTMLInputElement>("ss-speed"),
+  ssSpeedOut: $<HTMLOutputElement>("ss-speed-out"),
+  ssVoid: $<HTMLInputElement>("ss-void"),
+  ssErosionStyle: $<HTMLSelectElement>("ss-erosion-style"),
   ssSounds: $<HTMLInputElement>("ss-sounds"),
   ssBackdrop: $<HTMLInputElement>("ss-backdrop"),
   ssBrowse: $<HTMLButtonElement>("ss-browse"),
   ssClear: $<HTMLButtonElement>("ss-clear"),
   ssBackdropStatus: $<HTMLParagraphElement>("ss-backdrop-status"),
+  ssWinSet: $<HTMLButtonElement>("ss-win-set"),
+  ssWinUnset: $<HTMLButtonElement>("ss-win-unset"),
+  ssWinStatus: $<HTMLParagraphElement>("ss-win-status"),
   ttsEngine: $<HTMLSelectElement>("tts-engine"),
   voicePreview: $<HTMLButtonElement>("voice-preview"),
   voicePreviewStatus: $<HTMLParagraphElement>("voice-preview-status"),
@@ -436,6 +443,10 @@ function render() {
   els.size.value = String(settings.size);
   els.sizeOut.value = `${Math.round(settings.size * 100)}%`;
   showLightingFor(previewing ?? settings.character);
+  els.ssSpeed.value = String(settings.screensaverErosionSpeed ?? 20);
+  els.ssSpeedOut.value = `${els.ssSpeed.value}%`;
+  els.ssVoid.value = String(settings.screensaverVoidSeconds ?? 6);
+  els.ssErosionStyle.value = settings.screensaverErosionStyle ?? "tiles";
   els.ssSounds.checked = settings.screensaverSounds ?? false;
   els.ssBackdrop.value = settings.screensaverBackdrop ?? "";
   els.paused.checked = settings.paused;
@@ -716,8 +727,13 @@ function wireVoicePreview() {
   });
 }
 
-/** The screensaver options: its sounds, and another screensaver to play behind it. */
+/** The screensaver options: its sounds, another screensaver to play behind it, and whether it
+ * is the one Windows runs on idle. */
 function wireScreensaver() {
+  els.ssSpeed.addEventListener("input", () => { els.ssSpeedOut.value = `${els.ssSpeed.value}%`; });
+  els.ssSpeed.addEventListener("change", () => void commit({ screensaverErosionSpeed: Number(els.ssSpeed.value) }));
+  els.ssVoid.addEventListener("change", () => void commit({ screensaverVoidSeconds: Math.max(0, Math.min(120, Number(els.ssVoid.value) || 0)) }));
+  els.ssErosionStyle.addEventListener("change", () => void commit({ screensaverErosionStyle: els.ssErosionStyle.value === "cracks" ? "cracks" : "tiles" }));
   els.ssSounds.addEventListener("change", () => void commit({ screensaverSounds: els.ssSounds.checked }));
   els.ssBackdrop.addEventListener("change", () => void setBackdrop(els.ssBackdrop.value.trim()));
   els.ssClear.addEventListener("click", () => {
@@ -735,6 +751,30 @@ function wireScreensaver() {
       els.ssBackdropStatus.textContent = `Could not open that: ${err}`;
     }
   });
+  els.ssWinSet.addEventListener("click", () => void setWindowsSaver(true));
+  els.ssWinUnset.addEventListener("click", () => void setWindowsSaver(false));
+  void refreshWindowsSaver();
+}
+
+/** Reflect whether Robo Buddy is the current Windows screen saver. */
+async function refreshWindowsSaver() {
+  try {
+    const on = await invoke<boolean>("windows_screensaver_status");
+    els.ssWinStatus.textContent = on
+      ? "Robo Buddy is your Windows screen saver. Windows will start it when you are idle."
+      : "Not set. Windows runs its own screen saver until you set this.";
+  } catch {
+    els.ssWinStatus.textContent = "";
+  }
+}
+
+async function setWindowsSaver(enable: boolean) {
+  try {
+    els.ssWinStatus.textContent = await invoke<string>("set_windows_screensaver", { enable });
+  } catch (err) {
+    els.ssWinStatus.textContent = `Could not change that: ${err}`;
+  }
+  void refreshWindowsSaver();
 }
 
 async function setBackdrop(path: string) {

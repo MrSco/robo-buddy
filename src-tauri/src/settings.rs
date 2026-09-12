@@ -38,6 +38,9 @@ pub struct Settings {
     pub screensaver_sounds: bool,
     /// A .scr to run behind the screensaver; blank means a plain black backdrop.
     pub screensaver_backdrop: String,
+    pub screensaver_erosion_style: String,
+    pub screensaver_erosion_speed: f64,
+    pub screensaver_void_seconds: f64,
     pub bubbles_enabled: bool,
     /// Wander along the floor when idle.
     pub wander_enabled: bool,
@@ -104,6 +107,9 @@ impl Default for Settings {
             sounds_enabled: true,
             screensaver_sounds: false,
             screensaver_backdrop: String::new(),
+            screensaver_erosion_style: "tiles".into(),
+            screensaver_erosion_speed: 20.0,
+            screensaver_void_seconds: 6.0,
             bubbles_enabled: true,
             wander_enabled: true,
             dance_mode: "random".into(),

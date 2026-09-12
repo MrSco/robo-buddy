@@ -1,3 +1,4 @@
+import { ScreensaverDance } from "./screensaver-dance";
 import * as THREE from "three";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -80,6 +81,9 @@ let mirrorOn = false;
 let forcedDanceUntil = -1;
 let danceSuppressUntil = -1;
 let commandedSleepUntil = -1;
+// Screensaver: music only pulls him into an occasional dance break, not a whole set, so he
+// spends most of it wrecking the desktop. Breaks begin only when he is on the floor.
+const ssDance = new ScreensaverDance();
 let quietUntil = -1;
 let mirrorPose: MirrorPose | null = null;
 let lastPoseAt = -Infinity;
@@ -239,6 +243,8 @@ async function boot() {
         asleep = false;
         commandedSleepUntil = -1;
         lastActivity = clock.elapsedTime;
+        // Let him wreck things for a while before the first dance break.
+        ssDance.reset(clock.elapsedTime);
       }
     });
     await onKeys((k) => {
@@ -879,8 +885,12 @@ function frame() {
     const musicOn = settings.musicEnabled && !paused && (manifest?.reactions.music?.enabled ?? true);
     const forced = t < forcedDanceUntil && physics?.mode === "rest" && !asleep;
     const suppressed = t < danceSuppressUntil;
+    // In the screensaver he is on a rampage; music only tempts him into a short dance now and
+    // then, and the rest of the time he ignores it and keeps smashing.
+    const requested = forced || (musicOn && music.dancing && !suppressed);
+    const ssDanceOk = !screensaverOn || ssDance.allows(t, requested, physics?.mode === "rest" && physics.support === null);
     // With every dance unticked (the built-in groove too) music does not move him at all.
-    const target = (forced || (musicOn && music.dancing && !suppressed)) && behavior.canDance && !physics?.airborne && physics?.mode !== "held" ? 1 : 0;
+    const target = (requested && ssDanceOk) && behavior.canDance && !physics?.airborne && physics?.mode !== "held" ? 1 : 0;
     danceAmount += (target - danceAmount) * (1 - Math.exp(-dt * (target ? 2.5 : 1.5)));
   }
   sincePoke += dt;
@@ -956,6 +966,9 @@ function frame() {
     // stand on it. Without this the charge and the punch never come up at all.
     charge: screensaverOn && settings.surfacesEnabled && settings.wanderEnabled ? (physics?.chargeTarget() ?? null) : null,
     onSurface: physics?.onSurface ?? false,
+    support: physics?.support ?? null,
+    deskLeft: physics?.deskBounds.left ?? 0,
+    deskRight: physics?.deskBounds.right ?? 1920,
   });
   const resolved = resolveState(t, act);
   currentState = resolved.state;
@@ -973,6 +986,10 @@ function frame() {
     physics.hop(behavior.pendingHop);
     behavior.pendingHop = null;
     hopCount++;
+  }
+  if (behavior.pendingLeave !== null && physics) {
+    physics.leapOff(behavior.pendingLeave);
+    behavior.pendingLeave = null;
   }
   if (behavior.pendingPunch !== null) {
     const dir = behavior.pendingPunch;
