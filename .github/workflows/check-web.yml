@@ -1,0 +1,41 @@
+name: Check (web)
+
+# Types and tests. Linux bills at 1x, so this runs on anything that touches the frontend.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "*.html"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "tsconfig.json"
+      - "vite.config.*"
+      - ".github/workflows/check-web.yml"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  web:
+    name: Types and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: TypeScript
+        run: pnpm exec tsc --noEmit
+
+      - name: Tests
+        run: pnpm test

@@ -1,0 +1,54 @@
+name: Check (Rust)
+
+# Windows runners bill at 2x and a cold build is over ten minutes, so this only runs when the
+# Rust side actually changes. Frontend-only work is covered by Check (web).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src-tauri/**"
+      - ".github/workflows/check-rust.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src-tauri/**"
+  workflow_dispatch:
+
+jobs:
+  rust:
+    name: Rust
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      # Without this a cold build is over ten minutes; warm it is a fraction of that.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      # tauri-build reads dist/, so the frontend has to exist first.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: cargo check
+        working-directory: src-tauri
+        run: cargo check --locked
+
+      # Reports lints without failing the build. There is no rustup on the development machine,
+      # so the warning list has never been seen; tighten to `-- -D warnings` once it is clean.
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --locked
