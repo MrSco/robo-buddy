@@ -177,6 +177,18 @@ export class Behavior {
   /** Set when a walk that was heading for a climb arrives; main performs the hop. */
   pendingHop: number | null = null;
 
+  /**
+   * Screensaver mode: no one is watching a desk toy stand still, so he barely rests, walks
+   * further and faster, climbs whatever he can reach and jumps for the sake of it.
+   */
+  energetic = false;
+
+  /** Seconds to wait before the next idea, squeezed hard while he is being energetic. */
+  private gap(base: number, spread: number): number {
+    const k = this.energetic ? 0.2 : 1;
+    return (base + Math.random() * spread) * k;
+  }
+
   /** Nothing scheduled for at least `seconds`; used after a landing so he does not fidget at once. */
   rest(t: number, seconds: number) {
     this.nextEvent = Math.max(this.nextEvent, t + seconds);
@@ -196,7 +208,7 @@ export class Behavior {
       }
       this.activity = { kind: "idle", clip: this.stateClip("idle") };
       this.activityEnds = Infinity;
-      this.nextEvent = s.t + 8 + Math.random() * 14;
+      this.nextEvent = s.t + this.gap(8, 14);
     }
     if (this.activity.kind === "walk") {
       const arrived = Math.abs(s.x - this.activity.targetX) < 4;
@@ -204,14 +216,14 @@ export class Behavior {
       if (arrived || !s.free) {
         this.activity = { kind: "idle", clip: this.stateClip("idle") };
         this.activityEnds = Infinity;
-        this.nextEvent = s.t + 6 + Math.random() * 10;
+        this.nextEvent = s.t + this.gap(6, 10);
       }
       return this.activity;
     }
     if (!s.free) {
       // Never start anything while he is busy; just push the schedule back.
       if (this.activity.kind !== "idle") this.activity = { kind: "idle", clip: this.stateClip("idle") };
-      this.nextEvent = Math.max(this.nextEvent, s.t + 4);
+      this.nextEvent = Math.max(this.nextEvent, s.t + this.gap(4, 0));
       return this.activity;
     }
     if (s.t < this.nextEvent) return this.activity;
@@ -223,7 +235,7 @@ export class Behavior {
     const walk = m.states.walk;
     const canWalk = this.opts.wander && !!walk && this.durations(walk.clip) > 0 && s.right - s.left - s.w > MIN_WANDER * 2;
     const options: Array<() => void> = [];
-    if (variants.length) {
+    if (variants.length && !this.energetic) {
       options.push(() => {
         const v = variants[Math.floor(Math.random() * variants.length)];
         this.activity = { kind: "idle", clip: { name: v, loop: true } };
@@ -249,6 +261,7 @@ export class Behavior {
         this.activityEnds = s.t + Math.abs(climb.x - s.x) / speed + 2;
       });
       options.push(options[options.length - 1]); // twice as likely as any single other option
+      if (this.energetic) for (let i = 0; i < 3; i++) options.push(options[options.length - 1]);
     }
     if (canWalk && s.onSurface && Math.random() < 0.35) {
       // Been up here a while: walk off the edge and drop back down.
@@ -269,7 +282,7 @@ export class Behavior {
           target = minX + Math.random() * (maxX - minX);
         }
         target = Math.max(minX, Math.min(maxX, target));
-        const speed = walk!.speed ?? 120;
+        const speed = (walk!.speed ?? 120) * (this.energetic ? 2.2 : 1);
         this.activity = { kind: "walk", clip: { name: walk!.clip, loop: true }, targetX: target, speed };
         this.activityEnds = s.t + Math.abs(target - s.x) / speed + 1.5; // safety timeout
       });

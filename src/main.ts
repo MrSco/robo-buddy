@@ -99,6 +99,8 @@ let asleep = false;
 let sleepAmount = 0;
 let nextSnore = 0;
 let dancedThisSession = false;
+/** The screensaver is up: he roams and climbs instead of idling on the taskbar. */
+let screensaverOn = false;
 
 const bubble = new Bubble();
 const sounds = new Sounds();
@@ -207,6 +209,18 @@ async function boot() {
     });
     await onSurfaces((list) => {
       if (physics) physics.surfaces = list;
+    });
+    // Screensaver: nobody is watching a desk toy stand still, so he puts on a show.
+    await listen<boolean>("screensaver", (e) => {
+      screensaverOn = e.payload;
+      behavior.energetic = e.payload;
+      if (e.payload) {
+        // Start doing something at once rather than finishing the current doze.
+        behavior.interrupt(clock.elapsedTime);
+        asleep = false;
+        commandedSleepUntil = -1;
+        lastActivity = clock.elapsedTime;
+      }
     });
     await onKeys((k) => {
       keyEvents++;
@@ -854,6 +868,7 @@ function frame() {
   sinceLand += dt;
   // Typing along: the rate decays between key bursts; a steady 3 keys/s counts as typing.
   typingRate *= Math.exp(-dt * 0.8);
+  if (screensaverOn) lastActivity = t;
   const typingTarget = settings.keyboardEnabled && typingRate > 3 && physics?.mode === "rest" && !asleep && !talk.open ? 1 : 0;
   if (typingTarget && typingAmount < 0.5) behavior.interrupt(t);
   typingAmount += (typingTarget - typingAmount) * (1 - Math.exp(-dt * (typingTarget ? 3 : 0.7)));

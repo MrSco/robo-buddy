@@ -73,6 +73,92 @@ fn grab(x: i32, y: i32, w: i32, h: i32) -> Result<Vec<u8>, String> {
     }
 }
 
+
+/// One window's own pixels, even when something is sitting on top of it. Cutting a sprite out
+/// of the desktop screenshot would give a rectangle full of whatever covers it; asking the
+/// window to draw itself gives the real thing. Returns RGBA, or None when the window declines
+/// (some hardware-accelerated windows hand back nothing but a flat colour).
+#[cfg(windows)]
+fn capture_window(hwnd: isize, w: i32, h: i32) -> Option<Vec<u8>> {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::Storage::Xps::{PrintWindow, PRINT_WINDOW_FLAGS};
+    const PW_RENDERFULLCONTENT: u32 = 0x00000002;
+    unsafe {
+        let hwnd = HWND(hwnd as *mut _);
+        let screen = GetDC(None);
+        if screen.is_invalid() {
+            return None;
+        }
+        let mem = CreateCompatibleDC(Some(screen));
+        let bmp = CreateCompatibleBitmap(screen, w, h);
+        if mem.is_invalid() || bmp.is_invalid() {
+            ReleaseDC(None, screen);
+            return None;
+        }
+        let old = SelectObject(mem, HGDIOBJ(bmp.0));
+        let ok = PrintWindow(hwnd, mem, PRINT_WINDOW_FLAGS(PW_RENDERFULLCONTENT)).as_bool();
+
+        let mut info = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: w,
+                biHeight: -h,
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut pixels = vec![0u8; (w as usize) * (h as usize) * 4];
+        let rows = if ok {
+            GetDIBits(mem, bmp, 0, h as u32, Some(pixels.as_mut_ptr() as *mut _), &mut info, DIB_RGB_COLORS)
+        } else {
+            0
+        };
+        SelectObject(mem, old);
+        let _ = DeleteObject(HGDIOBJ(bmp.0));
+        let _ = DeleteDC(mem);
+        ReleaseDC(None, screen);
+        if rows == 0 {
+            return None;
+        }
+        // A window that drew nothing comes back one flat colour; that is not worth showing.
+        let total = pixels.len() / 4;
+        let step = (total / 400).max(1);
+        let first = [pixels[0], pixels[1], pixels[2]];
+        let flat = (0..total).step_by(step).all(|i| pixels[i * 4] == first[0] && pixels[i * 4 + 1] == first[1] && pixels[i * 4 + 2] == first[2]);
+        if flat {
+            return None;
+        }
+        for p in pixels.chunks_exact_mut(4) {
+            p.swap(0, 2);
+            p[3] = 255;
+        }
+        Some(pixels)
+    }
+}
+
+#[cfg(not(windows))]
+fn capture_window(_hwnd: isize, _w: i32, _h: i32) -> Option<Vec<u8>> {
+    None
+}
+
+/// RGBA to a base64 PNG.
+fn encode(rgba: &[u8], w: i32, h: i32) -> Result<String, String> {
+    let mut png = Vec::new();
+    {
+        let mut enc = png::Encoder::new(&mut png, w as u32, h as u32);
+        enc.set_color(png::ColorType::Rgba);
+        enc.set_depth(png::BitDepth::Eight);
+        enc.set_compression(png::Compression::Fast);
+        let mut writer = enc.write_header().map_err(|e| e.to_string())?;
+        writer.write_image_data(rgba).map_err(|e| e.to_string())?;
+    }
+    use base64::Engine;
+    Ok(base64::engine::general_purpose::STANDARD.encode(&png))
+}
+
 /// One monitor's worth of screensaver: the picture of it, and the windows that were on it.
 /// A window per monitor rather than one giant one, because WebView2 cannot make a surface
 /// spanning several screens and silently renders nothing when asked to.
@@ -89,13 +175,16 @@ pub struct MonitorShot {
     pub sprites: Vec<Sprite>,
 }
 
-/// A window that was on screen when the picture was taken, so it can be cut out as a sprite.
+/// A window that was on screen when the picture was taken, with its own pixels so it stays
+/// itself even when something was sitting on top of it.
 #[derive(serde::Serialize, Clone)]
 pub struct Sprite {
     pub x: i32,
     pub y: i32,
     pub width: i32,
     pub height: i32,
+    /// PNG of this window alone, base64.
+    pub png: String,
 }
 
 /// The pictures taken when the screensaver started, waiting for their pages to ask for them.
@@ -115,34 +204,34 @@ pub fn capture_desktop(state: tauri::State<Shot>, index: usize) -> Result<Monito
         .ok_or_else(|| "no picture was taken for this screen".to_string())
 }
 
-/// Grab one monitor and encode it.
-fn shoot_monitor(x: i32, y: i32, w: i32, h: i32) -> Result<String, String> {
-    let bgra = grab(x, y, w, h)?;
+/// Grab one monitor as RGBA.
+fn grab_rgba(x: i32, y: i32, w: i32, h: i32) -> Result<Vec<u8>, String> {
+    let mut rgba = grab(x, y, w, h)?;
     // BGRA from GDI, RGBA for PNG; the alpha byte is meaningless here so it is forced opaque.
-    let mut rgba = vec![0u8; bgra.len()];
-    for (src, dst) in bgra.chunks_exact(4).zip(rgba.chunks_exact_mut(4)) {
-        dst[0] = src[2];
-        dst[1] = src[1];
-        dst[2] = src[0];
-        dst[3] = 255;
+    for p in rgba.chunks_exact_mut(4) {
+        p.swap(0, 2);
+        p[3] = 255;
     }
-    let mut png = Vec::new();
-    {
-        let mut enc = png::Encoder::new(&mut png, w as u32, h as u32);
-        enc.set_color(png::ColorType::Rgba);
-        enc.set_depth(png::BitDepth::Eight);
-        // Thrown away when the screensaver ends, so favour speed over size.
-        enc.set_compression(png::Compression::Fast);
-        let mut writer = enc.write_header().map_err(|e| e.to_string())?;
-        writer.write_image_data(&rgba).map_err(|e| e.to_string())?;
+    Ok(rgba)
+}
+
+/// A rectangle out of an RGBA image.
+fn crop(src: &[u8], src_w: i32, x: i32, y: i32, w: i32, h: i32) -> Vec<u8> {
+    let mut out = vec![0u8; (w as usize) * (h as usize) * 4];
+    let row_len = w as usize * 4;
+    for row in 0..h as usize {
+        let from = (((y as usize + row) * src_w as usize) + x as usize) * 4;
+        let to = row * row_len;
+        if from + row_len <= src.len() {
+            out[to..to + row_len].copy_from_slice(&src[from..from + row_len]);
+        }
     }
-    use base64::Engine;
-    Ok(base64::engine::general_purpose::STANDARD.encode(&png))
+    out
 }
 
 /// The windows worth throwing around, front to back, in virtual-screen pixels. Reuses the same
 /// enumeration the buddy stands on, so anything he can climb is something he can also shove.
-fn list_windows() -> Vec<(i32, i32, i32, i32)> {
+fn list_windows() -> Vec<(isize, i32, i32, i32, i32)> {
     crate::input::list_surfaces()
         .into_iter()
         .filter_map(|w| {
@@ -150,7 +239,7 @@ fn list_windows() -> Vec<(i32, i32, i32, i32)> {
             if width < 160 || height < 120 {
                 return None;
             }
-            Some((w.left, w.top, width, height))
+            Some((w.hwnd, w.left, w.top, width, height))
         })
         .take(32)
         .collect()
@@ -185,6 +274,13 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
     if monitors.is_empty() {
         return Err("no monitors".into());
     }
+    // Out of shot: he is about to be standing on this picture, and a frozen copy of him in it
+    // looks ridiculous. Hidden, the screen settles, the picture is taken, then he comes back.
+    let buddy = app.get_webview_window("buddy");
+    if let Some(b) = &buddy {
+        let _ = b.hide();
+        std::thread::sleep(std::time::Duration::from_millis(160));
+    }
     // Everything he plays with is cut from these pictures, taken while the desktop is still the
     // desktop; the windows are listed at the same moment for the same reason.
     let windows = list_windows();
@@ -192,15 +288,23 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
     for m in &monitors {
         let (mx, my) = (m.position().x, m.position().y);
         let (mw, mh) = (m.size().width as i32, m.size().height as i32);
-        let png = shoot_monitor(mx, my, mw, mh)?;
+        let shot_rgba = grab_rgba(mx, my, mw, mh)?;
+        let png = encode(&shot_rgba, mw, mh)?;
         // A window belongs to the monitor its middle sits on, and is clipped to it. Each screen
         // is then its own playpen, so nothing has to be kept in step across monitors.
         let sprites = windows
             .iter()
-            .filter_map(|&(wx, wy, ww, wh)| {
+            .filter_map(|&(hwnd, wx, wy, ww, wh)| {
                 let (cx, cy) = (wx + ww / 2, wy + wh / 2);
                 if cx < mx || cx >= mx + mw || cy < my || cy >= my + mh {
                     return None;
+                }
+                // Its own pixels where the window will give them. Otherwise its patch of the
+                // desktop picture, which is right whenever nothing was covering it.
+                if let Some(rgba) = capture_window(hwnd, ww, wh) {
+                    if let Ok(png) = encode(&rgba, ww, wh) {
+                        return Some(Sprite { x: wx - mx, y: wy - my, width: ww, height: wh, png });
+                    }
                 }
                 let x = wx.max(mx);
                 let y = wy.max(my);
@@ -209,11 +313,19 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
                 if width < 120 || height < 90 {
                     return None;
                 }
-                Some(Sprite { x: x - mx, y: y - my, width, height })
+                let rgba = crop(&shot_rgba, mw, x - mx, y - my, width, height);
+                Some(Sprite { x: x - mx, y: y - my, width, height, png: encode(&rgba, width, height).ok()? })
             })
             .collect();
         shots.push(MonitorShot { x: mx, y: my, width: mw, height: mh, png, sprites });
     }
+    if let Some(b) = &buddy {
+        let _ = b.show();
+    }
+    crate::chat::append_log(
+        app.clone(),
+        format!("screensaver: {} windows, {} per screen", windows.len(), shots.iter().map(|s| s.sprites.len().to_string()).collect::<Vec<_>>().join("/")),
+    );
     if let Ok(mut slot) = app.state::<Shot>().0.lock() {
         *slot = shots.clone();
     }

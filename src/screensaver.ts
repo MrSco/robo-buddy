@@ -15,6 +15,8 @@ interface SpriteRect {
   y: number;
   width: number;
   height: number;
+  /** The window's own pixels, base64 PNG. */
+  png: string;
 }
 
 /** One monitor: its picture, where it sits, and the windows that were on it. */
@@ -75,9 +77,10 @@ async function start() {
   screen = await invoke<MonitorShot>("capture_desktop", { index });
   const blob = await (await fetch(`data:image/png;base64,${screen.png}`)).blob();
   shot = await createImageBitmap(blob);
-  // Back to front, so the sprite drawn last is the one that was on top.
+  // Back to front, so the sprite drawn last is the one that was on top. Each carries its own
+  // picture, so a window that was buried still looks like itself once he knocks it loose.
   for (const r of screen.sprites.slice().reverse()) {
-    const img = await createImageBitmap(shot, r.x, r.y, r.width, r.height);
+    const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${r.png}`)).blob());
     sprites.push({
       img,
       homeX: r.x,
@@ -121,23 +124,29 @@ async function pollBuddy() {
 }
 
 /**
- * His feet and shoulders push sprites aside. The box is narrower than his window because most
- * of it is empty around him, and it is the middle of him that does the shoving.
+ * He shoves a sprite by running into its edge. Standing in front of a big window is not a
+ * shove, so the push only counts when he is barely overlapping it: otherwise a maximised
+ * window, which covers him entirely, would take off the moment the screensaver appeared.
  */
 function shove(s: Sprite, dt: number) {
   if (!buddy) return;
-  const bx = buddy.x + buddy.w * 0.32;
-  const bw = buddy.w * 0.36;
-  const by = buddy.y + buddy.h * 0.2;
-  const bh = buddy.h * 0.8;
-  if (s.x + s.w < bx || s.x > bx + bw || s.y + s.h < by || s.y > by + bh) return;
-  // Push out of whichever side he is nearest, and give it some of his own motion.
-  const fromLeft = bx + bw - s.x;
-  const fromRight = s.x + s.w - bx;
-  const dir = fromLeft < fromRight ? 1 : -1;
-  s.vx += dir * 520 * dt * 8;
-  s.vy -= 130 * dt * 8;
-  s.spin += dir * 1.2 * dt * 8;
+  // His middle, where the shoving happens; the rest of his window is mostly empty air.
+  const bx = buddy.x + buddy.w * 0.34;
+  const bw = buddy.w * 0.32;
+  const by = buddy.y + buddy.h * 0.15;
+  const bh = buddy.h * 0.85;
+  const overlapX = Math.min(bx + bw, s.x + s.w) - Math.max(bx, s.x);
+  const overlapY = Math.min(by + bh, s.y + s.h) - Math.max(by, s.y);
+  if (overlapX <= 0 || overlapY <= 0) return;
+  // Only a shallow overlap is a collision. Deeper than this and he is simply in front of it.
+  const reach = Math.min(bw, s.w) * 0.9;
+  if (overlapX > reach) return;
+  // Push it the way he is going: out of whichever side of it he came in through.
+  const dir = bx + bw / 2 < s.x + s.w / 2 ? 1 : -1;
+  const force = s.asleep ? 26 : 9;
+  s.vx += dir * 60 * force * dt;
+  s.vy -= 18 * force * dt;
+  s.spin += dir * 0.16 * force * dt;
   s.asleep = false;
 }
 
