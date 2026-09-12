@@ -1,0 +1,74 @@
+name: Check
+
+# Every push and pull request on main. The web checks run on Linux because it bills at 1x;
+# the Rust check has to run on Windows (Tauri's dependencies are Windows-only here) and bills
+# at 2x, so it is kept to `cargo check` rather than a full build.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  web:
+    name: Types and tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: TypeScript
+        run: pnpm exec tsc --noEmit
+
+      - name: Tests
+        run: pnpm test
+
+  rust:
+    name: Rust
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      # Without this a cold build is several minutes; warm it is well under one.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      # The frontend must exist before tauri-build runs, and it reads dist/.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: cargo check
+        working-directory: src-tauri
+        run: cargo check --locked
+
+      # Reports lints without failing the build. There is no rustup on the development machine,
+      # so the warning list has never been seen; turn this into `-- -D warnings` once it is
+      # clean and known.
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --locked

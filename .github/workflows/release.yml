@@ -1,0 +1,78 @@
+name: Release
+
+# Push a tag to cut a release:  git tag v0.3.0 && git push origin v0.3.0
+# Or run it by hand from the Actions tab to get installers as build artifacts without
+# publishing a release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Build installers
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - run: pnpm install --frozen-lockfile
+
+      # Fail here rather than after a ten minute build.
+      - name: TypeScript and tests
+        run: |
+          pnpm exec tsc --noEmit
+          pnpm test
+
+      - name: Build
+        run: pnpm tauri build
+
+      # Tauri names its output "Robo Buddy_0.3.0_x64-setup.exe"; give downloads a name without
+      # spaces, matching what scripts/make-installer.ps1 produces locally.
+      - name: Collect installers
+        id: collect
+        shell: pwsh
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          New-Item -ItemType Directory -Force release | Out-Null
+          $setup = Get-ChildItem "src-tauri/target/release/bundle/nsis/*$version*-setup.exe" | Select-Object -First 1
+          $msi = Get-ChildItem "src-tauri/target/release/bundle/msi/*$version*.msi" | Select-Object -First 1
+          Copy-Item $setup.FullName "release/RoboBuddy-Setup-$version.exe"
+          Copy-Item $msi.FullName "release/RoboBuddy-$version.msi"
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Get-ChildItem release | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}} | Format-Table -AutoSize
+
+      - name: Upload as build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: RoboBuddy-${{ steps.collect.outputs.version }}
+          path: release/*
+          retention-days: 30
+
+      # Only a tag publishes a release; a manual run stops at the artifacts above.
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          gh release create "${{ github.ref_name }}" (Get-ChildItem release | ForEach-Object { $_.FullName }) `
+            --title "Robo Buddy ${{ github.ref_name }}" `
+            --generate-notes
