@@ -35,6 +35,8 @@ interface Status {
   right: number;
   /** A window edge he could climb from here (from the physics), and whether he is on one. */
   climb: { x: number; hwnd: number; top: number } | null;
+  /** Something to run at and leap at, even when standing on it is out of the question. */
+  charge?: { x: number; hwnd: number; top: number } | null;
   onSurface: boolean;
 }
 
@@ -255,6 +257,17 @@ export class Behavior {
         this.activity = { kind: "fidget", clip: { name: first, loop: false } };
         this.activityEnds = s.t + this.durations(first);
       });
+    }
+    // Showing off: run at a window and throw himself at it. He rarely gets to stand on one,
+    // because most are far taller than he is, but the charge and the crash are the show.
+    if (canWalk && this.energetic && s.charge) {
+      const charge = s.charge;
+      const speed = (walk!.speed ?? 120) * 2.6;
+      const run = () => {
+        this.activity = { kind: "walk", clip: { name: walk!.clip, loop: true }, targetX: charge.x, speed, then: "hop", hopTop: charge.top };
+        this.activityEnds = s.t + Math.abs(charge.x - s.x) / speed + 2;
+      };
+      for (let i = 0; i < 4; i++) options.push(run);
     }
     if (canWalk && s.climb) {
       // A title bar within reach: stroll under it, jump, grab, pull himself up.

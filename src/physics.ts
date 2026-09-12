@@ -355,7 +355,8 @@ export class WindowPhysics {
       const s = this.surfaces[i];
       if (s.hwnd === this.support) continue;
       const rise = hands - s.top; // how far above his hands the edge is
-      if (rise < 40 || rise > 460) continue;
+      // Roaming, he throws himself much higher: the point of the screensaver is the show.
+      if (rise < 40 || rise > (this.roam ? 1000 : 460)) continue;
       const tx = Math.max(s.left + WindowPhysics.EDGE + 8, Math.min(s.right - WindowPhysics.EDGE - 8, cx));
       if (tx < b.left + this.w / 2 || tx > b.right - this.w / 2) continue; // must be able to walk there
       if (this.occluded(i, tx)) continue;
@@ -368,13 +369,36 @@ export class WindowPhysics {
     return best;
   }
 
+  /**
+   * Something to charge at: the nearest window edge he can reach on foot, ignoring whether he
+   * could ever stand on it. Most windows are far taller than he is, so standing on one would
+   * put his head off the screen and `climbable` rightly refuses; he can still run at it and
+   * knock it about, which is the point of the screensaver.
+   */
+  chargeTarget(): { x: number; hwnd: number; top: number } | null {
+    if (this.mode !== "rest") return null;
+    const cx = this.x + this.w / 2;
+    const b = this.bounds;
+    let best: { x: number; hwnd: number; top: number; dist: number } | null = null;
+    for (const s of this.surfaces) {
+      if (s.hwnd === this.support) continue;
+      // Aim at the near edge, so he arrives at the window rather than stopping in its middle.
+      const near = cx < (s.left + s.right) / 2 ? s.left : s.right;
+      const tx = Math.max(b.left + this.w / 2, Math.min(b.right - this.w / 2, near));
+      const dist = Math.abs(tx - cx);
+      if (dist < 60 || dist > 2400) continue;
+      if (!best || dist < best.dist) best = { x: tx - this.w / 2, hwnd: s.hwnd, top: s.top, dist };
+    }
+    return best;
+  }
+
   /** Jump from rest so his hands reach just above `top` (a window edge); tryGrab does the rest. */
   hop(top: number) {
     if (this.mode !== "rest") return;
     const rise = Math.max(60, this.y + this.h * WindowPhysics.HAND - top + 14);
     this.support = null;
     this.mode = "falling";
-    this.vy = -Math.min(1900, Math.sqrt(2 * GRAVITY * rise));
+    this.vy = -Math.min(this.roam ? 2600 : 1900, Math.sqrt(2 * GRAVITY * rise));
     this.vx = 0;
   }
 

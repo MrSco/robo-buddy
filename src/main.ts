@@ -101,6 +101,7 @@ let nextSnore = 0;
 let dancedThisSession = false;
 /** The screensaver is up: he roams and climbs instead of idling on the taskbar. */
 let screensaverOn = false;
+let hopCount = 0;
 
 const bubble = new Bubble();
 const sounds = new Sounds();
@@ -843,7 +844,7 @@ function debugTitle(t: number) {
   }
   const title =
     `Robo Buddy | ${p.mode} y=${p.y.toFixed(0)} air=${p.airborne} yaw=${yaw.toFixed(2)} cur=${cursor.x},${cursor.y},${cursor.buttons}` +
-    ` | pack=${pack?.id} state=${currentState} grab=${grabPart ?? '-'} talk=${talk.open} talking=${voice.speaking || live.speaking} live=${live.state}/${Math.round(live.seconds)}s/${live.lastReason} keys=${typingRate.toFixed(1)}/${typingAmount.toFixed(2)}/${keyEvents} sup=${physics?.support ?? '-'} snd=${sounds.last} head=${Math.round(p.headPx)} crouch=${Math.round(p.crouchPx)} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
+    ` | pack=${pack?.id} state=${currentState} grab=${grabPart ?? '-'} talk=${talk.open} talking=${voice.speaking || live.speaking} live=${live.state}/${Math.round(live.seconds)}s/${live.lastReason} keys=${typingRate.toFixed(1)}/${typingAmount.toFixed(2)}/${keyEvents} sup=${physics?.support ?? '-'} surf=${physics?.surfaces.length ?? 0} ss=${screensaverOn ? 1 : 0} nrg=${behavior.energetic ? 1 : 0} climb=${physics?.climbable() ? 'y' : 'n'} chg=${physics?.chargeTarget() ? 'y' : 'n'} hops=${hopCount} snd=${sounds.last} head=${Math.round(p.headPx)} crouch=${Math.round(p.crouchPx)} act=${lastAct} clip=${lastClip} free=${lastFree} amt=${danceAmount.toFixed(2)} dance=${behavior.currentDance ?? "-"} sleep=${sleepAmount.toFixed(2)} idle=${(t - lastActivity).toFixed(0)}s ct=${settings.clickThrough} ign=${ignoringCursor} alpha=${alpha} probe=[${probe}] px=${p.x} canvas=${stage3d.width}x${stage3d.height} paused=${settings.paused} size=${settings.size} evt=${settingsEvents} boot=${bootStamp}` +
     (m ? ` | lvl=${m.level.toFixed(2)} gate=${m.gateLevel.toFixed(2)}/${m.threshold.toFixed(2)} bpm=${m.bpm.toFixed(0)} dance=${m.dancing} amt=${danceAmount.toFixed(2)} beats=${m.beats.toFixed(1)}` : "");
   getCurrentWindow().setTitle(title).catch(() => {});
 }
@@ -953,6 +954,7 @@ function frame() {
   if (behavior.pendingHop !== null && physics) {
     physics.hop(behavior.pendingHop);
     behavior.pendingHop = null;
+    hopCount++;
   }
   facing = targetFacing;
 

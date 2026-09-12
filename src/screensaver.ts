@@ -63,6 +63,8 @@ let sprites: Sprite[] = [];
  * see straight through its hole to the black.
  */
 let backdrop: ImageBitmap | null = null;
+/** Which monitor this window covers; the backend keeps each screen's pieces apart by it. */
+let screenIndex = 0;
 let screen: MonitorShot | null = null;
 /** Device pixels per CSS pixel for the canvas backing store. */
 let dpr = 1;
@@ -82,8 +84,8 @@ async function start() {
   // Each monitor gets its own window and its own picture, taken before any of them went up, so
   // they show the desktop as it really was rather than these backdrops covering it.
   // The window is labelled "screensaver-<n>", one per monitor.
-  const index = Number(/(\d+)$/.exec(getCurrentWindow().label)?.[1] ?? 0);
-  screen = await invoke<MonitorShot>("capture_desktop", { index });
+  screenIndex = Number(/(\d+)$/.exec(getCurrentWindow().label)?.[1] ?? 0);
+  screen = await invoke<MonitorShot>("capture_desktop", { index: screenIndex });
   const full = await createImageBitmap(await (await fetch(`data:image/png;base64,${screen.png}`)).blob());
   // Punch the windows out of the desktop picture once, here, rather than every frame.
   const holes = document.createElement("canvas");
@@ -162,8 +164,12 @@ async function pollBuddy() {
 /** The resting pieces, as things he can stand on, in virtual-screen pixels. */
 function sendSurfaces() {
   if (!screen) return;
+  // Front to back: the occlusion test treats the first entry as the one on top, and `sprites`
+  // is stored back to front for drawing. Sent the wrong way round, the rearmost window shadows
+  // every other one and he finds nothing he can climb.
   const list = sprites
     .filter((s) => s.asleep)
+    .reverse()
     .map((s, i) => ({
       hwnd: 900000 + i,
       left: Math.round(screen!.x + s.x),
@@ -171,7 +177,7 @@ function sendSurfaces() {
       right: Math.round(screen!.x + s.x + s.w),
       bottom: Math.round(screen!.y + s.y + s.h),
     }));
-  void invoke("screensaver_surfaces", { surfaces: list }).catch(() => {});
+  void invoke("screensaver_surfaces", { index: screenIndex, surfaces: list }).catch(() => {});
 }
 
 /** Below this he is loitering, not charging, and nothing should budge. */

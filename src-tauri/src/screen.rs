@@ -384,14 +384,29 @@ pub fn screensaver_stop(app: tauri::AppHandle) -> Result<(), String> {
     if let Ok(mut slot) = app.state::<Shot>().0.lock() {
         slot.clear();
     }
+    if let Ok(mut per_screen) = app.state::<Standable>().0.lock() {
+        per_screen.clear();
+    }
     let _ = app.emit("screensaver", false);
     Ok(())
 }
 
+/// What each screen's backdrop last reported as standable, so one screen's list does not
+/// replace another's.
+#[derive(Default)]
+pub struct Standable(pub std::sync::Mutex<std::collections::BTreeMap<usize, Vec<crate::input::Surface>>>);
+
 /// The screensaver telling the buddy what is standable right now: the cut-out windows where
-/// they have ended up, rather than the real ones sitting untouched behind the backdrop.
+/// they have ended up, rather than the real ones sitting untouched behind the backdrop. Every
+/// screen reports its own, and he is sent all of them together.
 #[tauri::command]
-pub fn screensaver_surfaces(app: tauri::AppHandle, surfaces: Vec<crate::input::Surface>) {
-    use tauri::Emitter;
-    let _ = app.emit("surfaces", &surfaces);
+pub fn screensaver_surfaces(app: tauri::AppHandle, index: usize, surfaces: Vec<crate::input::Surface>) {
+    use tauri::{Emitter, Manager};
+    let merged = {
+        let state = app.state::<Standable>();
+        let Ok(mut per_screen) = state.0.lock() else { return };
+        per_screen.insert(index, surfaces);
+        per_screen.values().flatten().cloned().collect::<Vec<_>>()
+    };
+    let _ = app.emit("surfaces", &merged);
 }

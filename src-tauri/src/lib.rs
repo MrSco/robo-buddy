@@ -154,6 +154,7 @@ pub fn run() {
         ))
         .manage(PendingTab::default())
         .manage(screen::Shot::default())
+        .manage(screen::Standable::default())
         .setup(move |app| {
             // Launched as a screensaver with nothing else running: go straight into it.
             if let Some(ScreensaverArg::Show) = screensaver_arg(&std::env::args().collect::<Vec<_>>()) {
