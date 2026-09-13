@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { WindowPhysics } from "./physics";
 import type { Surface, WorkArea } from "./input";
+import { cursor } from "./input";
+
+it("pins an animated grip to the cursor without easing behind it", () => {
+  const p = new WindowPhysics({ gravity: true, throwable: false });
+  const saved = { ...cursor };
+  try {
+    p.grab();
+    for (let frame = 0; frame < 120; frame++) {
+      cursor.x = 1000 + frame * 3;
+      cursor.y = 500;
+      const grip = { x: 200 + Math.sin(frame) * 60, y: 150 + Math.cos(frame) * 45 };
+      p.steerHold(grip.x, grip.y);
+      p.step(1 / 60);
+      expect(p.x + grip.x).toBeCloseTo(cursor.x, 8);
+      expect(p.y + grip.y).toBeCloseTo(cursor.y, 8);
+    }
+  } finally { Object.assign(cursor, saved); }
+});
 
 /**
  * The climb, end to end, with the numbers from the machine this was debugged on: three

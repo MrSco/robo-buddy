@@ -1055,7 +1055,7 @@ function frame() {
   // While held, keep the point he is held by (a hand, the head) under the cursor.
   if (physics?.mode === "held" && renderer && grabPart) {
     const hp = renderer.holdPoint();
-    if (hp) physics.steerHold(hp.x * scaleFactor, hp.y * scaleFactor, dt);
+    if (hp) physics.steerHold(hp.x * scaleFactor, hp.y * scaleFactor);
   }
   if (!paused || physics?.mode === "held" || physics?.airborne) physics?.step(dt);
   if (renderer) {

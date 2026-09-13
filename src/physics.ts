@@ -109,12 +109,13 @@ export class WindowPhysics {
     return best;
   }
 
-  /** Ease the grab offset so a window-space point ends up under the cursor (used to hold by a hand). */
-  steerHold(pointX: number, pointY: number, dt: number) {
+  /** Pin the rendered window-space grip point to the cursor. */
+  steerHold(pointX: number, pointY: number) {
     if (this.mode !== "held") return;
-    const k = Math.min(1, dt * 8);
-    this.grabDx += (pointX - this.grabDx) * k;
-    this.grabDy += (pointY - this.grabDy) * k;
+    // The animated grip is a constraint, not a spring. Any lag here lets the held point
+    // bounce away from the cursor as the body, limbs, and camera move.
+    this.grabDx = pointX;
+    this.grabDy = pointY;
   }
 
   /** Cursor velocity while held, px/s, from the recent samples. */
