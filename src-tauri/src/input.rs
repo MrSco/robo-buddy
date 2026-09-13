@@ -157,7 +157,7 @@ pub fn bring_here(app: AppHandle) {
 /// True when the foreground window covers an entire monitor (a fullscreen game or video),
 /// so the buddy can get out of the way.
 #[cfg(windows)]
-fn foreground_is_fullscreen() -> bool {
+pub(crate) fn foreground_is_fullscreen() -> bool {
     use windows::Win32::Foundation::RECT;
     use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST};
     use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowRect, GetShellWindow, GetDesktopWindow};
@@ -189,7 +189,7 @@ fn foreground_is_fullscreen() -> bool {
 }
 
 #[cfg(not(windows))]
-fn foreground_is_fullscreen() -> bool {
+pub(crate) fn foreground_is_fullscreen() -> bool {
     false
 }
 
@@ -621,4 +621,44 @@ pub fn start_hotkey_thread(app: AppHandle) {
         #[cfg(not(windows))]
         let _ = &app;
     });
+}
+
+/// Whether this process's desktop currently receives input. Never switches desktops.
+#[cfg(windows)]
+pub(crate) fn desktop_is_visible() -> bool {
+    use windows::Win32::{Foundation::HANDLE, System::{StationsAndDesktops::{CloseDesktop, GetThreadDesktop, GetUserObjectInformationW, OpenInputDesktop, DESKTOP_READOBJECTS, DESKTOP_CONTROL_FLAGS, UOI_NAME}, Threading::GetCurrentThreadId}};
+    fn object_name(handle: HANDLE) -> Option<String> {
+        let mut buffer = [0u16; 256];
+        unsafe { GetUserObjectInformationW(handle, UOI_NAME, Some(buffer.as_mut_ptr().cast()), (buffer.len() * 2) as u32, None).ok()?; }
+        Some(String::from_utf16_lossy(&buffer[..buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len())]))
+    }
+
+    fn visible() -> bool {
+        unsafe {
+            let Ok(input) = OpenInputDesktop(DESKTOP_CONTROL_FLAGS(0), false, DESKTOP_READOBJECTS) else { return false };
+            let input_name = object_name(HANDLE(input.0));
+            let own_name = GetThreadDesktop(GetCurrentThreadId()).ok().and_then(|d| object_name(HANDLE(d.0)));
+            let _ = CloseDesktop(input);
+            input_name.is_some() && input_name == own_name
+        }
+    }
+
+    visible()
+}
+
+#[cfg(not(windows))]
+pub(crate) fn desktop_is_visible() -> bool { true }
+
+pub(crate) fn idle_time() -> Option<(u32, f64)> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
+        #[link(name = "kernel32")]
+        extern "system" { fn GetTickCount() -> u32; }
+        let mut info = LASTINPUTINFO { cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32, dwTime: 0 };
+        unsafe { GetLastInputInfo(&mut info).ok().ok()?; }
+        Some((info.dwTime, crate::idle_episode::elapsed(unsafe { GetTickCount() }, info.dwTime)))
+    }
+    #[cfg(not(windows))]
+    { None }
 }

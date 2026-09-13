@@ -33,6 +33,8 @@ export interface Settings {
    * than plain black. Blank for black.
    */
   screensaverBackdrop: string;
+  screensaverBackdropMode: "" | "windows" | "custom" | "none";
+  screensaverAfterMin: number;
   screensaverErosionStyle: "tiles" | "cracks";
   screensaverErosionSpeed: number;
   screensaverVoidSeconds: number;
@@ -99,6 +101,8 @@ export const DEFAULT_SETTINGS: Settings = {
   soundsEnabled: true,
   screensaverSounds: false,
   screensaverBackdrop: "",
+  screensaverBackdropMode: "",
+  screensaverAfterMin: 0,
   screensaverErosionStyle: "tiles",
   screensaverErosionSpeed: 20,
   screensaverVoidSeconds: 6,

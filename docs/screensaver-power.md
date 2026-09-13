@@ -1,3 +1,7 @@
+> Historical investigation. The implemented design is in [screensaver-idle-redesign.md](screensaver-idle-redesign.md).
+> The keep-alive recommendation below was superseded by the later desktop tests. Power-timer
+> resets are a causal inference from the launch loop, not a direct measurement.
+
 # Screensaver mode prevents display sleep and system sleep
 
 Investigation log, 2026-09-13. Windows 11 Pro 10.0.26200.

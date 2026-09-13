@@ -347,27 +347,20 @@
             <div class="group">
               <h2>Screensaver</h2>
               <p class="hint">Right-click him and choose "Screensaver now". He takes over the screen and plays with a picture of your desktop; the real windows are never touched. Any key or mouse movement ends it.</p>
-              <label class="field" title="Make Robo Buddy the screen saver Windows starts on its own after you have been idle. Reversible: 'Restore previous' puts your old one back.">
-                <span>Use as the Windows screen saver</span>
-                <div class="row">
-                  <button id="ss-win-set" type="button">Use Robo Buddy</button>
-                  <button id="ss-win-unset" type="button">Restore previous</button>
-                </div>
-              </label>
+              <label class="field"><span>Start after idle (minutes; 0 = off)</span><input id="ss-after" type="number" min="0" max="120" step="1" /></label>
+              <p class="hint">While Buddy runs, he handles the screensaver. When he closes, Windows runs your usual saver. Password-protected Windows screensavers keep control.</p>
               <p class="hint" id="ss-win-status"></p>
               <label class="field"><span>Desktop destruction</span><select id="ss-erosion-style"><option value="tiles">Falling grid tiles</option><option value="cracks">Cracked glass cutouts</option></select></label>
               <label class="field"><span>Ambient erosion speed <output id="ss-speed-out">20%</output></span><input id="ss-speed" type="range" min="0" max="100" step="1" /></label>
               <p class="hint">Slow lets the buddy do most of the damage. At 0%, only his hits break the desktop.</p>
               <label class="field"><span>Black void after CRT-off (seconds)</span><input id="ss-void" type="number" min="0" max="120" step="1" /></label>
               <label class="check" title="Pokes, thuds and landings while the screensaver is running. Off by default, since the room is usually empty."><input id="ss-sounds" type="checkbox" /> Sound effects during the screensaver</label>
-              <label class="field" title="Another screensaver to play underneath. Where he knocks a window aside, you see it playing through the hole. Leave blank for plain black.">
-                <span>Play a screensaver behind it (optional)</span>
-                <div class="row">
-                  <input id="ss-backdrop" type="text" spellcheck="false" class="grow" placeholder="blank = black" />
-                  <button id="ss-browse" type="button">Choose .scr…</button>
-                  <button id="ss-clear" type="button">Clear</button>
-                </div>
-              </label>
+              <label class="field"><span>Background screensaver</span><select id="ss-backdrop-mode"><option value="windows">Use my Windows screensaver</option><option value="custom">Choose another screensaver</option><option value="none">No background screensaver</option></select></label>
+              <div class="row" id="ss-custom-backdrop">
+                <input id="ss-backdrop" type="text" spellcheck="false" class="grow" placeholder="Path to a .scr file" />
+                <button id="ss-browse" type="button">Choose .scr…</button>
+                <button id="ss-clear" type="button">Clear</button>
+              </div>
               <p class="hint" id="ss-backdrop-status"></p>
             </div>
           </div>

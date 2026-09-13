@@ -87,8 +87,9 @@ const els = {
   ssBrowse: $<HTMLButtonElement>("ss-browse"),
   ssClear: $<HTMLButtonElement>("ss-clear"),
   ssBackdropStatus: $<HTMLParagraphElement>("ss-backdrop-status"),
-  ssWinSet: $<HTMLButtonElement>("ss-win-set"),
-  ssWinUnset: $<HTMLButtonElement>("ss-win-unset"),
+  ssAfter: $<HTMLInputElement>("ss-after"),
+  ssBackdropMode: $<HTMLSelectElement>("ss-backdrop-mode"),
+  ssCustomBackdrop: $<HTMLDivElement>("ss-custom-backdrop"),
   ssWinStatus: $<HTMLParagraphElement>("ss-win-status"),
   ttsEngine: $<HTMLSelectElement>("tts-engine"),
   voicePreview: $<HTMLButtonElement>("voice-preview"),
@@ -453,6 +454,10 @@ function render() {
   els.ssErosionStyle.value = settings.screensaverErosionStyle ?? "tiles";
   els.ssSounds.checked = settings.screensaverSounds ?? false;
   els.ssBackdrop.value = settings.screensaverBackdrop ?? "";
+  els.ssAfter.value = String(settings.screensaverAfterMin ?? 0);
+  els.ssBackdropMode.value = settings.screensaverBackdropMode || (settings.screensaverBackdrop ? "custom" : "windows");
+  els.ssCustomBackdrop.hidden = els.ssBackdropMode.value !== "custom";
+  void refreshWindowsSaver();
   els.paused.checked = settings.paused;
   els.mouse.checked = settings.mouseEnabled;
   els.physics.checked = settings.physicsEnabled;
@@ -818,34 +823,31 @@ function wireScreensaver() {
       els.ssBackdropStatus.textContent = `Could not open that: ${err}`;
     }
   });
-  els.ssWinSet.addEventListener("click", () => void setWindowsSaver(true));
-  els.ssWinUnset.addEventListener("click", () => void setWindowsSaver(false));
+  els.ssAfter.addEventListener("change", async () => {
+    try {
+      els.ssWinStatus.textContent = await invoke<string>("set_idle_screensaver", { minutes: Number(els.ssAfter.value) });
+    } catch (err) {
+      els.ssAfter.value = String(settings.screensaverAfterMin ?? 0);
+      els.ssWinStatus.textContent = String(err);
+    }
+  });
+  els.ssBackdropMode.addEventListener("change", () => {
+    const mode = els.ssBackdropMode.value as "windows" | "custom" | "none";
+    els.ssCustomBackdrop.hidden = mode !== "custom";
+    void commit({ screensaverBackdropMode: mode });
+    els.ssBackdropStatus.textContent = mode === "windows" ? "Uses your current Windows screensaver selection automatically." : mode === "none" ? "Plain black behind the desktop effects." : "Choose a screensaver to play behind Buddy.";
+  });
   void refreshWindowsSaver();
 }
 
-/** Reflect whether Robo Buddy is the current Windows screen saver. */
+/** The resident reports whether automatic mode has its Windows recovery helper. */
 async function refreshWindowsSaver() {
-  try {
-    const on = await invoke<boolean>("windows_screensaver_status");
-    els.ssWinStatus.textContent = on
-      ? "Robo Buddy is your Windows screen saver. Windows will start it when you are idle."
-      : "Not set. Windows runs its own screen saver until you set this.";
-  } catch {
-    els.ssWinStatus.textContent = "";
-  }
-}
-
-async function setWindowsSaver(enable: boolean) {
-  try {
-    els.ssWinStatus.textContent = await invoke<string>("set_windows_screensaver", { enable });
-  } catch (err) {
-    els.ssWinStatus.textContent = `Could not change that: ${err}`;
-  }
-  void refreshWindowsSaver();
+  try { els.ssWinStatus.textContent = await invoke<string>("idle_saver_status"); }
+  catch { els.ssWinStatus.textContent = ""; }
 }
 
 async function setBackdrop(path: string) {
-  await commit({ screensaverBackdrop: path });
+  await commit({ screensaverBackdrop: path, screensaverBackdropMode: "custom" });
   els.ssBackdropStatus.textContent = path
     ? "It will play behind the screensaver; knock a window aside to see it."
     : "Plain black behind the screensaver.";

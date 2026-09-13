@@ -675,3 +675,5 @@ details.adv summary {
   padding: 2px 0;
   font-size: 12px;
 }
+
+#ss-custom-backdrop[hidden] { display: none; }

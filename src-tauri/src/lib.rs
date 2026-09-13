@@ -12,7 +12,8 @@ mod input;
 mod piper;
 mod packs;
 mod screen;
-mod saver_launch;
+mod idle_saver;
+mod idle_episode;
 mod settings;
 
 /// The tab the settings window should open on, left here until the page asks for it.
@@ -24,36 +25,6 @@ struct PendingTab(std::sync::Mutex<Option<String>>);
 #[tauri::command]
 fn take_settings_tab(state: tauri::State<PendingTab>) -> Option<String> {
     state.0.lock().ok().and_then(|mut t| t.take())
-}
-
-/// What Windows asked for when it launched us as a screensaver.
-enum ScreensaverArg {
-    /// `/s`: run it.
-    Show,
-    /// `/c` or `/c:<hwnd>`: show the settings for it.
-    Configure,
-    /// `/p <hwnd>`: draw the little preview in the screensaver dialog. Not supported; ignored.
-    Preview,
-}
-
-/// Reads the screensaver convention: a single letter after a slash or a dash, so `/s`, `-s`
-/// and `--screensaver` all work. Returns None for an ordinary launch.
-fn screensaver_arg(args: &[String]) -> Option<ScreensaverArg> {
-    for a in args.iter().skip(1) {
-        let flag = a.trim_start_matches(['/', '-']).to_ascii_lowercase();
-        let letter = flag.chars().next()?;
-        match letter {
-            's' if flag == "s" || flag.starts_with("screensaver") => return Some(ScreensaverArg::Show),
-            'c' if flag == "c" || flag.starts_with("c:") || flag.starts_with("configure") => {
-                return Some(ScreensaverArg::Configure)
-            }
-            'p' if flag == "p" || flag.starts_with("p:") || flag.starts_with("preview") => {
-                return Some(ScreensaverArg::Preview)
-            }
-            _ => {}
-        }
-    }
-    None
 }
 
 fn show_settings(app: &tauri::AppHandle) {
@@ -125,31 +96,11 @@ fn context_menu(app: tauri::AppHandle) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Do this before Tauri/single-instance/WebView2 initialization: Windows may launch
-    // /s on a different desktop, where the resident's hidden message window is invisible.
-    #[cfg(windows)]
-    if matches!(screensaver_arg(&std::env::args().collect::<Vec<_>>()), Some(ScreensaverArg::Show)) {
-        if let Err(e) = saver_launch::relay() { eprintln!("screensaver launch: {e}"); }
-        return;
-    }
+    if idle_saver::guard_entry() { return; }
     let context = tauri::generate_context!();
     let initial = settings::load_early(&context.config().identifier);
     tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
-            // Windows launches a screensaver by running it again with /s, which lands here
-            // because the buddy is already running. Anything else just summons him.
-            match screensaver_arg(&args) {
-                Some(ScreensaverArg::Show) => {
-                    let handle = app.clone();
-                    std::thread::spawn(move || { let _ = screen::screensaver_start(handle); });
-                }
-                // Windows' Screen Saver dialog sends /c for its Settings button, and every
-                // screensaver setting of ours lives on the Window tab.
-                Some(ScreensaverArg::Configure) => show_settings_on(app, Some("window")),
-                Some(ScreensaverArg::Preview) => {}
-                None => input::bring_here(app.clone()),
-            }
-        }))
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| input::bring_here(app.clone())))
         // Managed before any window exists: the buddy window calls get_settings on load.
         .manage(settings::SettingsState(std::sync::Mutex::new(initial.clone())))
         .plugin(
@@ -164,6 +115,7 @@ pub fn run() {
             None,
         ))
         .manage(PendingTab::default())
+        .manage(idle_saver::State::default())
         .manage(screen::Shot::default())
         .manage(screen::PageReadiness::default())
         .manage(screen::Cycle::default())
@@ -171,20 +123,6 @@ pub fn run() {
         .manage(screen::Backdrop::default())
         .manage(screen::Punch::default())
         .setup(move |app| {
-            // Launched as a screensaver with nothing else running: go straight into it, or
-            // straight to the screensaver settings if that is what was asked for.
-            match screensaver_arg(&std::env::args().collect::<Vec<_>>()) {
-                Some(ScreensaverArg::Show) => {
-                    let handle = app.handle().clone();
-                    std::thread::spawn(move || {
-                        // Let the buddy window finish loading first, or he blinks in afterwards.
-                        std::thread::sleep(std::time::Duration::from_millis(1200));
-                        let _ = screen::screensaver_start(handle);
-                    });
-                }
-                Some(ScreensaverArg::Configure) => show_settings_on(app.handle(), Some("window")),
-                _ => {}
-            }
             let bring_item = MenuItem::with_id(app, "bring", "Bring buddy here", true, None::<&str>)?;
             let saver_item = MenuItem::with_id(app, "screensaver", "Screensaver now", true, None::<&str>)?;
             let settings_item = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
@@ -232,9 +170,7 @@ pub fn run() {
             input::start_surfaces_thread(app.handle().clone());
             input::start_key_thread(app.handle().clone());
             input::start_hotkey_thread(app.handle().clone());
-            screen::refresh_scr();
-            #[cfg(windows)]
-            saver_launch::listen(app.handle().clone());
+            idle_saver::start(app.handle().clone());
             audio::start_audio_thread(app.handle().clone());
             Ok(())
         })
@@ -293,8 +229,8 @@ pub fn run() {
             screen::screensaver_stop,
             screen::screensaver_surfaces,
             screen::screensaver_crt,
-            screen::set_windows_screensaver,
-            screen::windows_screensaver_status,
+            idle_saver::set_idle_screensaver,
+            idle_saver::idle_saver_status,
             take_settings_tab,
             context_menu,
             chat::set_chat_key,
@@ -320,6 +256,12 @@ pub fn run() {
             piper::piper_download_voice,
             piper::piper_open_voices,
         ])
-        .run(context)
-        .expect("error while running Robo Buddy");
+        .build(context)
+        .expect("error while building Robo Buddy")
+        .run(|app, event| {
+            if matches!(event, tauri::RunEvent::Exit) {
+                idle_saver::shutdown(app);
+                let _ = screen::screensaver_stop(app.clone());
+            }
+        });
 }

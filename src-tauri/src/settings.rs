@@ -38,6 +38,9 @@ pub struct Settings {
     pub screensaver_sounds: bool,
     /// A .scr to run behind the screensaver; blank means a plain black backdrop.
     pub screensaver_backdrop: String,
+    /// Empty is a legacy setting: retain an explicit path, otherwise use Windows.
+    pub screensaver_backdrop_mode: String,
+    pub screensaver_after_min: f64,
     pub screensaver_erosion_style: String,
     pub screensaver_erosion_speed: f64,
     pub screensaver_void_seconds: f64,
@@ -110,6 +113,8 @@ impl Default for Settings {
             sounds_enabled: true,
             screensaver_sounds: false,
             screensaver_backdrop: String::new(),
+            screensaver_backdrop_mode: String::new(),
+            screensaver_after_min: 0.0,
             screensaver_erosion_style: "tiles".into(),
             screensaver_erosion_speed: 20.0,
             screensaver_void_seconds: 6.0,
@@ -178,9 +183,10 @@ pub fn get_settings(state: tauri::State<SettingsState>) -> Settings {
 }
 
 #[tauri::command]
-pub fn set_settings(app: AppHandle, state: tauri::State<SettingsState>, settings: Settings) {
+pub fn set_settings(app: AppHandle, state: tauri::State<SettingsState>, mut settings: Settings) {
     {
         let mut cur = state.0.lock().unwrap();
+        settings.screensaver_after_min = cur.screensaver_after_min;
         *cur = settings.clone();
     }
     save(&app, &settings);
