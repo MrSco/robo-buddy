@@ -77,14 +77,23 @@ export interface ResolvedPersonality {
 }
 
 /** The persona, lines and model settings in effect for a character under a profile id. */
-export async function resolvePersonality(id: string, characterName: string, packPersona: string | undefined, packLines: Lines): Promise<ResolvedPersonality> {
+export async function resolvePersonality(
+  id: string,
+  characterName: string,
+  packPersona: string | undefined,
+  packLines: Lines,
+  packLlm?: { temperature?: number; maxWords?: number },
+): Promise<ResolvedPersonality> {
   const profiles = await listPersonalities();
   const p = profiles.find((x) => x.id === id) ?? profiles[0];
+  if (!p.persona) {
+    // As the character: its own warmth and brevity too, not just its own words.
+    const temperature = packLlm?.temperature ?? p.llm?.temperature ?? 0.9;
+    const maxWords = packLlm?.maxWords ?? p.llm?.maxWords ?? 35;
+    return { id: p.id, persona: packPersona ?? defaultPersona(characterName, maxWords), lines: packLines, temperature, maxWords };
+  }
   const temperature = p.llm?.temperature ?? 0.9;
   const maxWords = p.llm?.maxWords ?? 35;
-  if (!p.persona) {
-    return { id: p.id, persona: packPersona ?? defaultPersona(characterName), lines: packLines, temperature, maxWords };
-  }
   const persona =
     p.persona.replaceAll("{name}", characterName) +
     ` Reply in one or two short sentences, at most ${maxWords} words, plain text only: no markdown, no lists, no emojis.`;

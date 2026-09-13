@@ -84,6 +84,30 @@
     "loop": true
   },
   {
+    "name": "Jump",
+    "file": "Jump.glb",
+    "duration": 2.2,
+    "loop": false
+  },
+  {
+    "name": "Jumping",
+    "file": "Jumping.glb",
+    "duration": 1.933,
+    "loop": false
+  },
+  {
+    "name": "Jumping_Down",
+    "file": "Jumping_Down.glb",
+    "duration": 2.333,
+    "loop": false
+  },
+  {
+    "name": "Jumping_Up",
+    "file": "Jumping_Up.glb",
+    "duration": 0.867,
+    "loop": false
+  },
+  {
     "name": "Neutral_Idle",
     "file": "Neutral_Idle.glb",
     "duration": 8.8,

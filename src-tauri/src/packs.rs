@@ -295,3 +295,44 @@ pub fn delete_user_clip(app: AppHandle, file: String) -> Result<(), String> {
     let p = dir.join(Path::new(&file).file_name().ok_or("bad name")?);
     fs::remove_file(p).map_err(|e| e.to_string())
 }
+
+/// Write a character's own persona, bubble lines and model settings into its manifest, so an
+/// imported model can be someone in particular instead of falling back to the generic buddy.
+/// Only imported packs: bundled ones are install-dir assets and an edit would not survive.
+/// A null field is removed, which puts that part back to the built-in default.
+#[tauri::command]
+pub fn set_pack_persona(
+    app: AppHandle,
+    id: String,
+    persona: Option<String>,
+    lines: Option<serde_json::Value>,
+    llm: Option<serde_json::Value>,
+) -> Result<(), String> {
+    let folder = id.strip_prefix("user:").ok_or("only imported characters can be edited")?;
+    let root = characters_dir(&app).ok_or("no data dir")?;
+    let dir = root.join(Path::new(folder).file_name().ok_or("bad id")?);
+    if !dir.starts_with(&root) || !dir.is_dir() {
+        return Err("character folder not found".into());
+    }
+    let path = dir.join("manifest.json");
+    let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut manifest: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    let obj = manifest.as_object_mut().ok_or("manifest is not an object")?;
+    // Everything else in the manifest is left exactly as it was: this edits the character's
+    // voice, not its model, states or clips.
+    for (key, value) in [
+        ("persona", persona.map(serde_json::Value::String)),
+        ("lines", lines),
+        ("llm", llm),
+    ] {
+        match value {
+            Some(v) => {
+                obj.insert(key.to_string(), v);
+            }
+            None => {
+                obj.remove(key);
+            }
+        }
+    }
+    fs::write(&path, serde_json::to_string_pretty(&manifest).unwrap()).map_err(|e| e.to_string())
+}

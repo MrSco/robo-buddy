@@ -7,8 +7,10 @@ reference world rotation, then convert back to the target's local space. Hips
 translation is transferred as a world-space offset scaled by the two rigs' hip heights.
 
 Usage:
-  python scripts/retarget_clips.py SOURCE.glb TARGET_RIG.glb OUT_DIR [--ref A_TPose] [--map ue] [clip names...]
-Without clip names every animation in the source is baked.
+  python scripts/retarget_clips.py SOURCE.glb TARGET_RIG.glb OUT_DIR [--ref A_TPose] [--map ue] [--in-place] [clip names...]
+Without clip names every animation in the source is baked. `--in-place` strips the hips'
+horizontal travel, for clips (leaps, dives) whose root motion would otherwise carry the
+character out of his own window while the physics is already moving it.
 """
 import json
 import math
@@ -259,8 +261,11 @@ def target_index(rig, short):
 
 # ---------------------------------------------------------------- baking
 
-def bake(src_rig, tgt_rig, clip, src_ref_world, tgt_ref_world, bone_map, fps=30):
-    """Return {mixamo_short: [quats]} local rotations and hips [positions] per frame."""
+def bake(src_rig, tgt_rig, clip, src_ref_world, tgt_ref_world, bone_map, fps=30, in_place=False):
+    """Return {mixamo_short: [quats]} local rotations and hips [positions] per frame.
+
+    `in_place` drops the hips' horizontal travel and keeps only its rise and fall, for clips
+    whose own root motion would fight the physics that is already moving the window."""
     frames = max(2, int(round(clip.duration * fps)) + 1)
     times = [min(clip.duration, i / fps) for i in range(frames)]
 
@@ -310,6 +315,10 @@ def bake(src_rig, tgt_rig, clip, src_ref_world, tgt_ref_world, bone_map, fps=30)
                     off = v_sub(src_world[src_hips][0], src_ref_world[src_hips][0])
                     off = q_rot(yaw180, off)
                     off = tuple(c * h_ratio for c in off)
+                    # A leap that travels in the clip would slide him out of his own window:
+                    # the physics owns where he goes, the clip only owns how he looks going.
+                    if in_place:
+                        off = (0.0, off[1], 0.0)
                     off_local = q_rot(q_inv(p_rot), off)
                     pos_local = v_add(rt, off_local)
                     hips_pos.append(pos_local)
@@ -378,6 +387,7 @@ def main(argv):
     wanted = args[3:]
     ref_name = opts.get("--ref", "A_TPose")
     bone_map = MAPS[opts.get("--map", "ue")]()
+    in_place = "--in-place" in argv
 
     src = Rig(*read_glb(src_path))
     tgt = Rig(*read_glb(tgt_path))
@@ -415,7 +425,7 @@ def main(argv):
         if name == ref_name:
             continue
         clip = Anim(src, a)
-        times, rots, hips, th = bake(src, tgt, clip, src_ref_world, tgt_ref_world, bone_map)
+        times, rots, hips, th = bake(src, tgt, clip, src_ref_world, tgt_ref_world, bone_map, in_place=in_place)
         out = os.path.join(out_dir, f"{name}.glb")
         write_clip(out, name, tgt, times, rots, hips, th)
         index.append({"name": name, "file": f"{name}.glb", "duration": round(clip.duration, 3), "loop": name.endswith("_Loop")})

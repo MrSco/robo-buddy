@@ -274,6 +274,7 @@ pub fn run() {
             packs::list_user_packs,
             packs::user_packs_dir,
             packs::import_pack,
+            packs::set_pack_persona,
             packs::list_user_clips,
             packs::stage_dropped,
             packs::finalize_import,

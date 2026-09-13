@@ -4,7 +4,7 @@ import type { ClipChoice } from "./behavior";
 import type { Manifest, PackRef } from "./packs";
 
 /** Behaviour states resolved by main.ts each frame. Packs may provide a clip per state. */
-export type StateName = "idle" | "dance" | "poked" | "dragged" | "fall" | "sleep" | "fidget" | "walk" | "land" | "down" | "typing" | "mirror" | "hang" | "mantle";
+export type StateName = "idle" | "dance" | "poked" | "dragged" | "fall" | "jump" | "sleep" | "fidget" | "walk" | "land" | "down" | "typing" | "mirror" | "hang" | "mantle";
 
 export type GrabPart = "head" | "torso" | "leftArm" | "rightArm" | "leftLeg" | "rightLeg";
 

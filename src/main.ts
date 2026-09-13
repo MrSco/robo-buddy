@@ -124,6 +124,9 @@ const sounds = new Sounds();
 const behavior = new Behavior();
 let pokeClip: ClipChoice | null = null;
 let landClip: ClipChoice | null = null;
+/** Latched when a jump starts: stateClip picks at random, and re-picking every frame would thrash. */
+let jumpClip: ClipChoice | null = null;
+let jumpKind: "up" | "off" | null = null;
 let landUntil = -1;
 /** Knocked down after a tumbling or very hard landing: limp on the floor until this time. */
 let downUntil = -1;
@@ -259,9 +262,21 @@ async function boot() {
         if (settings.bubblesEnabled) bubble.say(lines, 2.5, clock.elapsedTime);
       }
     });
-    await listen("personalities-changed", () => {
+    await listen("personalities-changed", async () => {
       invalidatePersonalities();
       chat.reset();
+      // An imported character's own persona lives in its manifest, which the settings window
+      // may have just rewritten. Re-read those fields rather than reloading the whole model.
+      if (pack && manifest) {
+        try {
+          const raw = (await (await fetch(pack.base + "manifest.json")).json()) as Manifest;
+          manifest.persona = raw.persona;
+          manifest.lines = raw.lines;
+          manifest.llm = raw.llm;
+        } catch {
+          // Unreadable: keep the persona already loaded.
+        }
+      }
       if (pack) void refreshPhrases(pack.id);
     });
     // Hide behind fullscreen apps (games, videos) and come back afterwards.
@@ -463,7 +478,7 @@ function linesFor(event: LineEvent): string[] {
 /** Persona, line bucket and model settings for the current character under the chosen profile. */
 async function applyPersonality() {
   const name = manifest?.name ?? "Buddy";
-  personality = await resolvePersonality(settings.personality, name, manifest?.persona, (manifest?.lines ?? {}) as Lines);
+  personality = await resolvePersonality(settings.personality, name, manifest?.persona, (manifest?.lines ?? {}) as Lines, manifest?.llm);
   chat.tuning = { temperature: personality.temperature, maxWords: personality.maxWords };
 }
 
@@ -819,6 +834,18 @@ function resolveState(t: number, act: ReturnType<Behavior["update"]>): { state: 
   }
   if (physics?.airborne) {
     if (airborneSince < 0) airborneSince = t;
+    // A push-off of his own reads as a jump from the very first frame: the crouch and the
+    // spring are the whole of it, and waiting to be sure he is airborne would miss them.
+    if (physics.launch) {
+      if (jumpKind !== physics.launch) {
+        jumpKind = physics.launch;
+        jumpClip = behavior.stateClip(physics.launch === "off" ? "jumpOff" : "jump");
+      }
+      if (jumpClip) {
+        flailNow = false;
+        return { state: "jump", clip: jumpClip };
+      }
+    }
     const long = t - airborneSince > 0.35;
     const fallClip = long ? behavior.stateClip("fall") : null;
     // The arm flail is only for packs with no falling clip at all; on a short hop or a bounce
@@ -826,6 +853,7 @@ function resolveState(t: number, act: ReturnType<Behavior["update"]>): { state: 
     flailNow = long && !fallClip;
     return { state: "fall", clip: fallClip };
   }
+  if (!physics?.launch) jumpKind = null;
   // A bounce touches the floor for a frame; only a settled rest ends the airborne stretch,
   // otherwise the falling clip would flicker off and on across every bounce.
   if (physics?.mode === "rest") airborneSince = -1;

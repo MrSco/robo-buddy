@@ -218,3 +218,46 @@ describe("the desk is one floor, screensaver or not", () => {
     expect(p.y).toBe(AREAS[0].bottom - H + TASKBAR); // stepped onto that screen's taskbar
   });
 });
+
+describe("a jump is told apart from a fall", () => {
+  it("marks a hop at a window edge as a launch, and drops the mark on landing", () => {
+    const p = buddyOn(AREAS[1], 1000);
+    expect(p.launch).toBe(null);
+    p.hop(AREAS[1].bottom - H);
+    expect(p.launch).toBe("up");
+    // It survives the whole flight, so the take-off clip is not cut off mid-air.
+    for (let frame = 0; frame < 10; frame++) p.step(1 / 60);
+    expect(p.airborne).toBe(true);
+    expect(p.launch).toBe("up");
+    for (let frame = 0; frame < 400; frame++) p.step(1 / 60);
+    expect(p.mode).toBe("rest");
+    expect(p.launch).toBe(null);
+  });
+
+  it("marks a leap off a window, and a throw not at all", () => {
+    const p = buddyOn(AREAS[1], 1000);
+    p.leapOff(1);
+    expect(p.launch).toBe("off");
+
+    // Being thrown is the same "falling" mode with no push-off of his own behind it.
+    const q = buddyOn(AREAS[1], 1000);
+    q.mode = "falling";
+    q.vy = -1200;
+    q.vx = 900;
+    q.step(1 / 60);
+    expect(q.airborne).toBe(true);
+    expect(q.launch).toBe(null);
+  });
+
+  it("ends the jump when he catches a ledge, so letting go later is a plain drop", () => {
+    const area = AREAS[1];
+    const p = buddyOn(area, 1000);
+    const top = area.bottom - H - 120;
+    p.surfaces = [{ hwnd: 1, left: 600, right: 1400, top, bottom: area.bottom } as Surface];
+    p.hop(top);
+    expect(p.launch).toBe("up");
+    for (let frame = 0; frame < 400 && p.mode === "falling"; frame++) p.step(1 / 60);
+    expect(p.mode === "hanging" || p.mode === "mantling" || p.mode === "rest").toBe(true);
+    expect(p.launch).toBe(null);
+  });
+});

@@ -19,13 +19,13 @@ export type LineEvent = "greet" | "poked" | "sleep" | "wake" | "land" | "bump" |
 export type Lines = Partial<Record<LineEvent, string[]>>;
 
 /** What he is, unless the pack or a personality says otherwise. */
-export function defaultPersona(name: string): string {
+export function defaultPersona(name: string, maxWords = 35): string {
   return (
     `You are ${name}, a small 3D character living on the user's Windows desktop, standing on the taskbar. ` +
     `You are warm, playful and a little cheeky, and you talk like a good friend, not an assistant. ` +
     `You can see the user's mouse, hear their music (you dance when it plays), you get poked, picked up, ` +
     `dragged around and thrown, and you doze off when ignored. ` +
-    `Reply in one or two short sentences, at most 35 words, plain text only: no markdown, no lists, no emojis.`
+    `Reply in one or two short sentences, at most ${maxWords} words, plain text only: no markdown, no lists, no emojis.`
   );
 }
 

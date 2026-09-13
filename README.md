@@ -18,6 +18,12 @@ Character packs live in `public/characters/` (bundled) and
 `%APPDATA%/com.rocco.robobuddy/characters/` (user). Each has a `manifest.json`;
 see `public/characters/rocco/manifest.json` and `pixel-pal/manifest.json` for the two formats.
 
+A manifest's `persona`, `lines` and `llm` say who that character is when it talks. For a
+character you imported, Settings > Talk > Personality with "As the character" chosen edits
+those three in place and writes them back to that pack's own `manifest.json`, so the
+personality belongs to the model and survives switching profiles. Bundled packs are
+install-directory assets and stay read-only; copy one to a profile of your own instead.
+
 ## Install and run
 
 **Just install it (you or a friend):** run `release\RoboBuddy-Setup-<version>.exe`. It installs per user, adds "Robo Buddy"

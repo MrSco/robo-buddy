@@ -48,8 +48,10 @@ export interface Manifest {
   dances?: Array<string | { clip: string; beatsPerLoop?: number; label?: string }>;
   /** Who he is when talking (M6); a default persona is built from the name when absent. */
   persona?: string;
+  /** How the model answers as this character: its own warmth and its own brevity. */
+  llm?: { temperature?: number; maxWords?: number };
   /** Optional speech-bubble lines per event; one is picked at random. */
-  lines?: Partial<Record<"greet" | "poked" | "sleep" | "wake" | "land" | "bump" | "dance", string[]>>;
+  lines?: Partial<Record<"greet" | "poked" | "sleep" | "wake" | "land" | "bump" | "dance" | "idle", string[]>>;
   /** Optional sound files per event, relative to the pack. */
   sounds?: Partial<Record<"poked" | "land" | "wake" | "greet" | "bounce" | "bump" | "grab" | "throw", string>>;
   reactions: {
@@ -91,6 +93,20 @@ export async function listPacks(): Promise<PackRef[]> {
   if (!IN_TAURI) return bundled;
   const users = await invoke<UserPack[]>("list_user_packs");
   return [...bundled, ...users.map((u) => ({ id: u.id, name: u.name, base: userBase(u.dir), bundled: false }))];
+}
+
+/**
+ * Store a character's own persona, lines and model settings in its manifest. Imported packs
+ * only; a bundled pack lives in the install directory and an edit there would be lost on the
+ * next update. Undefined clears a field, putting that part back to the built-in default.
+ */
+export async function savePackPersona(
+  id: string,
+  persona: string | undefined,
+  lines: Manifest["lines"] | undefined,
+  llm: Manifest["llm"] | undefined,
+): Promise<void> {
+  await invoke("set_pack_persona", { id, persona: persona ?? null, lines: lines ?? null, llm: llm ?? null });
 }
 
 export async function resolvePack(id: string): Promise<PackRef> {

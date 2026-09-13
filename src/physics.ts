@@ -48,6 +48,16 @@ export class WindowPhysics {
   accelY = 0;
   /** Angular velocity handed to the renderer at release, rad/s (sign = spin direction). */
   spin = 0;
+  private launchKind: "up" | "off" | null = null;
+  /**
+   * Set while he is in the air under his own power, so the renderer can draw a jump instead of
+   * a fall: "up" is a hop at a window edge, "off" a leap clean off one. Derived from the mode
+   * rather than cleared on landing, so it ends on the very frame the flight does: a throw, a
+   * shove, and letting go of a ledge he caught are all plain falling.
+   */
+  get launch(): "up" | "off" | null {
+    return this.mode === "falling" ? this.launchKind : null;
+  }
   private prevX = NaN;
   private prevY = NaN;
   private prevVx = 0;
@@ -429,6 +439,7 @@ export class WindowPhysics {
     const rise = top < handY ? Math.max(60, handY - top + 14) : Math.max(60, feetY - top + 24);
     this.support = null;
     this.mode = "falling";
+    this.launchKind = "up";
     this.vy = -Math.min(this.roam ? 2600 : 1900, Math.sqrt(2 * GRAVITY * rise));
     this.vx = 0;
   }
@@ -485,6 +496,7 @@ export class WindowPhysics {
     this.departedSurface = this.support;
     this.support = null;
     this.mode = "falling";
+    this.launchKind = "off";
     this.vy = -600;
     this.vx = (dir >= 0 ? 1 : -1) * 1500;
     this.spin = 0;
@@ -552,6 +564,9 @@ export class WindowPhysics {
     dt = Math.min(dt, 0.05);
     this.trackAccel(dt);
     if (this.mode === "rest" || this.mode === "held") this.departedSurface = null;
+    // Only a flight that began with a push-off is a jump. Catching a ledge on the way up ends
+    // it, so letting go of that ledge later is an ordinary drop and is drawn as one.
+    if (this.mode !== "falling") this.launchKind = null;
     if (this.mode === "held") {
       this.x = cursor.x - this.grabDx;
       this.y = cursor.y - this.grabDy;

@@ -66,7 +66,7 @@ interface Sprite {
 }
 
 const GRAVITY = 1900; // px/s^2
-const BOUNCE = 0.42;
+const BOUNCE = 0.31;
 const FRICTION = 2.4;
 const SETTLE = 28; // px/s
 

@@ -29,6 +29,11 @@ Mixamo cannot be scripted, so the flow is manual:
    ```
    (`--ref=` empty means "use the file's rest pose as the T-pose reference", which is what a
    Mixamo export gives you.)
+
+   Add `--in-place` for a clip that travels — a leap, a dive, a run downloaded without the
+   "In Place" box ticked. It keeps the hips' rise and fall and drops their horizontal travel,
+   because the physics already decides where he goes: a clip that moves him too would carry
+   him out of his own window. `Jumping_Down` travels nearly two metres and needs it.
 4. Reference it from a pack manifest and add it to the `dances` list:
    ```json
    "clips": { "hiphop": "/clips/mixamo/Hip Hop Dancing.glb" },

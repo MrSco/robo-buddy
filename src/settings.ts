@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { open } from "@tauri-apps/plugin-dialog";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { listPacks, type Manifest, type PackRef } from "./packs";
+import { listPacks, savePackPersona, type Manifest, type PackRef } from "./packs";
 import { LivePreview, thumbnailFor } from "./preview";
 import { Behavior } from "./behavior";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -1143,17 +1143,23 @@ function editorToProfile(id: string): Personality {
 
 function showEditor(p: Personality) {
   els.pedit.hidden = false;
-  const editable = !!p.user;
   // "As the character" shows what the current pack actually uses, so it can be copied and tweaked.
+  // For an imported character it is editable in place and saved into that character's own
+  // manifest, which is the only way a model you brought yourself can be someone in particular.
+  const ownPack = p.id === "pack" ? editablePack() : null;
+  const editable = !!p.user || !!ownPack;
   const packName = currentManifest?.name ?? "Buddy";
-  const persona = p.persona ?? (p.id === "pack" ? currentManifest?.persona ?? defaultPersona(packName) : "");
+  const packLlm = p.id === "pack" ? currentManifest?.llm : undefined;
+  const persona = p.persona ?? (p.id === "pack" ? currentManifest?.persona ?? defaultPersona(packName, packLlm?.maxWords ?? 35) : "");
   const lines = p.lines ?? (p.id === "pack" ? ((currentManifest?.lines ?? {}) as Personality["lines"]) : undefined);
   els.peName.value = p.id === "pack" ? `${packName} (as the character)` : p.name;
   els.peDesc.value = p.description ?? "";
   els.pePersona.value = persona;
-  els.peTemp.value = String(p.llm?.temperature ?? 0.9);
-  els.peWords.value = String(p.llm?.maxWords ?? 35);
-  for (const el of [els.peName, els.peDesc, els.pePersona, els.peTemp, els.peWords]) el.readOnly = !editable;
+  els.peTemp.value = String(packLlm?.temperature ?? p.llm?.temperature ?? 0.9);
+  els.peWords.value = String(packLlm?.maxWords ?? p.llm?.maxWords ?? 35);
+  // The character's name and blurb belong to the pack, not to this profile.
+  for (const el of [els.peName, els.peDesc]) el.readOnly = !p.user;
+  for (const el of [els.pePersona, els.peTemp, els.peWords]) el.readOnly = !editable;
   els.peLines.innerHTML = "";
   for (const [key, label] of LINE_EVENTS) {
     const l = document.createElement("label");
@@ -1167,9 +1173,21 @@ function showEditor(p: Personality) {
     els.peLines.appendChild(l);
   }
   els.peSave.disabled = !editable;
-  els.peDelete.disabled = !editable;
+  els.peDelete.disabled = !p.user;
   els.peSaveAs.textContent = editable ? "Save as new" : "Copy to a new profile";
-  els.peStatus.textContent = editable ? "" : "Built in and read-only. Copy it to a new profile to change anything.";
+  els.peStatus.textContent = ownPack
+    ? `Saving writes this into "${ownPack.name}" itself, so it stays with that character.`
+    : editable
+      ? ""
+      : p.id === "pack"
+        ? "This character ships with the app, so its own personality is read-only. Copy it to a new profile to change anything."
+        : "Built in and read-only. Copy it to a new profile to change anything.";
+}
+
+/** The current character when it is one the user imported, whose manifest we may write to. */
+function editablePack(): PackRef | null {
+  const pack = packs.find((x) => x.id === settings.character);
+  return pack && !pack.bundled ? pack : null;
 }
 
 function wirePersonalityEditor() {
@@ -1204,6 +1222,26 @@ function wirePersonalityEditor() {
   });
   els.peSave.addEventListener("click", async () => {
     const id = els.personality.value;
+    // "As the character" writes to the character itself, so it travels with that model and
+    // survives switching profiles; every other profile is a row in personalities.json.
+    if (id === "pack") {
+      const pack = editablePack();
+      if (!pack) return;
+      const p = editorToProfile(id);
+      try {
+        await savePackPersona(pack.id, p.persona, p.lines as Manifest["lines"], p.llm);
+      } catch (err) {
+        els.peStatus.textContent = `Could not save: ${err}`;
+        return;
+      }
+      // The manifest is cached per pack; drop it so the editor redraws from what was written.
+      manifests.delete(pack.id);
+      await updatePackDetails();
+      await emit("personalities-changed").catch(() => {});
+      showEditor({ id: "pack", name: "As the character" });
+      els.peStatus.textContent = `Saved into "${pack.name}".`;
+      return;
+    }
     const users = await loadUserPersonalities();
     if (!users.some((u) => u.id === id)) return;
     const p = editorToProfile(id);

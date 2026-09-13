@@ -44,6 +44,14 @@
       "clip": "Falling_Idle",
       "loop": true
     },
+    "jump": {
+      "clip": "Jumping_Up",
+      "loop": false
+    },
+    "jumpOff": {
+      "clip": "Jumping_Down",
+      "loop": false
+    },
     "land": {
       "clip": "jumpLand",
       "loop": false
@@ -128,7 +136,11 @@
     "Getting_Up_2": "/clips/mixamo/Getting_Up_2.glb",
     "Standing_Up": "/clips/mixamo/Standing_Up.glb",
     "run": "/clips/mixamo/Running.glb",
-    "sprint": "/clips/mixamo/Fast_Run.glb"
+    "sprint": "/clips/mixamo/Fast_Run.glb",
+    "Jump": "/clips/mixamo/Jump.glb",
+    "Jumping": "/clips/mixamo/Jumping.glb",
+    "Jumping_Up": "/clips/mixamo/Jumping_Up.glb",
+    "Jumping_Down": "/clips/mixamo/Jumping_Down.glb"
   },
   "lines": {
     "greet": [
