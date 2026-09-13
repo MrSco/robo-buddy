@@ -205,7 +205,37 @@ overlay", not "one launch". Both mechanisms are fixed by keeping the `.scr` aliv
 
 ## Recommendations
 
-### 1. Keep the `.scr` process alive for the session — *the fix*
+### 1. Keep the `.scr` process alive for the session — ~~*the fix*~~ **TRIED, DOES NOT WORK**
+
+**Implemented and reverted on 2026-09-13. Do not attempt this again.** It is not a matter of
+getting the details right; the approach cannot work at all.
+
+Windows runs a screen saver on a **desktop of its own**, named `Screen-saver`, and only switches
+the input desktop back to `Default` once the saver process ends. The resident's windows live on
+`Default` and it refuses to draw while another desktop has the input — that is what
+`desktop_is_visible()` and the 400 ms + 30×100 ms retry loop in `listen()` are for. So:
+
+- `.scr` exits promptly → Windows tears down the `Screen-saver` desktop → the resident sees
+  `Default` come back and draws. This is why the original design works.
+- `.scr` holds itself open → the desktop never switches back → the resident waits out its three
+  seconds, logs `desktop not interactive; request expired`, and gives up. The screens go black for
+  a second or two and then return.
+
+Caught in `buddy.log`, with the launcher logging its own desktop:
+
+```
+15:11:03  launcher pid=1696   start desktop=Some("Default")        <- drew fine
+15:12:12  launcher pid=38720  start desktop=Some("Screen-saver")
+15:12:12  relay: request received; resident pid=37368 desktop visible=false
+15:12:15  relay: desktop not interactive; request expired
+```
+
+The comment that was already in `relay()` said this before the attempt — *"The `.scr` must return
+to Windows before we capture/show the ordinary desktop. Never switch desktops ourselves or bypass
+the Windows lock screen."* Having the `.scr` call `SwitchDesktop` itself is not a way around it:
+that is the deliberate security boundary the second sentence is about.
+
+What follows is the original reasoning, kept only so the dead end is legible.
 
 Add a second named event, set by the resident in `screensaver_stop`. `relay()` should signal the
 start event as it does now, then **block on the stop event** instead of returning, so the `.scr`
@@ -271,7 +301,28 @@ Sample `SystemParametersInfoW(SPI_GETSCREENSAVERRUNNING /* 0x0072 */)` alongside
 fields. That records Windows' own view of whether a screen saver is running, which is the state
 this bug corrupts and which nothing currently observes. No elevation needed for that call.
 
-## Alternative design — stop being the registered screen saver
+## The remaining route — own the idle trigger
+
+With recommendation 1 ruled out, the only way to fix the power bug is to stop letting Windows
+launch us at all, so there is no launch-and-exit for it to misread and no `Screen-saver` desktop in
+the way. Test 3 is the evidence this works: started from the tray, with the overlay up and the
+backdrop spawned, the machine blanked at 2 min and slept at 5 min.
+
+Shape of it:
+
+- Leave `SCRNSAVE.EXE` alone entirely — the user's own saver stays registered, which is what they
+  asked for. Clear `ScreenSaveActive` instead so Windows does not fire it on top of ours, and put
+  it back on disable.
+- Poll `GetLastInputInfo` in the resident and call `screensaver_start` directly at the threshold.
+  Keep reading `ScreenSaveTimeOut` for the timing so the Windows dialog still sets it.
+- Keep spawning `screensaverBackdrop` as today; it already holds their saver.
+- `saver_launch` goes away, along with the `.scr` copy and the registry write.
+
+The cost is that "On resume, display logon screen" would no longer apply to our screensaver. It
+never locked anything anyway — the overlay is ordinary windows over the desktop — so nothing that
+works today is lost, but the Windows setting would silently stop meaning anything.
+
+## Alternative design — ride the user's registered screen saver
 
 Longer-term, the cleanest shape is for Robo Buddy never to touch `SCRNSAVE.EXE` at all: leave the
 user's saver registered, poll `SPI_GETSCREENSAVERRUNNING`, and lay the overlay over whatever

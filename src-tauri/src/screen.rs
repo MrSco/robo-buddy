@@ -515,8 +515,6 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
     }
     // He belongs on top of his own playground, not behind it.
     crate::input::raise_buddy(&app);
-    // Ours is up: any launcher Windows sent stays held until it comes down again.
-    crate::saver_launch::screensaver_active();
     let _ = app.emit("screensaver", true);
     Ok(())
 }
@@ -544,10 +542,6 @@ pub fn screensaver_stop(app: tauri::AppHandle) -> Result<(), String> {
         per_screen.clear();
     }
     stop_backdrop(&app);
-    // Last, once everything is really down: a `.scr` Windows launched is holding itself open on
-    // this, and it is what tells Windows the screen saver is over. Released here rather than at
-    // the top so Windows never sees the saver end while our windows are still on screen.
-    crate::saver_launch::screensaver_ended();
     let _ = app.emit("screensaver", false);
     Ok(())
 }
