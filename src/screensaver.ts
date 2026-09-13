@@ -352,8 +352,8 @@ function punched(dir: number) {
   if (!buddy) return;
   const fistX = buddy.x + buddy.w / 2 + dir * buddy.w * 0.3;
   const fistY = buddy.y + buddy.h * 0.45;
-  // A fist through the glass shatters a good patch of it, so he is plainly the one wrecking it.
-  breakAt(fistX, fistY, 360);
+  // One mark where the fist lands.
+  breakAt(fistX, fistY);
   let hit: Sprite | null = null;
   let nearest = Infinity;
   // Front-most first, so the one he can actually see takes the hit.
@@ -542,16 +542,15 @@ function nudgeCell(i: number) {
   active.add(i);
 }
 
-/** Break every cell within `radius` px of a point at once: his fist or shoulder hit there. */
-function breakAt(px: number, py: number, radius: number) {
-  if (!cols || phase !== "erode") return;
-  const c0 = Math.max(0, Math.floor((px - radius) / CELL));
-  const c1 = Math.min(cols - 1, Math.floor((px + radius) / CELL));
-  const r0 = Math.max(0, Math.floor((py - radius) / CELL));
-  const r1 = Math.min(rows - 1, Math.floor((py + radius) / CELL));
-  for (let r = r0; r <= r1; r++) {
-    for (let c = c0; c <= c1; c++) nudgeCell(r * cols + c);
-  }
+/**
+ * Break the one cell he struck. A radius used to take every cell it touched, which at this grid
+ * size was up to sixteen of them for a single punch: one blow left a whole region of glass gone
+ * at once, which read as a patch of damage rather than as a hit.
+ */
+function breakAt(px: number, py: number) {
+  if (!cols || !screen || phase !== "erode") return;
+  if (px < 0 || py < 0 || px >= screen.width || py >= screen.height) return;
+  nudgeCell(Math.floor(py / CELL) * cols + Math.floor(px / CELL));
 }
 
 /**
@@ -675,7 +674,7 @@ function frame(now: number) {
     // The desktop, minus the windows and minus whatever has broken away: wallpaper and icons
     // stay until a cell of them is torn out to show the moving layer behind. His charges tear a
     // path through it as he barges along; the timed erosion takes care of the rest.
-    if (barging && buddy) breakAt(buddy.x + buddy.w / 2, buddy.y + buddy.h * 0.55, 200);
+    if (barging && buddy) breakAt(buddy.x + buddy.w / 2, buddy.y + buddy.h * 0.55);
     updateErosion(dt);
     if (eroded) ctx.drawImage(eroded, 0, 0, canvas.width, canvas.height);
 
