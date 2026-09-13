@@ -248,10 +248,16 @@ if !is_our_scr(&cur, &scr) {
 The guard correctly avoids overwriting the backup with Robo Buddy's own path, but it will happily
 save an **empty** `cur`. If the feature is ever enabled while `SCRNSAVE.EXE` is blank, the backup
 becomes `""`; anything the user sets afterwards is then overwritten on the next enable with no
-record of it. This is how the user's glmatrix path was lost — `RoboBuddyPrevSaver` is currently
-empty while `SCRNSAVE.EXE` points at Robo Buddy.
+record of it.
 
 Wants `&& !cur.trim().is_empty()`.
+
+**Correction.** An earlier draft of this document claimed the user's glmatrix path had already been
+lost this way. That was wrong, and the recommendation stands only as a latent bug. The backup is
+kept under the value name `SCRNSAVE.EXE.RoboBuddyPrev`
+([screen.rs:578](../src-tauri/src/screen.rs#L578)), not `RoboBuddyPrevSaver`; the checks that
+reported it empty were reading a value name that has never existed. The real value was holding
+`…\glmatrix_scr\glmatrix.scr` correctly the whole time.
 
 ### 4. Move the relay log line above the early-out
 
