@@ -197,12 +197,12 @@ export class WindowPhysics {
   }
 
   /**
-   * Screensaver: he is putting on a show, so the whole desk is his rather than one monitor.
-   * Walking across a monitor edge moves him onto that screen's floor.
+   * Screensaver: he is putting on a show, so he reaches further, jumps higher and is easier to
+   * knock about. Which screens are his is no longer part of it; every screen always is.
    */
   roam = false;
 
-  /** Every monitor end to end, for roaming; falls back to the current one before they load. */
+  /** Every monitor end to end; falls back to the current one before they load. */
   private get allScreens() {
     if (!this.areas.length) return { left: this.area.left, right: this.area.right };
     return {
@@ -211,18 +211,22 @@ export class WindowPhysics {
     };
   }
 
-  /** Horizontal range he may wander in: the window he stands on, else the work area. */
+  /**
+   * Horizontal range he may wander in: the window he stands on, else the whole desk. One monitor
+   * used to be his world unless the screensaver was up, which left him stuck on whichever screen
+   * he happened to be on, and threw him back off its inner edges as if they were walls.
+   */
   get bounds() {
     const s = this.surfaceOf(this.support);
     if (s) return { left: s.left, right: s.right };
-    return this.roam ? this.allScreens : { left: this.area.left, right: this.area.right };
+    return this.allScreens;
   }
 
-  /** The whole floor he may walk on, ignoring any window he happens to be standing on: every
-   * screen while roaming, else the work area. Lets the behaviour tell where the real edges are
-   * even from up on a window, so it does not walk him off the end of the desk into nothing. */
+  /** The whole floor he may walk on, ignoring any window he happens to be standing on. Lets the
+   * behaviour tell where the real edges are even from up on a window, so it does not walk him off
+   * the end of the desk into nothing. */
   get deskBounds() {
-    return this.roam ? this.allScreens : { left: this.area.left, right: this.area.right };
+    return this.allScreens;
   }
 
   private static readonly EDGE = 28;
@@ -505,9 +509,9 @@ export class WindowPhysics {
     // Walking off a window on purpose: the rest check drops him once his centre leaves it.
     const margin = beyondEdge ? this.w : 0;
     this.x = Math.max(b.left - margin, Math.min(b.right - this.w + margin, this.x + dx));
-    // Roaming: crossing onto another monitor hands him that screen's floor, so he steps up or
-    // down onto its taskbar rather than walking through the air at the old height.
-    if (this.roam && !this.onSurface) {
+    // Crossing onto another monitor hands him that screen's floor, so he steps up or down onto
+    // its taskbar rather than walking through the air at the old height.
+    if (!this.onSurface) {
       const here = this.areaAt(this.x + this.w / 2, this.y + this.h / 2);
       if (here !== this.area) {
         this.area = here;
@@ -560,7 +564,7 @@ export class WindowPhysics {
       this.vy += GRAVITY * dt;
       this.x += this.vx * dt;
       this.y += this.vy * dt;
-      if (this.roam) this.area = this.areaAt(this.x + this.w / 2, this.y + this.h / 2);
+      this.area = this.areaAt(this.x + this.w / 2, this.y + this.h / 2);
       // Descending past a title bar within reach: grab it instead of falling on by.
       if (this.vy >= 0 && this.surfaces.length && (this.tryGrab() || this.tryStepUp())) {
         this.apply();
@@ -569,7 +573,9 @@ export class WindowPhysics {
       const landing = this.landingFloor();
       const floor = landing.y;
       if (this.y >= floor) this.support = landing.hwnd;
-      const flightBounds = this.roam ? this.allScreens : this.area;
+      // Only the far ends of the desk are walls. Bouncing him off a monitor's inner edge stopped
+      // a throw dead at a seam that is not there to the eye.
+      const flightBounds = this.allScreens;
       const left = flightBounds.left;
       const right = flightBounds.right - this.w;
       if (this.y >= floor) {

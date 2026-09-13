@@ -73,6 +73,15 @@ interface Status {
 }
 
 const MIN_WANDER = 160;
+/**
+ * How far one stroll or one dash may take him. Every screen is his to walk, and picking a target
+ * anywhere on it meant single walks the width of the desk: a minute of trudging in a straight
+ * line, with nothing else happening. Held to about half a screen at a stroll and a screen at a
+ * run, he crosses from monitor to monitor over several trips instead, and stops to do things
+ * along the way.
+ */
+const MAX_STROLL = 1400;
+const MAX_DASH = 2600;
 /** A dash needs this much clear floor ahead of him to be worth breaking into a run for. */
 const DASH_MIN = 700;
 
@@ -436,7 +445,7 @@ export class Behavior {
         const maxX = s.right - s.w;
         let target = s.x;
         for (let i = 0; i < 8 && Math.abs(target - s.x) < MIN_WANDER; i++) {
-          target = minX + Math.random() * (maxX - minX);
+          target = s.x + (Math.random() * 2 - 1) * MAX_STROLL;
         }
         target = Math.max(minX, Math.min(maxX, target));
         const speed = walk!.speed ?? 120;
@@ -455,8 +464,10 @@ export class Behavior {
       options.push(() => {
         const minX = s.left;
         const maxX = s.right - s.w;
-        const far = s.x - minX > maxX - s.x ? minX : maxX;
-        const target = far === minX ? far + Math.random() * 120 : far - Math.random() * 120;
+        // Toward whichever end he has more room in front of him, a screen's worth at most.
+        const dir = s.x - minX > maxX - s.x ? -1 : 1;
+        const reach = DASH_MIN + Math.random() * (MAX_DASH - DASH_MIN);
+        const target = Math.max(minX, Math.min(maxX, s.x + dir * reach));
         this.activity = { kind: "walk", clip: dashGear.clip, targetX: target, speed };
         this.activityEnds = s.t + Math.abs(target - s.x) / speed + 1.5;
       });

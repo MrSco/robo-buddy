@@ -141,3 +141,45 @@ describe("climbing a window during the screensaver", () => {
     expect(p.support).toBeNull();
   });
 });
+
+describe("the desk is one floor, screensaver or not", () => {
+  /** Ordinary life: no show on, so nothing here is the screensaver's doing. */
+  function thrownFrom(cx: number, vx: number, vy = -900) {
+    const p = buddyOn(AREAS[1], cx);
+    p.roam = false;
+    p.mode = "falling";
+    p.vx = vx;
+    p.vy = vy;
+    let minX = Infinity;
+    for (let frame = 0; frame < 400; frame++) {
+      p.step(1 / 120);
+      minX = Math.min(minX, p.x);
+    }
+    return { p, minX };
+  }
+
+  it("carries him over a monitor seam and hands him that screen", () => {
+    const { p } = thrownFrom(300, -1500);
+    expect(p.x + p.w / 2).toBeLessThan(0); // he is over the left monitor now
+    expect(p.mode).toBe("rest");
+    // And he came to rest on its floor, which is 86px higher than the one he was thrown from.
+    expect(p.y).toBe(AREAS[0].bottom - H + TASKBAR);
+    expect((p as unknown as { area: WorkArea }).area).toBe(AREAS[0]);
+  });
+
+  it("stops him at the far end of the desk, not at the seam he passed", () => {
+    // With air under him: thrown flat he lands as he crosses, because the monitor next door has
+    // its floor 86px higher, and skids to a halt on it.
+    const { minX } = thrownFrom(300, -3000, -2000);
+    expect(minX).toBe(AREAS[0].left); // the outer edge, a whole monitor past the seam
+  });
+
+  it("lets him wander onto every screen without the screensaver", () => {
+    const p = buddyOn(AREAS[1], 1200);
+    p.roam = false;
+    expect(p.bounds).toEqual({ left: -2560, right: 5120 });
+    for (let frame = 0; frame < 600; frame++) p.nudge(-12);
+    expect(p.x + p.w / 2).toBeLessThan(0);
+    expect(p.y).toBe(AREAS[0].bottom - H + TASKBAR); // stepped onto that screen's taskbar
+  });
+});
