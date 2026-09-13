@@ -14,7 +14,7 @@ export interface PhysicsOptions {
 
 const GRAVITY = 3200; // px/s^2
 const THREE_CLAMP = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-const BOUNCE = 0.35;
+const BOUNCE = 0.26;
 const FLOOR_FRICTION = 6; // 1/s
 const SETTLE_SPEED = 40; // px/s
 
