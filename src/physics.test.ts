@@ -74,8 +74,9 @@ function climb(p: WindowPhysics, area: WorkArea, surfaces: Surface[], hwnd: numb
 }
 
 describe("climbing a window during the screensaver", () => {
-  it("leaves even a monitor-wide window and returns to the roaming floor", () => {
+  it.each([true, false])("leaves even a monitor-wide window (screensaver=%s)", (roam) => {
     const p = buddyOn(AREAS[0], -1900);
+    p.roam = roam;
     const win = { hwnd: 902001, left: -2560, right: 0, top: 560, bottom: 1306 };
     p.surfaces = [win];
     p.support = win.hwnd;
@@ -143,6 +144,22 @@ describe("climbing a window during the screensaver", () => {
 });
 
 describe("the desk is one floor, screensaver or not", () => {
+  it("walks off a stationary window without grabbing it again", () => {
+    const p = buddyOn(AREAS[1], 1200);
+    p.roam = false;
+    const win = { hwnd: 123, left: 900, right: 1500, top: 800, bottom: 1300 };
+    p.surfaces = [win];
+    p.support = win.hwnd;
+    p.y = win.top - H;
+    for (let frame = 0; frame < 1200; frame++) {
+      if (p.support === win.hwnd && p.mode === "rest") p.nudge(2, true);
+      p.step(1 / 60);
+    }
+    expect(p.support).toBeNull();
+    expect(p.mode).toBe("rest");
+    expect(p.y).toBe(AREAS[1].bottom - H + TASKBAR);
+  });
+
   /** Ordinary life: no show on, so nothing here is the screensaver's doing. */
   function thrownFrom(cx: number, vx: number, vy = -900) {
     const p = buddyOn(AREAS[1], cx);

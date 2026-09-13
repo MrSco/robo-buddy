@@ -46,6 +46,30 @@ function walker(run: boolean) {
 
 const floor = { free: true, x: 1200, w: 320, left: 0, right: 2560, climb: null, charge: null, onSurface: false, support: null, deskLeft: 0, deskRight: 2560 };
 
+it("eventually leaves an ordinary window even when random choices keep him perched", () => {
+  const random = vi.spyOn(Math, "random").mockReturnValue(0.5);
+  try {
+    const behavior = walker(false);
+    const perched = { ...floor, onSurface: true, support: 123 };
+    for (let t = 0; t <= 90 && behavior.pendingLeave === null; t++) behavior.update({ ...perched, t });
+    expect(behavior.pendingLeave).not.toBeNull();
+    behavior.pendingLeave = null;
+    behavior.update({ ...floor, free: false, t: 91 });
+    expect(behavior.update({ ...floor, t: 120 }).kind).toBe("walk");
+  } finally { random.mockRestore(); }
+});
+
+it("does not force a departure while busy or with wandering disabled", () => {
+  for (const busy of [true, false]) {
+    const behavior = walker(false);
+    behavior.opts.wander = busy;
+    for (let t = 0; t <= 120; t++) {
+      behavior.update({ ...floor, onSurface: true, support: 123, free: !busy, t });
+      expect(behavior.pendingLeave).toBeNull();
+    }
+  }
+});
+
 it("breaks into a run on the floor once the pack has a run gait", () => {
   const behavior = walker(true);
   const gaits = new Map<number, string>();

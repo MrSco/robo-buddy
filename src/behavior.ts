@@ -255,6 +255,8 @@ export class Behavior {
   private roamDir: 1 | -1 = 1;
   /** When he last climbed onto a window while roaming, so he is moved along before he settles. */
   private perchedSince = -1;
+  private ordinaryPerchSince = -1;
+  private ordinarySupport: number | null = null;
   /** The window he was last standing on, and when he stepped off it, so he does not turn round
    * and climb the very same one over and over instead of crossing to the next screen. */
   private lastPerchHwnd: number | null = null;
@@ -278,6 +280,25 @@ export class Behavior {
   update(s: Status): Activity {
     const m = this.manifest;
     if (!m) return this.activity;
+
+    // Random fidgets and short strolls must not leave him on a title bar indefinitely.
+    // Count only uninterrupted, available time on the same window; never override a hold,
+    // dance, sleep, pause, or disabled wandering.
+    const ordinaryPerch = !this.energetic && s.free && s.onSurface && this.opts.wander;
+    if (!ordinaryPerch || this.ordinarySupport !== s.support) this.ordinaryPerchSince = -1;
+    this.ordinarySupport = ordinaryPerch ? s.support : null;
+    if (ordinaryPerch) {
+      if (this.ordinaryPerchSince < 0) this.ordinaryPerchSince = s.t;
+      if (s.t - this.ordinaryPerchSince >= 45 && m.states.walk && this.durations(m.states.walk.clip) > 0) {
+        this.pendingLeave = s.x + s.w / 2 < (s.deskLeft + s.deskRight) / 2 ? 1 : -1;
+        this.activity = { kind: "idle", clip: this.stateClip("idle") };
+        this.fidgetQueue = [];
+        this.activityEnds = Infinity;
+        this.nextEvent = s.t + this.gap(6, 10);
+        this.ordinaryPerchSince = -1;
+        return this.activity;
+      }
+    }
 
     // Roaming, he does not linger on any one window: note when he got up so he can be moved
     // along, remember which window it was so he does not climb straight back onto it, and now
