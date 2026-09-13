@@ -28,8 +28,13 @@ export interface Manifest {
       beatsPerLoop?: number;
       playbackRate?: number;
       then?: string;
-      /** Walk state only: px/s at size 1. */
+      /** Walk, run and sprint states: px/s at size 1. */
       speed?: number;
+      /**
+       * Walk, run and sprint states: metres per second this clip's own stride covers, so its
+       * playback can be matched to how fast he is really moving. Defaults to a walking 1.15.
+       */
+      naturalMps?: number;
       sheet?: string;
       frames?: number;
       fps?: number;

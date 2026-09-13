@@ -101,7 +101,8 @@ let bootStamp = Date.now() % 100000;
 let lastActivity = 0;
 let asleep = false;
 let sleepAmount = 0;
-let nextSnore = 0;
+/** When to say the going-to-sleep line, once per nap; Infinity once it has been said. */
+let sleepLineAt = Infinity;
 let dancedThisSession = false;
 /** The screensaver is up: he roams and climbs instead of idling on the taskbar. */
 let screensaverOn = false;
@@ -515,6 +516,7 @@ function runCommand(cmd: Command): string | null {
       return "You stopped what you were doing.";
     case "sleep":
       asleep = true;
+      sleepLineAt = t + 1; // armed here too, so every nap has one announcement and no more
       commandedSleepUntil = t + 300;
       forcedDanceUntil = -1;
       behavior.interrupt(t);
@@ -830,19 +832,30 @@ function resolveState(t: number, act: ReturnType<Behavior["update"]>): { state: 
   if (pokeUntil > t) return { state: "poked", clip: pokeClip };
   if (mirrorOn && t - lastPoseAt < 1) return { state: "mirror", clip: behavior.stateClip("idle") };
   if (landUntil > t) return { state: "land", clip: landClip };
-  if (asleep) return { state: "sleep", clip: null };
+  // Something has to keep playing or the mixer falls to a T-pose, and with no clip the renderer
+  // holds the last one: dozing off mid-stroll left the walk cycle looping under the slump, since
+  // applySleep only touches the chest, neck, head and arms. A pack's own sleep clip poses him
+  // outright; otherwise the idle is just a calm base for the procedural droop.
+  if (asleep) {
+    const sleepClip = behavior.stateClip("sleep");
+    const idle = behavior.stateClip("idle");
+    return { state: "sleep", clip: sleepClip ?? (idle ? { ...idle, base: true } : null) };
+  }
   if (danceAmount > 0.5) return { state: "dance", clip: danceClip };
   if (typingAmount > 0.5 && t >= forcedDanceUntil) return { state: "typing", clip: behavior.stateClip("typing") ?? act.clip ?? behavior.stateClip("idle") };
-  if (act.kind === "walk") return { state: "walk", clip: act.clip ? { ...act.clip, playbackRate: walkRate(act.speed) } : null };
+  if (act.kind === "walk") return { state: "walk", clip: act.clip ? { ...act.clip, playbackRate: walkRate(act.speed, act.clip.naturalMps) } : null };
   if (act.kind === "fidget") return { state: "fidget", clip: act.clip };
   return { state: "idle", clip: act.clip ?? behavior.stateClip("idle") };
 }
 
-/** Playback rate so the walk cycle roughly matches the window's speed across the screen. */
-function walkRate(speedPx: number): number {
+/**
+ * Playback rate so a stride cycle roughly matches the window's speed across the screen. Which
+ * cycle it is comes from the behaviour, which knows whether he is strolling, dashing or charging;
+ * all this does is keep the feet from sliding, given how far that clip's own stride carries it.
+ */
+function walkRate(speedPx: number, naturalMps = 1.15): number {
   const h = renderer3d?.debugCharacter?.height ?? 1.8;
   const pxPerMeter = (cssH * scaleFactor) / (1.3 * h);
-  const naturalMps = 1.15;
   return Math.max(0.5, Math.min(1.6, speedPx / (pxPerMeter * naturalMps)));
 }
 
@@ -932,11 +945,14 @@ function frame() {
   const sleepAfter = settings.sleepAfterMin * 60;
   if (!asleep && sleepAfter > 0 && !paused && t - lastActivity > sleepAfter) {
     asleep = true;
-    nextSnore = t + 1;
+    sleepLineAt = t + 1; // a beat after his eyes close, not the same frame
   }
-  if (asleep && t > nextSnore) {
-    speak("sleep", 2.2);
-    nextSnore = t + 6 + Math.random() * 4;
+  // Once, as he drops off. The "sleep" lines are announcements ("Gonna rest my eyes"), not
+  // snores, so the timer that repeated them every 6 to 10 seconds read as a stuck bubble; and
+  // being told to be quiet has to quieten this too, the way it does the idle chatter above.
+  if (asleep && t > sleepLineAt) {
+    sleepLineAt = Infinity;
+    if (t >= quietUntil && !talk.open) speak("sleep", 2.2);
   }
   sleepAmount += ((asleep ? 1 : 0) - sleepAmount) * (1 - Math.exp(-dt * (asleep ? 0.8 : 3)));
 

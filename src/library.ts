@@ -7,8 +7,8 @@ import type { Manifest } from "./packs";
  * clips the user imported. Roles decide where a clip is used; the manifest's own lists
  * are the defaults and user roles from settings extend or override them.
  */
-export type Role = "idle" | "fidget" | "dance" | "poke" | "held" | "fall" | "walk" | "off";
-export const ROLES: Role[] = ["idle", "fidget", "dance", "poke", "held", "fall", "walk", "off"];
+export type Role = "idle" | "fidget" | "dance" | "poke" | "held" | "fall" | "walk" | "run" | "off";
+export const ROLES: Role[] = ["idle", "fidget", "dance", "poke", "held", "fall", "walk", "run", "off"];
 
 export interface LibraryClip {
   /** Clip key used in manifests and roles. */
@@ -78,6 +78,7 @@ export async function listLibrary(reference?: Manifest): Promise<LibraryClip[]> 
     if (reference.states.dragged) roleOfKey.set(reference.states.dragged.clip, "held");
     if (reference.states.fall) roleOfKey.set(reference.states.fall.clip, "fall");
     if (reference.states.walk) roleOfKey.set(reference.states.walk.clip, "walk");
+    if (reference.states.run) roleOfKey.set(reference.states.run.clip, "run");
     if (reference.states.idle) roleOfKey.set(reference.states.idle.clip, "idle");
     for (const c of clips) {
       const key = fileToKey.get(c.url);
@@ -158,6 +159,8 @@ export function applyLibrary(manifest: Manifest, library: LibraryClip[], roles: 
     if (role === "held") m.states.dragged = { clip: key, loop: true };
     if (role === "fall") m.states.fall = { clip: key, loop: true };
     if (role === "walk") m.states.walk = { ...(m.states.walk ?? { speed: 110 }), clip: key, loop: true };
+    // A run assigned by hand keeps the pack's own pace if it has one; otherwise a jog's worth.
+    if (role === "run") m.states.run = { ...(m.states.run ?? { speed: 300, naturalMps: 3.5 }), clip: key, loop: true };
   }
   m.idleVariants = [...idle];
   m.fidgets = fidgets;

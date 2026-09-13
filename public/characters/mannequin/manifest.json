@@ -27,6 +27,18 @@
       "loop": true,
       "speed": 110
     },
+    "run": {
+      "clip": "run",
+      "loop": true,
+      "speed": 300,
+      "naturalMps": 3.5
+    },
+    "sprint": {
+      "clip": "sprint",
+      "loop": true,
+      "speed": 480,
+      "naturalMps": 5.6
+    },
     "fall": {
       "clip": "Falling_Idle",
       "loop": true
@@ -113,7 +125,9 @@
     "Texting": "/clips/mixamo/Texting.glb",
     "Getting_Up": "/clips/mixamo/Getting_Up.glb",
     "Getting_Up_2": "/clips/mixamo/Getting_Up_2.glb",
-    "Standing_Up": "/clips/mixamo/Standing_Up.glb"
+    "Standing_Up": "/clips/mixamo/Standing_Up.glb",
+    "run": "/clips/mixamo/Running.glb",
+    "sprint": "/clips/mixamo/Fast_Run.glb"
   },
   "idleVariants": [
     "talk",

@@ -413,7 +413,10 @@ export class Renderer3D implements Renderer {
     const crouchTarget = (this.crouchPx * 2 * Math.max(this.fitDist, 0.05) * tanV) / this.cssH;
     this.crouchU += (crouchTarget - this.crouchU) * Math.min(1, input.dt * 6);
     if (this.crouchU > 1e-4) applyCrouch(c, this.crouchU);
-    if (!(input.state === "sleep" && clipDriven)) applySleep(c, input.t, input.sleepAmount);
+    // A pack with a sleep clip of its own poses him; a clip flagged as a base is only there to
+    // keep the mixer weighted, so the slump still goes over it.
+    const posedAsleep = input.state === "sleep" && clipDriven && !input.clip?.base;
+    if (!posedAsleep) applySleep(c, input.t, input.sleepAmount);
     c.update(input.dt);
     this.detectTpose(c, input);
     this.fitCamera(input.dt);

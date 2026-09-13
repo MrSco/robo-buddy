@@ -11,6 +11,13 @@ export interface ClipChoice {
   loop: boolean;
   beatsPerLoop?: number;
   playbackRate?: number;
+  /**
+   * Only a resting base pose to keep the mixer off a T-pose, not the state's own animation, so
+   * the procedural layer for that state still goes on top of it.
+   */
+  base?: boolean;
+  /** Metres per second the clip's own stride covers, for matching playback to his real speed. */
+  naturalMps?: number;
 }
 
 export type Activity =
@@ -66,6 +73,8 @@ interface Status {
 }
 
 const MIN_WANDER = 160;
+/** A dash needs this much clear floor ahead of him to be worth breaking into a run for. */
+const DASH_MIN = 700;
 
 export class Behavior {
   private manifest: Manifest | null = null;
@@ -99,7 +108,19 @@ export class Behavior {
     const names = def.clips?.length ? def.clips : [def.clip];
     const name = names[Math.floor(Math.random() * names.length)];
     if (!name || this.durations(name) <= 0) return null;
-    return { name, loop: def.loop ?? state !== "poked", beatsPerLoop: def.beatsPerLoop, playbackRate: def.playbackRate };
+    return { name, loop: def.loop ?? state !== "poked", beatsPerLoop: def.beatsPerLoop, playbackRate: def.playbackRate, naturalMps: def.naturalMps };
+  }
+
+  /**
+   * A faster gait than the stroll: the clip and the speed it is meant to carry him at, or null
+   * when this pack has no such clip. Speed and cycle come from the same place on purpose, so a
+   * pack cannot ask to travel at a run and be drawn walking.
+   */
+  private gear(name: "run" | "sprint"): { clip: ClipChoice; speed: number } | null {
+    const def = this.manifest?.states[name];
+    const clip = this.stateClip(name);
+    if (!def || !clip) return null;
+    return { clip: { ...clip, loop: true }, speed: def.speed ?? 300 };
   }
 
   /** Called when a dance session starts: pick which dance to do this time. */
@@ -350,10 +371,14 @@ export class Behavior {
     // strand him orbiting the same window, which is the whole reason travelling blocks the rest.
     if (canWalk && this.energetic && !s.onSurface && s.charge && !stale(s.charge.hwnd)) {
       const charge = s.charge;
-      const speed = (walk!.speed ?? 120) * 2.6;
+      // Flat out at a window: his sprint if he has one. Without one this is the old multiplier on
+      // the walk cycle, which is as fast as a stretched stroll can look before it skates.
+      const gear = this.gear("sprint") ?? this.gear("run");
+      const speed = gear?.speed ?? (walk!.speed ?? 120) * 2.6;
+      const cycle = gear?.clip ?? { name: walk!.clip, loop: true };
       const dir = Math.sign(charge.x - s.x) || 1;
       const runAt = (then: "hop" | "punch" | "barge") => () => {
-        this.activity = { kind: "walk", clip: { name: walk!.clip, loop: true }, targetX: charge.x, speed, then, hopTop: charge.top, punchDir: dir };
+        this.activity = { kind: "walk", clip: cycle, targetX: charge.x, speed, then, hopTop: charge.top, punchDir: dir };
         this.activityEnds = s.t + Math.abs(charge.x - s.x) / speed + 2;
       };
       if (traveling) {
@@ -419,6 +444,23 @@ export class Behavior {
         this.activityEnds = s.t + Math.abs(target - s.x) / speed + 1.5; // safety timeout
       });
     }
+    // The same stroll taken flat out, so the run is part of ordinary life and not only the
+    // screensaver's. He runs at the end of the floor he has most room in front of him: a run
+    // needs somewhere to go, and over a step or two it just reads as a stumble. Never up on a
+    // window, where the ground is a title bar a few pixels deep.
+    const dashRoom = Math.max(s.x - s.left, s.right - s.w - s.x);
+    const dashGear = this.gear("run");
+    if (canWalk && dashGear && !this.energetic && !s.onSurface && dashRoom >= DASH_MIN) {
+      const speed = dashGear.speed;
+      options.push(() => {
+        const minX = s.left;
+        const maxX = s.right - s.w;
+        const far = s.x - minX > maxX - s.x ? minX : maxX;
+        const target = far === minX ? far + Math.random() * 120 : far - Math.random() * 120;
+        this.activity = { kind: "walk", clip: dashGear.clip, targetX: target, speed };
+        this.activityEnds = s.t + Math.abs(target - s.x) / speed + 1.5;
+      });
+    }
     // Screensaver: he settles on no window and no screen, both so the show keeps moving and so
     // no corner of the desk is left standing still long enough to burn in. Up on a window he
     // drops off the roaming edge, the sooner the longer he has been up; on the floor he marches
@@ -448,7 +490,8 @@ export class Behavior {
         const weight = s.t - this.perchedSince > 3 ? 8 : 3;
         for (let i = 0; i < weight; i++) options.push(leap);
       } else {
-        const speed = (walk!.speed ?? 120) * 2.2;
+        const run = this.gear("run");
+        const speed = run?.speed ?? (walk!.speed ?? 120) * 2.2;
         // A bounded stride in his roaming direction: about a monitor when travelling to the next
         // screen, a shorter hop otherwise. Never the whole desk at once, or one long march eats
         // the time he should be spending knocking windows about, and he pins himself at the far
@@ -456,7 +499,7 @@ export class Behavior {
         const stride = traveling ? 2600 : 1200 * (0.7 + Math.random() * 0.6);
         const target = Math.max(s.left, Math.min(s.right - s.w, s.x + this.roamDir * stride));
         const sweep = () => {
-          this.activity = { kind: "walk", clip: { name: clip, loop: true }, targetX: target, speed };
+          this.activity = { kind: "walk", clip: run?.clip ?? { name: clip, loop: true }, targetX: target, speed };
           this.activityEnds = s.t + Math.abs(target - s.x) / speed + 1.5;
         };
         // While travelling the sweep leads; otherwise it is just filler between window-knocks,

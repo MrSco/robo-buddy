@@ -10,3 +10,6 @@ release/
 # Test tooling and smoke-test output
 .playwright-cli/
 output/
+
+# Bytecode from the clip-baking scripts
+__pycache__/

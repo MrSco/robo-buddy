@@ -48,6 +48,12 @@
     "loop": true
   },
   {
+    "name": "Fast_Run",
+    "file": "Fast_Run.glb",
+    "duration": 0.567,
+    "loop": false
+  },
+  {
     "name": "Gangnam_Style",
     "file": "Gangnam_Style.glb",
     "duration": 12.4,
@@ -94,6 +100,12 @@
     "file": "Rumba.glb",
     "duration": 2.4,
     "loop": true
+  },
+  {
+    "name": "Running",
+    "file": "Running.glb",
+    "duration": 0.733,
+    "loop": false
   },
   {
     "name": "Running_Man",
