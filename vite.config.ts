@@ -15,7 +15,12 @@ const { stamp: BUILD, dirty: DIRTY } = (() => {
   } catch {
     // not a git checkout
   }
-  return { stamp: `${commit} ${new Date().toISOString().slice(0, 10)}`, dirty };
+  // The builder's own date, not UTC: toISOString stamped tomorrow on any build made after
+  // early evening in the Americas, which reads as a build from the future.
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const day = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return { stamp: `${commit} ${day}`, dirty };
 })();
 
 /**
