@@ -15,6 +15,12 @@ public static class BuddyIdleProbe {
     struct LASTINPUTINFO { public uint size; public uint tick; }
     [DllImport("user32.dll")] static extern bool GetLastInputInfo(ref LASTINPUTINFO info);
     [DllImport("kernel32.dll")] static extern uint GetTickCount();
+    [DllImport("user32.dll", EntryPoint="SystemParametersInfoW")]
+    static extern bool SystemParametersInfo(uint action, uint param, out int value, uint flags);
+    public static bool? SaverRunning() {
+        int value;
+        return SystemParametersInfo(0x72, 0, out value, 0) ? (bool?)(value != 0) : null;
+    }
     public static double Seconds() {
         var info = new LASTINPUTINFO { size = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
         if (!GetLastInputInfo(ref info)) throw new InvalidOperationException("Cannot read idle time");
@@ -34,6 +40,7 @@ while ((Get-Date) -lt $until) {
     [pscustomobject]@{
         at = (Get-Date).ToString('o')
         idleSeconds = [BuddyIdleProbe]::Seconds()
+        windowsSaverRunning = [BuddyIdleProbe]::SaverRunning()
         requestsExitCode = $requestExit
         requests = $requests
         buddy = @(Get-Process -Name robo-buddy -ErrorAction SilentlyContinue | Select-Object Id,WorkingSet64,CPU)

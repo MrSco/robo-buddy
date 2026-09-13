@@ -515,6 +515,8 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
     }
     // He belongs on top of his own playground, not behind it.
     crate::input::raise_buddy(&app);
+    // Ours is up: any launcher Windows sent stays held until it comes down again.
+    crate::saver_launch::screensaver_active();
     let _ = app.emit("screensaver", true);
     Ok(())
 }
@@ -542,6 +544,10 @@ pub fn screensaver_stop(app: tauri::AppHandle) -> Result<(), String> {
         per_screen.clear();
     }
     stop_backdrop(&app);
+    // Last, once everything is really down: a `.scr` Windows launched is holding itself open on
+    // this, and it is what tells Windows the screen saver is over. Released here rather than at
+    // the top so Windows never sees the saver end while our windows are still on screen.
+    crate::saver_launch::screensaver_ended();
     let _ = app.emit("screensaver", false);
     Ok(())
 }
@@ -665,9 +671,10 @@ pub fn refresh_scr() {
 /// remembering whatever was there first; Windows then launches us with `/s` on idle, which the
 /// running buddy picks up and turns into the layered screensaver.
 #[tauri::command]
-pub fn set_windows_screensaver(enable: bool) -> Result<String, String> {
+pub fn set_windows_screensaver(app: tauri::AppHandle, enable: bool) -> Result<String, String> {
     #[cfg(windows)]
     {
+        use tauri::Manager;
         use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
         use winreg::RegKey;
         let scr = scr_path()?;
@@ -680,9 +687,22 @@ pub fn set_windows_screensaver(enable: bool) -> Result<String, String> {
             std::fs::copy(&exe, &scr).map_err(|e| format!("could not write {}: {e}", scr.display()))?;
             let cur: String = desktop.get_value("SCRNSAVE.EXE").unwrap_or_default();
             // Remember the previous saver, unless it was already ours (do not overwrite the backup
-            // with our own path when the user clicks twice).
-            if !is_our_scr(&cur, &scr) {
+            // with our own path when the user clicks twice) and unless there was nothing there.
+            // An empty backup reads as "they had none", so saving one loses whatever they pick
+            // between two enables: the real saver is overwritten with no record of it.
+            if !is_our_scr(&cur, &scr) && !cur.trim().is_empty() {
                 let _ = desktop.set_value(PREV_SAVER, &cur);
+                // Their saver keeps running, as the layer he plays in front of, rather than being
+                // simply taken away. Only when they have not chosen a backdrop of their own.
+                let theirs = cur.trim().trim_matches('"').to_string();
+                let unclaimed = {
+                    let state = app.state::<crate::settings::SettingsState>();
+                    let s = state.0.lock().map_err(|e| e.to_string())?;
+                    s.screensaver_backdrop.trim().is_empty()
+                };
+                if unclaimed && std::path::Path::new(&theirs).is_file() {
+                    crate::settings::update(&app, |s| s.screensaver_backdrop = theirs);
+                }
             }
             desktop
                 .set_value("SCRNSAVE.EXE", &scr.to_string_lossy().to_string())
@@ -717,7 +737,7 @@ pub fn set_windows_screensaver(enable: bool) -> Result<String, String> {
     }
     #[cfg(not(windows))]
     {
-        let _ = enable;
+        let _ = (app, enable);
         Err("Windows only".into())
     }
 }
