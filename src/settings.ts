@@ -83,6 +83,8 @@ const els = {
   personality: $<HTMLSelectElement>("personality"),
   personalityHint: $<HTMLParagraphElement>("personality-hint"),
   chatSttEndpoint: $<HTMLInputElement>("chat-stt-endpoint"),
+  chatSttPath: $<HTMLInputElement>("chat-stt-path"),
+  chatSttBrowse: $<HTMLButtonElement>("chat-stt-browse"),
   ssSpeed: $<HTMLInputElement>("ss-speed"),
   ssSpeedOut: $<HTMLOutputElement>("ss-speed-out"),
   ssVoid: $<HTMLInputElement>("ss-void"),
@@ -207,6 +209,11 @@ async function previewPack(id: string) {
 }
 
 async function renderGallery() {
+  // Held across the whole run. Almost all of the wait is the loop below, which loads every
+  // character in turn to make its thumbnail through this same canvas; claiming the overlay
+  // only for the preview at the end left the long part of the load with nothing on screen,
+  // and models flickering through the pane as each thumbnail was posed and thrown away.
+  const ticket = getLive().beginLoading();
   els.gallery.innerHTML = "";
   for (const p of packs) {
     const b = document.createElement("button");
@@ -238,8 +245,13 @@ async function renderGallery() {
       // leave the placeholder
     }
   }
-  // Thumbnails borrowed the live canvas; show the active pack in it now.
-  if (previewing === null) await previewPack(settings.character);
+  // Thumbnails borrowed the live canvas; show the active pack in it now. previewPack claims
+  // the overlay itself and hands it back when the preview is up, which releases this one too.
+  try {
+    if (previewing === null) await previewPack(settings.character);
+  } finally {
+    getLive().finishLoading(ticket);
+  }
 }
 
 let libraryClips: LibraryClip[] = [];
@@ -495,6 +507,7 @@ function render() {
   els.chatLines.checked = settings.chatGenerateLines;
   els.chatCap.value = String(settings.chatDailyCap);
   els.chatSttEndpoint.value = settings.chatSttEndpoint;
+  els.chatSttPath.value = settings.chatSttModelPath ?? "";
   els.ttsEngine.value = settings.ttsEngine;
   els.piperFields.hidden = settings.ttsEngine !== "piper";
   els.talkHotkeyEnabled.checked = settings.talkHotkeyEnabled;
@@ -909,6 +922,18 @@ function wireTalk() {
   els.chatLines.addEventListener("change", () => void commit({ chatGenerateLines: els.chatLines.checked }));
   els.chatCap.addEventListener("change", () => void commit({ chatDailyCap: Math.max(0, Math.round(Number(els.chatCap.value) || 0)) }));
   els.chatSttEndpoint.addEventListener("change", () => void commit({ chatSttEndpoint: els.chatSttEndpoint.value.trim() }));
+  els.chatSttPath.addEventListener("change", () => void commit({ chatSttModelPath: els.chatSttPath.value.trim() }));
+  els.chatSttBrowse.addEventListener("click", async () => {
+    try {
+      const picked = await open({ multiple: false, filters: [{ name: "Speech model", extensions: ["bin", "gguf", "ggml"] }] });
+      if (typeof picked === "string") {
+        els.chatSttPath.value = picked;
+        await commit({ chatSttModelPath: picked });
+      }
+    } catch (err) {
+      status(`Could not open that: ${err}`);
+    }
+  });
   wireScreensaver();
   wireVoicePreview();
   els.ttsEngine.addEventListener("change", () => {

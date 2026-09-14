@@ -78,6 +78,8 @@ pub struct Settings {
     pub chat_daily_cap: u32,
     /// Separate base URL for /audio/transcriptions (a local Vibe server, say); empty = chat endpoint.
     pub chat_stt_endpoint: String,
+    /// A speech model file for a local server that must be told to load one before it will work.
+    pub chat_stt_model_path: String,
     /// "windows" (speechSynthesis) or "piper" (local piper.exe with an .onnx voice).
     pub tts_engine: String,
     pub piper_exe: String,
@@ -142,6 +144,7 @@ impl Default for Settings {
             chat_generate_lines: true,
             chat_daily_cap: 300,
             chat_stt_endpoint: String::new(),
+            chat_stt_model_path: String::new(),
             tts_engine: "windows".into(),
             piper_exe: String::new(),
             piper_voice: String::new(),

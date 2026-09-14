@@ -44,8 +44,12 @@ interface Sprite {
   /** Stable for the life of the screensaver; his physics tracks what he stands on by it. */
   id: number;
   img: ImageBitmap;
-  /** The broken silhouette it was cut to, in 0..1 of its own rectangle, so it scales exactly. */
+  /** The broken silhouette it will be cut to, in 0..1 of its own rectangle, so it scales exactly. */
   outline: Float32Array | null;
+  /** Whether that silhouette has been applied yet. A window starts whole and is cut on the
+   * first hit: the desk should look like your desk when the screensaver opens and come apart
+   * as he works, rather than sitting there already smashed before he has touched anything. */
+  carved: boolean;
   cut: HTMLCanvasElement;
   damage: number;
   broken: boolean;
@@ -170,7 +174,7 @@ async function start() {
     const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${r.png}`)).blob());
     const outline = crackTextures.length ? windowOutline(crackTextures[sprites.length % crackTextures.length]) : null;
     sprites.push({
-      outline, cut: maskedWindow(img, outline), damage: 0, broken: false,
+      outline, carved: false, cut: maskedWindow(img, null), damage: 0, broken: false,
       id: sprites.length,
       img,
       homeX: r.x,
@@ -190,13 +194,9 @@ async function start() {
   hctx.save();
   hctx.globalCompositeOperation = "destination-out";
   for (const s of sprites) {
-    if (s.outline) {
-      // The same silhouette the window itself was cut to, so the hole and the piece agree.
-      hctx.save();
-      hctx.translate(s.homeX, s.homeY);
-      hctx.fill(outlinePath(s.outline, s.w, s.h));
-      hctx.restore();
-    } else hctx.fillRect(s.homeX, s.homeY, s.w, s.h);
+    // Square, because the window covering it is still square. The silhouette it is later cut
+    // to is inscribed in this rectangle, so the hole is never too small for what is left.
+    hctx.fillRect(s.homeX, s.homeY, s.w, s.h);
   }
   hctx.restore();
   erodedCtx.clearRect(0, 0, screen.width, screen.height);
@@ -368,6 +368,7 @@ function shove(s: Sprite, dt: number) {
   // Dropping onto something drives it down; running into it lifts it a little.
   s.vy += (buddyVy > 200 ? 300 : -220) * push * dt * 6;
   s.spin += dir * 2.8 * push * dt * 6;
+  carve(s);
   s.asleep = false;
   s.damage += dt * speed / 550;
   if (s.damage >= 1 || buddyVy > 800) shatterQueue.add(s);
@@ -405,6 +406,7 @@ function punched(dir: number, kind: StrikeKind = "punch") {
     }
   }
   if (!hit) return;
+  carve(hit);
   hit.vx += dir * 1800;
   hit.vy -= 620;
   hit.spin += dir * 3.6;
@@ -414,9 +416,23 @@ function punched(dir: number, kind: StrikeKind = "punch") {
   else shed(hit, false);
 }
 
+/**
+ * Cut a window down to its broken silhouette, once, the first time something happens to it.
+ * Called before any damage is baked into the raster, because it replaces that raster.
+ */
+function carve(s: Sprite) {
+  if (s.carved) return;
+  s.carved = true;
+  if (!s.outline) return;
+  const fresh = maskedWindow(s.img, s.outline);
+  s.cut.width = s.cut.height = 1;
+  s.cut = fresh;
+}
+
 /** Artwork partitions are rasterized only on impact, never in the render loop. */
 function shed(s: Sprite, all: boolean) {
   if (s.broken || !crackTextures.length) return;
+  carve(s);
   const pieces = fractureImage(s.cut, crackTextures[s.id % crackTextures.length], s.w, s.h).sort((a,b) => a.w*a.h-b.w*b.h);
   const selected = all ? pieces : pieces.slice(0, 1);
   const c = s.cut.getContext("2d")!;
@@ -510,7 +526,7 @@ function restoreDesktop() {
   carry = 0;
   for (const s of sprites) {
     s.broken=false; s.damage=0;
-    s.cut.width=s.cut.height=1; s.cut=maskedWindow(s.img,s.outline);
+    s.cut.width=s.cut.height=1; s.cut=maskedWindow(s.img,null); s.carved=false;
     s.reveal = 0;
     s.x = s.homeX;
     s.y = s.homeY;
@@ -559,6 +575,7 @@ function paintCell(i: number) { if (erodedCtx && erosionStyle === "tiles") cutCe
 /** Bake local damage into the window once so it never punches through unrelated layers. */
 function damageWindow(s: Sprite, cr: { tex: number; lx: number; ly: number; rot: number; sc: number }) {
   const tex=crackTextures[cr.tex];if(!tex)return;
+  carve(s);
   const c=s.cut.getContext("2d")!;c.save();
   c.scale(s.cut.width/s.w,s.cut.height/s.h);c.translate(cr.lx,cr.ly);c.rotate(cr.rot);c.scale(cr.sc,cr.sc);
   c.globalCompositeOperation="destination-out";c.drawImage(tex.hole,-tex.cx,-tex.cy);
@@ -652,7 +669,9 @@ const rimPatterns = new Map<number, CanvasPattern | null>();
  * own pixel density however large the window is.
  */
 function drawCutoutEdges(target: CanvasRenderingContext2D, s: Sprite, rx: number, ry: number) {
-  if (!crackTextures.length || !s.outline) return;
+  // Nothing to trace until the window has been cut to its silhouette. A square window with a
+  // broken rim drawn round the shape it has not taken yet reads as two different windows.
+  if (!crackTextures.length || !s.outline || !s.carved) return;
   const slot = s.id % crackTextures.length;
   if (!rimPatterns.has(slot)) rimPatterns.set(slot, target.createPattern(windowGlass(crackTextures[slot]), "repeat"));
   const pattern = rimPatterns.get(slot);

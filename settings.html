@@ -225,6 +225,12 @@
                   </div>
                 </label>
                 <label class="field" title="Send recordings somewhere other than the chat endpoint, such as a local Vibe server. The key is never sent here."><span>Speech endpoint (blank = same as the chat endpoint)</span><input id="chat-stt-endpoint" type="text" spellcheck="false" placeholder="e.g. a local Vibe server: http://127.0.0.1:PORT/v1" /></label>
+                <label class="field" title="Some local servers will not transcribe until they have been told which model file to use, and forget between runs. Vibe is one. Leave blank for servers that need no such thing."><span>Speech model file (only if the server must load one)</span>
+                  <div class="row">
+                    <input id="chat-stt-path" type="text" spellcheck="false" class="grow" placeholder="e.g. ...\ggml-large-v3-turbo.bin" />
+                    <button id="chat-stt-browse" type="button">Choose…</button>
+                  </div>
+                </label>
                 <p class="hint">The microphone sends a short recording to the speech endpoint, which speaks the Whisper API. Leave it blank to use the chat endpoint. To keep audio on this PC, run a local server such as Vibe: enable its API server, load a model in it, and paste its address here ending in /v1. Its port changes between runs. The key is never sent to it. You can also focus Buddy's chat input and press Windows + H to dictate with Windows, then press Send.</p>
 
                 <h2>Voice</h2>

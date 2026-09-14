@@ -65,6 +65,12 @@ export interface Settings {
   chatDailyCap: number;
   /** Separate base URL for transcriptions (a local Vibe server); blank = chat endpoint. */
   chatSttEndpoint: string;
+  /**
+   * A speech model file on disk, for a local server that will not transcribe until one is
+   * loaded. Vibe is the case in hand: it answers every request with "no model loaded" until
+   * told which file to use. Blank for servers that need no such thing.
+   */
+  chatSttModelPath: string;
   /** "windows" or "piper". */
   ttsEngine: string;
   /** "pipeline" (chat + speech models) or "live" (OpenAI GPT-Live, one session that listens, thinks and speaks). */
@@ -130,6 +136,7 @@ export const DEFAULT_SETTINGS: Settings = {
   chatGenerateLines: true,
   chatDailyCap: 300,
   chatSttEndpoint: "",
+  chatSttModelPath: "",
   ttsEngine: "windows",
   talkMode: "pipeline",
   liveBackendModel: "gpt-5.6-luna",

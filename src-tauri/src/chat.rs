@@ -49,6 +49,7 @@ struct Target {
     stt_endpoint: String,
     model: String,
     stt_model: String,
+    stt_model_path: String,
     cap: u32,
     piper_exe: String,
     piper_voice: String,
@@ -64,6 +65,7 @@ fn target(app: &AppHandle) -> Target {
         endpoint,
         model: s.chat_model.trim().to_string(),
         stt_model: s.chat_stt_model.trim().to_string(),
+        stt_model_path: s.chat_stt_model_path.trim().to_string(),
         cap: s.chat_daily_cap,
         piper_exe: s.piper_exe.trim().to_string(),
         piper_voice: s.piper_voice.trim().to_string(),
@@ -237,6 +239,7 @@ pub async fn transcribe(app: AppHandle, audio: Vec<u8>, mime: String) -> Result<
         .timeout(Duration::from_secs(45))
         .build()
         .map_err(|e| e.to_string())?;
+    load_speech_model(&app, &t.stt_endpoint, &t.stt_model_path).await;
     let mut req = client.post(format!("{}/audio/transcriptions", t.stt_endpoint)).multipart(form);
     // Only send the key where it belongs: a local speech server never sees it.
     if t.stt_endpoint == t.endpoint {
@@ -252,6 +255,54 @@ pub async fn transcribe(app: AppHandle, audio: Vec<u8>, mime: String) -> Result<
     }
     let v: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
     Ok(v["text"].as_str().unwrap_or("").trim().to_string())
+}
+
+/// The speech model file this endpoint has already been told to load, so it is asked once per
+/// run rather than before every utterance.
+static LOADED_SPEECH_MODEL: std::sync::Mutex<Option<(String, String)>> = std::sync::Mutex::new(None);
+
+/**
+ * Tell a local speech server which model file to use, if one has been configured.
+ *
+ * Vibe refuses every transcription with "no model loaded" until it is told, and it forgets
+ * between runs, so there is nothing the user can set once and be done with. Servers that need
+ * no such thing do not have the route; that answer is ignored and the transcription goes ahead,
+ * which then reports whatever the server really thinks is wrong.
+ */
+async fn load_speech_model(app: &AppHandle, endpoint: &str, path: &str) {
+    if path.is_empty() {
+        return;
+    }
+    if let Ok(slot) = LOADED_SPEECH_MODEL.lock() {
+        if slot.as_ref().is_some_and(|(e, p)| e == endpoint && p == path) {
+            return;
+        }
+    }
+    if !std::path::Path::new(path).is_file() {
+        crate::chat::append_log(app.clone(), format!("speech: model file not found at {path}"));
+        return;
+    }
+    let client = match reqwest::Client::builder().timeout(Duration::from_secs(120)).build() {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    let sent = client
+        .post(format!("{endpoint}/models/load"))
+        .json(&serde_json::json!({ "path": path }))
+        .send()
+        .await;
+    match sent {
+        Ok(resp) if resp.status().is_success() => {
+            if let Ok(mut slot) = LOADED_SPEECH_MODEL.lock() {
+                *slot = Some((endpoint.to_string(), path.to_string()));
+            }
+        }
+        Ok(resp) => {
+            let status = resp.status();
+            crate::chat::append_log(app.clone(), format!("speech: {endpoint}/models/load answered {status}"));
+        }
+        Err(e) => crate::chat::append_log(app.clone(), format!("speech: could not reach {endpoint}/models/load: {e}")),
+    }
 }
 
 // ---------- local text-to-speech through piper ----------
