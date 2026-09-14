@@ -59,6 +59,13 @@ export class Renderer3D implements Renderer {
    * the cursor and a leg hold already moves the pivot to the top.
    */
   private gripPivot = 0;
+  /**
+   * 0..1 while the cursor has him by the head or the body, used to hold the chest still.
+   * The idle breathes and sways the chest every frame, and while he hangs from a grip that is
+   * the very part under the cursor, so a body grab looked loose however well the window
+   * tracked. A limb grab hid it, because the held limb is re-aimed over the top of the idle.
+   */
+  private gripStill = 0;
   private heldAmount = 0;
   private flipAmount = 0;
   private springs = new LimbSprings();
@@ -173,6 +180,11 @@ export class Renderer3D implements Renderer {
   private fitCamera(dt: number, snap = 0) {
     const c = this.character;
     if (!c) return;
+    // Held by the head or the body: the frame stays where it was. This re-centres on his
+    // outline every frame, so a body swinging inside the window drags the frame after it and
+    // the very point the cursor has hold of slides away, however still the body is being held.
+    // A limb hold does not need it, because the held limb is re-aimed at the cursor regardless.
+    if (!snap && this.gripStill > 0.5) return;
     const h = this.baseSize.y;
     const floor = this.baseCenter.y - h / 2;
     c.root.updateMatrixWorld(true);
@@ -280,6 +292,7 @@ export class Renderer3D implements Renderer {
     const limbHold = !!grab && grab.part !== "head" && grab.part !== "torso";
     const gripTarget = grab && !limbHold ? this.baseSize.y * (grab.part === "head" ? 0.92 : 0.6) : 0;
     this.gripPivot += (gripTarget - this.gripPivot) * Math.min(1, input.dt * 10);
+    this.gripStill += ((grab && !limbHold ? 1 : 0) - this.gripStill) * Math.min(1, input.dt * 10);
     const down = input.state === "down";
     // Held by a limb the hanging clip still gives the body its slack base; the held limb and
     // the free ones are re-aimed on top of it, so the dance never keeps going in his hands.
@@ -298,7 +311,9 @@ export class Renderer3D implements Renderer {
 
     // Procedural base pose for whatever the clip does not cover.
     if (input.airborne && !clipDriven && !down && input.flail) applyFlail(c, input.t);
-    else applyIdle(c, input.t, calm ? 1 : 1 - input.danceAmount * 0.7);
+    // Held by the head or the body he hangs dead from the grip rather than breathing in it.
+    // The arms still drop, which that pose does regardless of this, and the dangle re-aims them.
+    else applyIdle(c, input.t, (calm ? 1 : 1 - input.danceAmount * 0.7) * (1 - this.gripStill));
 
     // Held: the body hangs from whatever part the cursor has. A pack that names its own held
     // clip keeps it for head and torso holds; otherwise everything dangles procedurally.
