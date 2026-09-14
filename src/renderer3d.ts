@@ -406,7 +406,11 @@ export class Renderer3D implements Renderer {
     // After look-at, which resets the head and neck each frame, so the head spring survives.
     const wantSprings = (input.state === "dragged" || input.airborne || input.state === "land" || down || input.state === "hang") && !input.mirror;
     this.springAmount += ((wantSprings ? 1 : 0) - this.springAmount) * Math.min(1, input.dt * (wantSprings ? 8 : 3));
-    const rigid = grab && grab.part !== "head" && grab.part !== "torso" ? grab.part : null;
+    // Whatever he is held by is pinned, the head included. Holding him by the head used to
+    // leave the neck spring running, so the one point welded to the cursor was the one that
+    // wobbled, while a limb grab pinned cleanly. The torso has no spring of its own: what hangs
+    // off it is the dangle pose and the other chains, which is the ragdoll doing its job.
+    const rigid = grab && grab.part !== "torso" ? grab.part : null;
     this.springs.update(c, input.dt, input.t, input.accelX, input.accelY, this.springAmount, rigid);
     applyLimp(c, this.downAmount);
     // Ducking under the top of the screen, eased so it reads as him bending, not snapping.

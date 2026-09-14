@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { crtShape, cyclePhase, erosionSeconds } from "./screensaver-cycle";
+import { collapseProgress, crtShape, cyclePhase, erosionSeconds } from "./screensaver-cycle";
 import { ScreensaverDance } from "./screensaver-dance";
 
 describe("screensaver cycle across offset monitors", () => {
@@ -15,14 +15,30 @@ describe("screensaver cycle across offset monitors", () => {
     expect(dot.x + dot.width).toBeLessThan(2560);
   });
   it("shares phase timing even when frames arrive late", () => {
+    // The desk shatters and fades for as long as the blackness afterwards lasts, then the tube
+    // goes off, then that blackness. He roams through the first and the last of those.
     const cycle = { startedAt: 1000, voidSeconds: 6 };
     expect(cyclePhase(cycle, 999)).toBe("waiting");
-    expect(cyclePhase(cycle, 1000)).toBe("crtOff");
-    expect(cyclePhase(cycle, 2350)).toBe("void");
-    expect(cyclePhase(cycle, 8349)).toBe("void");
-    expect(cyclePhase(cycle, 8350)).toBe("erode");
+    expect(cyclePhase(cycle, 1000)).toBe("collapse");
+    expect(cyclePhase(cycle, 6999)).toBe("collapse");
+    expect(cyclePhase(cycle, 7000)).toBe("crtOff");
+    expect(cyclePhase(cycle, 8349)).toBe("crtOff");
+    expect(cyclePhase(cycle, 8350)).toBe("void");
+    expect(cyclePhase(cycle, 14349)).toBe("void");
+    expect(cyclePhase(cycle, 14350)).toBe("erode");
     expect(crtShape(desktop, 2)).toBeNull();
+    // Nothing to fade and nothing to wait through when the setting is zero.
     expect(cyclePhase({ ...cycle, voidSeconds: 0 }, 2350)).toBe("erode");
+    expect(collapseProgress({ ...cycle, voidSeconds: 0 }, 1000)).toBe(1);
+  });
+  it("fades the desk away evenly across the collapse", () => {
+    const cycle = { startedAt: 1000, voidSeconds: 6 };
+    expect(collapseProgress(cycle, 1000)).toBe(0);
+    expect(collapseProgress(cycle, 4000)).toBeCloseTo(0.5);
+    expect(collapseProgress(cycle, 7000)).toBe(1);
+    // Late frames never drive it past either end.
+    expect(collapseProgress(cycle, 999)).toBe(0);
+    expect(collapseProgress(cycle, 99999)).toBe(1);
   });
   it("defaults slow and supports buddy-only erosion", () => {
     expect(erosionSeconds(20)).toBe(488);

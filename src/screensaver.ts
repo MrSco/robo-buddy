@@ -1,7 +1,7 @@
 import { Debris } from "./screensaver-debris";
 import { windowOutline, outlinePath, windowGlass, maskedWindow, fractureImage } from "./screensaver-fracture";
 import type { StrikeKind } from "./havoc";
-import { cyclePhase, drawCrtSlice, erosionSeconds, type CrtCycle, type DesktopRect } from "./screensaver-cycle";
+import { cyclePhase, collapseProgress, drawCrtSlice, erosionSeconds, type CrtCycle, type DesktopRect } from "./screensaver-cycle";
 import { loadCrackTextures, type CrackTexture } from "./screensaver-cracks";
 /**
  * Screensaver backdrop. It takes one picture of the desktop, dims it, and cuts a sprite out of
@@ -476,7 +476,9 @@ let orderPtr = 0;
 let carry = 0;
 /** "erode": desktop and windows breaking away. "crtOff": the tube-TV collapse before it all
  * snaps back whole and erodes again. */
-let phase: "erode" | "crtOff" | "void" = "erode";
+let phase: "erode" | "collapse" | "crtOff" | "void" = "erode";
+/** 1 while the desk is whole, falling to 0 across the collapse that precedes the tube going off. */
+let layerAlpha = 1;
 let crtCycle: CrtCycle | null = null;
 let crtRequested = false;
 
@@ -687,12 +689,16 @@ function drawCutoutEdges(target: CanvasRenderingContext2D, s: Sprite, rx: number
 
 function updateErosion(dt: number) {
   if (!cols) return;
-  if (phase !== "erode") return; // during the collapse the grid is left frozen.
+  // Frozen once the tube starts going off; still running through the collapse, where every cell
+  // has already been set going at once and only has to finish.
+  if (phase !== "erode" && phase !== "collapse") return;
   // Feed new cells into the erosion from the shuffled order, at a steady rate.
-  carry += ((cols * rows) / ambientSeconds) * dt;
-  while (carry >= 1 && orderPtr < order.length) {
-    nudgeCell(order[orderPtr++]);
-    carry -= 1;
+  if (phase === "erode") {
+    carry += ((cols * rows) / ambientSeconds) * dt;
+    while (carry >= 1 && orderPtr < order.length) {
+      nudgeCell(order[orderPtr++]);
+      carry -= 1;
+    }
   }
   // Advance every breaking cell and repaint it; drop it once it is fully gone.
   for (const i of active) {
@@ -702,7 +708,7 @@ function updateErosion(dt: number) {
   }
   // Whole desktop gone and settled: pull the plug. Tell every screen to collapse at the same
   // moment (this one included, via the event), so the whole desk powers off as one.
-  if (!crtRequested && reveal.every(value => value >= 1) && active.size === 0 && tiles.length === 0) {
+  if (phase === "erode" && !crtRequested && reveal.every(value => value >= 1) && active.size === 0 && tiles.length === 0) {
     crtRequested = true;
     void invoke<CrtCycle>("screensaver_crt").then(beginCycle).catch(() => { crtRequested = false; });
   }
@@ -726,15 +732,32 @@ function frame(now: number) {
     if (next === "erode") {
       restoreDesktop();
       phase = "erode";
+      layerAlpha = 1;
       sendSurfaces();
-    } else if (next !== "waiting") {
+    } else if (next === "collapse") {
+      // Everything still standing comes apart at once and fades out, leaving him roaming in
+      // front of whatever plays behind before the tube goes off. Nothing is standable from here,
+      // which the surface list already handles by refusing anything outside the erode phase.
       if (phase === "erode") {
+        phase = "collapse";
+        held = null;
+        // Queued rather than shed on the spot: the queue is drained a window per frame, which
+        // spreads the cost and reads as the desk going one piece at a time.
+        for (const s of sprites) if (!s.broken) shatterQueue.add(s);
+        for (let i = 0; i < reveal.length; i++) nudgeCell(i);
+        sendSurfaces();
+      }
+      layerAlpha = 1 - collapseProgress(crtCycle, Date.now());
+    } else if (next !== "waiting") {
+      if (phase === "erode" || phase === "collapse") {
         phase = "crtOff";
         held = null;
         sendSurfaces();
       }
       phase = next;
-      drawCrtSlice(ctx, screen, screen.virtualDesktop, (Date.now() - crtCycle.startedAt) / 1000);
+      layerAlpha = 0;
+      // The tube's own stretch begins after the collapse, not when the cycle did.
+      drawCrtSlice(ctx, screen, screen.virtualDesktop, (Date.now() - crtCycle.startedAt) / 1000 - crtCycle.voidSeconds);
       requestAnimationFrame(frame);
       return;
     }
@@ -746,6 +769,8 @@ function frame(now: number) {
     // A cleared pixel shows the page background behind: black, or see-through to the screensaver
     // playing underneath. Broken cells of the desktop and of the windows both read as that.
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Everything from here is the desk itself, which fades out together during the collapse.
+    ctx.globalAlpha = layerAlpha;
     // The desktop, minus the windows and minus whatever has broken away: wallpaper and icons
     // stay until a cell of them is torn out to show the moving layer behind. His charges tear a
     // path through it as he barges along; the timed erosion takes care of the rest.

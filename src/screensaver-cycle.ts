@@ -8,12 +8,26 @@ export function erosionSeconds(speed: number): number {
   return value === 0 ? Infinity : 600 - 560 * value / 100;
 }
 
-export function cyclePhase(cycle: CrtCycle, now: number): "waiting" | "crtOff" | "void" | "erode" {
+/**
+ * The cycle, in order: everything left standing shatters and fades while he keeps roaming in
+ * front of whatever plays behind, then the tube collapses, then the same stretch of blackness,
+ * then the desk comes back whole and erodes again. The collapse takes the same time as the void
+ * that follows it, so one setting governs both stretches of him roaming with nothing to climb.
+ */
+export function cyclePhase(cycle: CrtCycle, now: number): "waiting" | "collapse" | "crtOff" | "void" | "erode" {
   const seconds = (now - cycle.startedAt) / 1000;
   if (seconds < 0) return "waiting";
-  if (seconds < CRT_SECONDS) return "crtOff";
-  if (seconds < CRT_SECONDS + cycle.voidSeconds) return "void";
+  if (seconds < cycle.voidSeconds) return "collapse";
+  if (seconds < cycle.voidSeconds + CRT_SECONDS) return "crtOff";
+  if (seconds < cycle.voidSeconds + CRT_SECONDS + cycle.voidSeconds) return "void";
   return "erode";
+}
+
+/** How far through the collapse, 0..1, for fading what is left of the desk away. */
+export function collapseProgress(cycle: CrtCycle, now: number): number {
+  if (cycle.voidSeconds <= 0) return 1;
+  const seconds = (now - cycle.startedAt) / 1000;
+  return Math.max(0, Math.min(1, seconds / cycle.voidSeconds));
 }
 
 /** All monitors draw this same global geometry, clipped by their own canvas. */
@@ -33,6 +47,7 @@ export function crtShape(rect: DesktopRect, seconds: number) {
 }
 
 export function drawCrtSlice(ctx: CanvasRenderingContext2D, monitor: DesktopRect, desktop: DesktopRect, seconds: number) {
+  // The tube starts collapsing when its own stretch does, not when the whole cycle began.
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
