@@ -1,7 +1,7 @@
 import { Debris } from "./screensaver-debris";
 import { windowOutline, outlinePath, windowGlass, maskedWindow, fractureImage } from "./screensaver-fracture";
 import type { StrikeKind } from "./havoc";
-import { cyclePhase, collapseProgress, drawCrtSlice, erosionSeconds, type CrtCycle, type DesktopRect } from "./screensaver-cycle";
+import { cyclePhase, shatterProgress, crtStartsAt, SHATTER_SECONDS, drawCrtSlice, erosionSeconds, type CrtCycle, type DesktopRect } from "./screensaver-cycle";
 import { loadCrackTextures, type CrackTexture } from "./screensaver-cracks";
 /**
  * Screensaver backdrop. It takes one picture of the desktop, dims it, and cuts a sprite out of
@@ -191,16 +191,9 @@ async function start() {
       reveal: 0,
     });
   }
-  hctx.save();
-  hctx.globalCompositeOperation = "destination-out";
-  for (const s of sprites) {
-    // Square, because the window covering it is still square. The silhouette it is later cut
-    // to is inscribed in this rectangle, so the hole is never too small for what is left.
-    hctx.fillRect(s.homeX, s.homeY, s.w, s.h);
-  }
-  hctx.restore();
-  erodedCtx.clearRect(0, 0, screen.width, screen.height);
-  erodedCtx.drawImage(desktopSrc, 0, 0);
+  // No holes yet. Each window sits exactly over its own pixels in the picture, so the desk
+  // looks like the desk; the hole is cut at the moment the piece is, and to the same shape, so
+  // the two can never disagree. A square hole behind a jagged piece was the mismatch on screen.
   log(`drew ${sprites.length} sprites for ${screen.width}x${screen.height}`);
   loading.hidden = true;
   resize();
@@ -337,6 +330,7 @@ function dragUnder(s: Sprite, dt: number) {
   const lowest = screen.height - s.h * 0.35;
   const to = Math.min(want, lowest);
   if (s.y >= to) return;
+  carve(s);
   s.y = Math.min(to, s.y + DRAG_SPEED * dt);
   s.angle = 0;
 }
@@ -424,9 +418,22 @@ function carve(s: Sprite) {
   if (s.carved) return;
   s.carved = true;
   if (!s.outline) return;
-  const fresh = maskedWindow(s.img, s.outline);
-  s.cut.width = s.cut.height = 1;
-  s.cut = fresh;
+  // Clipped where it stands, so whatever cracks it has already taken survive being reshaped;
+  // rebuilding from the original picture wiped them.
+  const cc = s.cut.getContext("2d")!;
+  cc.save();
+  cc.globalCompositeOperation = "destination-in";
+  cc.fill(outlinePath(s.outline, s.cut.width, s.cut.height));
+  cc.restore();
+  // The same shape out of the desktop, so what is left behind matches what came away. Only the
+  // working copy: the pristine picture is what a restore puts back, whole.
+  if (erodedCtx) {
+    erodedCtx.save();
+    erodedCtx.globalCompositeOperation = "destination-out";
+    erodedCtx.translate(s.homeX, s.homeY);
+    erodedCtx.fill(outlinePath(s.outline, s.w, s.h));
+    erodedCtx.restore();
+  }
 }
 
 /** Artwork partitions are rasterized only on impact, never in the render loop. */
@@ -476,9 +483,7 @@ let orderPtr = 0;
 let carry = 0;
 /** "erode": desktop and windows breaking away. "crtOff": the tube-TV collapse before it all
  * snaps back whole and erodes again. */
-let phase: "erode" | "collapse" | "crtOff" | "void" = "erode";
-/** 1 while the desk is whole, falling to 0 across the collapse that precedes the tube going off. */
-let layerAlpha = 1;
+let phase: "erode" | "shatter" | "bare" | "crtOff" | "void" = "erode";
 let crtCycle: CrtCycle | null = null;
 let crtRequested = false;
 
@@ -577,7 +582,10 @@ function paintCell(i: number) { if (erodedCtx && erosionStyle === "tiles") cutCe
 /** Bake local damage into the window once so it never punches through unrelated layers. */
 function damageWindow(s: Sprite, cr: { tex: number; lx: number; ly: number; rot: number; sc: number }) {
   const tex=crackTextures[cr.tex];if(!tex)return;
-  carve(s);
+  // One crack, where it landed. Emphatically not a carve: the slow ambient erosion drops its
+  // first cells within seconds of the screensaver opening, and carving on one of those cut every
+  // window to its broken silhouette before he had touched anything, which is why they looked
+  // smashed from the start. Reshaping the whole window is for him knocking it about.
   const c=s.cut.getContext("2d")!;c.save();
   c.scale(s.cut.width/s.w,s.cut.height/s.h);c.translate(cr.lx,cr.ly);c.rotate(cr.rot);c.scale(cr.sc,cr.sc);
   c.globalCompositeOperation="destination-out";c.drawImage(tex.hole,-tex.cx,-tex.cy);
@@ -691,7 +699,7 @@ function updateErosion(dt: number) {
   if (!cols) return;
   // Frozen once the tube starts going off; still running through the collapse, where every cell
   // has already been set going at once and only has to finish.
-  if (phase !== "erode" && phase !== "collapse") return;
+  if (phase !== "erode" && phase !== "shatter") return;
   // Feed new cells into the erosion from the shuffled order, at a steady rate.
   if (phase === "erode") {
     carry += ((cols * rows) / ambientSeconds) * dt;
@@ -732,32 +740,46 @@ function frame(now: number) {
     if (next === "erode") {
       restoreDesktop();
       phase = "erode";
-      layerAlpha = 1;
       sendSurfaces();
-    } else if (next === "collapse") {
-      // Everything still standing comes apart at once and fades out, leaving him roaming in
-      // front of whatever plays behind before the tube goes off. Nothing is standable from here,
-      // which the surface list already handles by refusing anything outside the erode phase.
+    } else if (next === "shatter") {
+      // Everything still standing breaks into pieces, and the pieces fade out together. The
+      // desk is not dimmed where it stands: every cell is set going at once so the picture
+      // itself comes apart, and every window is queued to be shed. Nothing is standable from
+      // here, which the surface list already handles by refusing anything outside the erode
+      // phase. He keeps roaming throughout; his own clock does not start until this is done.
       if (phase === "erode") {
-        phase = "collapse";
+        phase = "shatter";
         held = null;
-        // Queued rather than shed on the spot: the queue is drained a window per frame, which
-        // spreads the cost and reads as the desk going one piece at a time.
         for (const s of sprites) if (!s.broken) shatterQueue.add(s);
         for (let i = 0; i < reveal.length; i++) nudgeCell(i);
         sendSurfaces();
       }
-      layerAlpha = 1 - collapseProgress(crtCycle, Date.now());
+      // Faded as one, over what is left of this stretch: the usual rule ages each piece on its
+      // own, so the last ones made hung about long after the rest had gone.
+      debris.fadeAll(dt, Math.max(0.2, SHATTER_SECONDS * (1 - shatterProgress(crtCycle, Date.now()))));
+    } else if (next === "bare") {
+      // Nothing of the desk left: just him, in front of whatever plays behind. This is the
+      // stretch the void seconds actually buy, which is why the breaking up above is not part
+      // of it.
+      if (phase !== "bare") {
+        phase = "bare";
+        held = null;
+        debris.clear();
+        tiles = [];
+        sendSurfaces();
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      requestAnimationFrame(frame);
+      return;
     } else if (next !== "waiting") {
-      if (phase === "erode" || phase === "collapse") {
-        phase = "crtOff";
+      if (phase !== "crtOff" && phase !== "void") {
         held = null;
         sendSurfaces();
       }
       phase = next;
-      layerAlpha = 0;
       // The tube's own stretch begins after the collapse, not when the cycle did.
-      drawCrtSlice(ctx, screen, screen.virtualDesktop, (Date.now() - crtCycle.startedAt) / 1000 - crtCycle.voidSeconds);
+      drawCrtSlice(ctx, screen, screen.virtualDesktop, (Date.now() - crtCycle.startedAt) / 1000 - crtStartsAt(crtCycle));
       requestAnimationFrame(frame);
       return;
     }
@@ -769,8 +791,6 @@ function frame(now: number) {
     // A cleared pixel shows the page background behind: black, or see-through to the screensaver
     // playing underneath. Broken cells of the desktop and of the windows both read as that.
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // Everything from here is the desk itself, which fades out together during the collapse.
-    ctx.globalAlpha = layerAlpha;
     // The desktop, minus the windows and minus whatever has broken away: wallpaper and icons
     // stay until a cell of them is torn out to show the moving layer behind. His charges tear a
     // path through it as he barges along; the timed erosion takes care of the rest.

@@ -58,6 +58,18 @@ export class Debris {
     for (const b of this.bodies) b.asleep = false;
     return true;
   }
+  /**
+   * Fade every piece at the same rate, for the end of the cycle when the whole desk is coming
+   * apart at once. Left to the usual rule each piece fades on its own age, so the ones made
+   * last hung about long after the rest had gone.
+   */
+  fadeAll(dt: number, seconds: number) {
+    if (seconds <= 0) return;
+    for (const b of [...this.bodies]) {
+      b.fade -= dt / seconds;
+      if (b.fade <= 0) this.remove(b);
+    }
+  }
   step(dt: number, width: number, height: number) {
     dt = Math.max(0, Math.min(0.05, dt));
     for (const b of [...this.bodies]) {

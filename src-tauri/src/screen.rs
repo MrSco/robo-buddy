@@ -746,6 +746,7 @@ fn start_backdrop(app: &tauri::AppHandle, path: &str) -> bool {
             if let Ok(mut slot) = app.state::<Backdrop>().0.lock() {
                 *slot = Some(owned);
             }
+            watch_backdrop(app.clone(), path.to_string());
             true
         }
         Err(e) => {
@@ -753,6 +754,62 @@ fn start_backdrop(app: &tauri::AppHandle, path: &str) -> bool {
             false
         }
     }
+}
+
+/**
+ * Keep the layer underneath playing for the whole run.
+ *
+ * Some screensavers quit the first time something else takes the foreground, and ours is
+ * topmost over it, so it is usually ours that provokes it. When that happens mid-run there is
+ * nothing behind the holes for the rest of the show. Ours is put back on top straight after
+ * starting it again, or the replacement would cover the very thing it is meant to play behind.
+ */
+fn watch_backdrop(app: tauri::AppHandle, path: String) {
+    std::thread::spawn(move || {
+        use tauri::Manager;
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+            if app.get_webview_window("screensaver-0").is_none() {
+                return;
+            }
+            let gone = match app.state::<Backdrop>().0.lock() {
+                // Taken away deliberately: the screensaver is coming down, so stop watching.
+                Ok(mut slot) => match slot.as_mut() {
+                    Some(owned) => matches!(owned.child.try_wait(), Ok(Some(_))),
+                    None => return,
+                },
+                Err(_) => return,
+            };
+            if !gone {
+                continue;
+            }
+            let started = std::process::Command::new(&path)
+                .arg("/s")
+                .spawn()
+                .ok()
+                .and_then(|child| BackdropProcess::attach(child).ok());
+            match started {
+                Some(owned) => {
+                    if let Ok(mut slot) = app.state::<Backdrop>().0.lock() {
+                        *slot = Some(owned);
+                    }
+                    crate::chat::append_log(app.clone(), "screensaver: backdrop had stopped, started it again".into());
+                    // It comes up topmost like any screensaver; ours has to go back over it.
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    for i in 0..16 {
+                        if let Some(win) = app.get_webview_window(&format!("screensaver-{i}")) {
+                            let _ = win.set_always_on_top(true);
+                        }
+                    }
+                    crate::input::raise_buddy(&app);
+                }
+                None => {
+                    crate::chat::append_log(app.clone(), "screensaver: backdrop stopped and would not start again".into());
+                    return;
+                }
+            }
+        }
+    });
 }
 
 /// Stop the screensaver playing underneath, if one is.

@@ -1,6 +1,12 @@
 export interface DesktopRect { x: number; y: number; width: number; height: number }
 export interface CrtCycle { startedAt: number; voidSeconds: number }
 export const CRT_SECONDS = 1.35;
+/**
+ * How long everything gets to come apart and its pieces to fade. This is not part of either
+ * stretch of him roaming: the desk breaking up is the show, and the quiet afterwards is meant
+ * to be quiet, so the roaming clock only starts once there is nothing left on screen.
+ */
+export const SHATTER_SECONDS = 4;
 
 /** Zero is buddy-only; the default 20% takes about eight minutes without his hits. */
 export function erosionSeconds(speed: number): number {
@@ -9,25 +15,31 @@ export function erosionSeconds(speed: number): number {
 }
 
 /**
- * The cycle, in order: everything left standing shatters and fades while he keeps roaming in
- * front of whatever plays behind, then the tube collapses, then the same stretch of blackness,
- * then the desk comes back whole and erodes again. The collapse takes the same time as the void
- * that follows it, so one setting governs both stretches of him roaming with nothing to climb.
+ * The cycle, in order. Everything still standing breaks into pieces and those pieces fade out.
+ * Then he roams with nothing but the layer behind him for company. Then the tube collapses,
+ * then the same stretch again in blackness, and then the desk comes back whole and erodes from
+ * the start. Both stretches of roaming are the same length, so one setting governs them.
  */
-export function cyclePhase(cycle: CrtCycle, now: number): "waiting" | "collapse" | "crtOff" | "void" | "erode" {
+export function cyclePhase(cycle: CrtCycle, now: number): "waiting" | "shatter" | "bare" | "crtOff" | "void" | "erode" {
   const seconds = (now - cycle.startedAt) / 1000;
+  const bareEnds = SHATTER_SECONDS + cycle.voidSeconds;
   if (seconds < 0) return "waiting";
-  if (seconds < cycle.voidSeconds) return "collapse";
-  if (seconds < cycle.voidSeconds + CRT_SECONDS) return "crtOff";
-  if (seconds < cycle.voidSeconds + CRT_SECONDS + cycle.voidSeconds) return "void";
+  if (seconds < SHATTER_SECONDS) return "shatter";
+  if (seconds < bareEnds) return "bare";
+  if (seconds < bareEnds + CRT_SECONDS) return "crtOff";
+  if (seconds < bareEnds + CRT_SECONDS + cycle.voidSeconds) return "void";
   return "erode";
 }
 
-/** How far through the collapse, 0..1, for fading what is left of the desk away. */
-export function collapseProgress(cycle: CrtCycle, now: number): number {
-  if (cycle.voidSeconds <= 0) return 1;
+/** How far through the breaking up, 0..1, for fading the pieces out together. */
+export function shatterProgress(cycle: CrtCycle, now: number): number {
   const seconds = (now - cycle.startedAt) / 1000;
-  return Math.max(0, Math.min(1, seconds / cycle.voidSeconds));
+  return Math.max(0, Math.min(1, seconds / SHATTER_SECONDS));
+}
+
+/** Seconds from the start of the cycle to the tube beginning to collapse. */
+export function crtStartsAt(cycle: CrtCycle): number {
+  return SHATTER_SECONDS + cycle.voidSeconds;
 }
 
 /** All monitors draw this same global geometry, clipped by their own canvas. */

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { collapseProgress, crtShape, cyclePhase, erosionSeconds } from "./screensaver-cycle";
+import { crtShape, cyclePhase, erosionSeconds, shatterProgress, SHATTER_SECONDS } from "./screensaver-cycle";
 import { ScreensaverDance } from "./screensaver-dance";
 
 describe("screensaver cycle across offset monitors", () => {
@@ -15,30 +15,35 @@ describe("screensaver cycle across offset monitors", () => {
     expect(dot.x + dot.width).toBeLessThan(2560);
   });
   it("shares phase timing even when frames arrive late", () => {
-    // The desk shatters and fades for as long as the blackness afterwards lasts, then the tube
-    // goes off, then that blackness. He roams through the first and the last of those.
+    // Everything breaks up first, and that is not part of either stretch of him roaming: the
+    // bare stretch starts once the pieces are gone, then the tube, then the same in blackness.
     const cycle = { startedAt: 1000, voidSeconds: 6 };
+    const bare = SHATTER_SECONDS * 1000;
     expect(cyclePhase(cycle, 999)).toBe("waiting");
-    expect(cyclePhase(cycle, 1000)).toBe("collapse");
-    expect(cyclePhase(cycle, 6999)).toBe("collapse");
-    expect(cyclePhase(cycle, 7000)).toBe("crtOff");
-    expect(cyclePhase(cycle, 8349)).toBe("crtOff");
-    expect(cyclePhase(cycle, 8350)).toBe("void");
-    expect(cyclePhase(cycle, 14349)).toBe("void");
-    expect(cyclePhase(cycle, 14350)).toBe("erode");
+    expect(cyclePhase(cycle, 1000)).toBe("shatter");
+    expect(cyclePhase(cycle, 1000 + bare - 1)).toBe("shatter");
+    expect(cyclePhase(cycle, 1000 + bare)).toBe("bare");
+    // Six seconds of him and the backdrop, whole, after the breaking up rather than during it.
+    expect(cyclePhase(cycle, 1000 + bare + 5999)).toBe("bare");
+    expect(cyclePhase(cycle, 1000 + bare + 6000)).toBe("crtOff");
+    expect(cyclePhase(cycle, 1000 + bare + 7349)).toBe("crtOff");
+    expect(cyclePhase(cycle, 1000 + bare + 7350)).toBe("void");
+    expect(cyclePhase(cycle, 1000 + bare + 13349)).toBe("void");
+    expect(cyclePhase(cycle, 1000 + bare + 13350)).toBe("erode");
     expect(crtShape(desktop, 2)).toBeNull();
-    // Nothing to fade and nothing to wait through when the setting is zero.
-    expect(cyclePhase({ ...cycle, voidSeconds: 0 }, 2350)).toBe("erode");
-    expect(collapseProgress({ ...cycle, voidSeconds: 0 }, 1000)).toBe(1);
+    // With no roaming asked for, the breaking up still happens; it is the show, not a wait.
+    expect(cyclePhase({ ...cycle, voidSeconds: 0 }, 1000 + bare - 1)).toBe("shatter");
+    expect(cyclePhase({ ...cycle, voidSeconds: 0 }, 1000 + bare)).toBe("crtOff");
   });
-  it("fades the desk away evenly across the collapse", () => {
+  it("fades the pieces out together across the breaking up", () => {
     const cycle = { startedAt: 1000, voidSeconds: 6 };
-    expect(collapseProgress(cycle, 1000)).toBe(0);
-    expect(collapseProgress(cycle, 4000)).toBeCloseTo(0.5);
-    expect(collapseProgress(cycle, 7000)).toBe(1);
-    // Late frames never drive it past either end.
-    expect(collapseProgress(cycle, 999)).toBe(0);
-    expect(collapseProgress(cycle, 99999)).toBe(1);
+    expect(shatterProgress(cycle, 1000)).toBe(0);
+    expect(shatterProgress(cycle, 1000 + SHATTER_SECONDS * 500)).toBeCloseTo(0.5);
+    expect(shatterProgress(cycle, 1000 + SHATTER_SECONDS * 1000)).toBe(1);
+    // Late frames never drive it past either end, and it does not depend on the roaming length.
+    expect(shatterProgress(cycle, 999)).toBe(0);
+    expect(shatterProgress(cycle, 99999)).toBe(1);
+    expect(shatterProgress({ ...cycle, voidSeconds: 0 }, 1000 + SHATTER_SECONDS * 500)).toBeCloseTo(0.5);
   });
   it("defaults slow and supports buddy-only erosion", () => {
     expect(erosionSeconds(20)).toBe(488);
