@@ -623,6 +623,14 @@ export class Renderer3D implements Renderer {
     return { x: ((this.tmp.x + 1) / 2) * this.cssW, y: ((1 - this.tmp.y) / 2) * this.cssH };
   }
 
+  /** Dev: the grip, as numbers, because four guesses at this bug were four too many. */
+  gripReport(): string {
+    const p = this.gripObject ? this.screenPos(this.gripObject) : null;
+    const a = this.gripAnchor;
+    const at = (q: { x: number; y: number } | null) => (q ? `${q.x.toFixed(0)},${q.y.toFixed(0)}` : "-");
+    return `${this.gripObject?.name ?? "-"} hold=${this.holding ? 1 : 0} still=${this.gripStill.toFixed(2)} anch=${at(a)} now=${at(p)} fit=${this.fitDist.toFixed(2)} fx=${this.fitX.toFixed(2)} fy=${this.fitY.toFixed(2)} css=${this.cssW}x${this.cssH}`;
+  }
+
   partAt(x: number, y: number): GrabPart | null {
     const c = this.character;
     if (!c) return null;

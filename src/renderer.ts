@@ -66,6 +66,8 @@ export interface Renderer {
   bubbleAnchor(): { x: number; y: number };
   /** Which body part is under a CSS-pixel point (3D only), or null when nothing is near. */
   partAt(x: number, y: number): GrabPart | null;
+  /** Dev: what the cursor has hold of and where it is, for the debug title. */
+  gripReport?(): string;
   /** CSS-pixel position of the point he is held by (a hand, the head...), or null. */
   holdPoint(): { x: number; y: number } | null;
   /** True when the pack provides a clip for the state, so procedural fallbacks can step aside. */
