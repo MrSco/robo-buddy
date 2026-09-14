@@ -688,12 +688,14 @@ export class Renderer3D implements Renderer {
         const p = this.screenPos(c.bone("head"));
         return p ? { x: p.x, y: p.y - this.cssH * 0.06 } : null;
       }
-      default: {
-        // Hanging by both hands: midway between them.
-        const l = this.screenPos(c.bone("leftHand"));
-        const r = this.screenPos(c.bone("rightHand"));
-        return l && r ? { x: (l.x + r.x) / 2, y: (l.y + r.y) / 2 } : null;
-      }
+      default:
+        // The body, held wherever the click landed on it. This branch used to return the point
+        // midway between his two hands, which is a fair description of hanging by both arms and
+        // nothing at all to do with a hand on his chest: with his arms dangling that midpoint
+        // sits at his hips, so the window was steered to put his hips under the cursor and he
+        // appeared to drop from chest to pelvis the instant the grab took. Worse, his hands
+        // swing, so the point being steered to moved the whole time, which was the wobble.
+        return this.screenPos(this.gripObject ?? c.bone("chest") ?? c.bone("spine") ?? c.bone("hips"));
     }
   }
 
