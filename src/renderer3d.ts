@@ -66,6 +66,20 @@ export class Renderer3D implements Renderer {
    * tracked. A limb grab hid it, because the held limb is re-aimed over the top of the idle.
    */
   private gripStill = 0;
+  /**
+   * Pinning the grip, properly. The drag anchors the *window* to the pointer, so the part of
+   * him under the cursor is whatever happens to be at that spot in the window. Take him by the
+   * chest and the hold pose drops his arms and hangs him, the frame re-fits around the new
+   * outline, and by the next frame the pointer is on his pelvis. Nothing about how still the
+   * body is held can fix that, because it is the body sliding inside the window, not wobbling.
+   *
+   * So: remember the exact bone the click landed on and where it sat in the window, then each
+   * frame move the camera by whatever it takes to put that bone back on that spot. One step,
+   * no feedback, because it is applied after the pose is final.
+   */
+  private gripObject: THREE.Object3D | null = null;
+  private gripAnchor: { x: number; y: number } | null = null;
+  private holding = false;
   private heldAmount = 0;
   private flipAmount = 0;
   private springs = new LimbSprings();
@@ -184,7 +198,7 @@ export class Renderer3D implements Renderer {
     // outline every frame, so a body swinging inside the window drags the frame after it and
     // the very point the cursor has hold of slides away, however still the body is being held.
     // A limb hold does not need it, because the held limb is re-aimed at the cursor regardless.
-    if (!snap && this.gripStill > 0.5) return;
+    if (!snap && this.holding) return;
     const h = this.baseSize.y;
     const floor = this.baseCenter.y - h / 2;
     c.root.updateMatrixWorld(true);
@@ -243,6 +257,23 @@ export class Renderer3D implements Renderer {
     this.camera.lookAt(this.fitX, this.fitY, this.baseCenter.z);
   }
 
+  /**
+   * Put the bone the cursor took hold of back where it was when it took hold, by moving the
+   * camera. Runs after the pose and after the fit, so one correction lands it exactly.
+   */
+  private holdGrip(c: Character) {
+    if (!this.holding || !this.gripAnchor || !this.gripObject) return;
+    c.root.updateMatrixWorld(true);
+    const p = this.screenPos(this.gripObject);
+    if (!p) return;
+    const unitsPerPx = (2 * Math.max(this.fitDist, 0.05) * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / this.cssH;
+    // Screen y grows downward and world y upward, hence the opposite signs.
+    this.fitX += (p.x - this.gripAnchor.x) * unitsPerPx;
+    this.fitY -= (p.y - this.gripAnchor.y) * unitsPerPx;
+    this.camera.position.set(this.fitX, this.fitY, this.baseCenter.z + this.fitDist);
+    this.camera.lookAt(this.fitX, this.fitY, this.baseCenter.z);
+  }
+
   resize(w: number, h: number) {
     this.cssW = w;
     this.cssH = h;
@@ -293,6 +324,12 @@ export class Renderer3D implements Renderer {
     const gripTarget = grab && !limbHold ? this.baseSize.y * (grab.part === "head" ? 0.92 : 0.6) : 0;
     this.gripPivot += (gripTarget - this.gripPivot) * Math.min(1, input.dt * 10);
     this.gripStill += ((grab && !limbHold ? 1 : 0) - this.gripStill) * Math.min(1, input.dt * 10);
+    // Caught on the frame the grip starts, before the hold pose has moved anything, so the
+    // anchor is where the click actually landed rather than where he ends up hanging.
+    const holding = !!grab && !limbHold && !!this.gripObject;
+    if (holding && !this.holding) this.gripAnchor = this.screenPos(this.gripObject ?? undefined);
+    if (!holding) this.gripAnchor = null;
+    this.holding = holding;
     const down = input.state === "down";
     // Held by a limb the hanging clip still gives the body its slack base; the held limb and
     // the free ones are re-aimed on top of it, so the dance never keeps going in his hands.
@@ -458,6 +495,7 @@ export class Renderer3D implements Renderer {
     c.update(input.dt);
     this.detectTpose(c, input);
     this.fitCamera(input.dt);
+    this.holdGrip(c);
     this.renderer.render(this.scene, this.camera);
     this.renders++;
   }
@@ -607,6 +645,7 @@ export class Renderer3D implements Renderer {
       ["rightLeg", c.bone("rightUpperLeg")],
     ];
     let best: GrabPart | null = null;
+    let bestBone: THREE.Object3D | null = null;
     let bestD = Infinity;
     for (const [part, bone] of candidates) {
       const p = this.screenPos(bone);
@@ -616,9 +655,12 @@ export class Renderer3D implements Renderer {
       if (d < bestD) {
         bestD = d;
         best = part;
+        bestBone = bone ?? null;
       }
     }
-    return bestD < this.cssH * 0.35 ? best : null;
+    if (bestD >= this.cssH * 0.35) return null;
+    this.gripObject = bestBone;
+    return best;
   }
 
   holdPoint(): { x: number; y: number } | null {
