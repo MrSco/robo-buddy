@@ -14,6 +14,10 @@ export interface Settings {
   musicEnabled: boolean;
   mouseEnabled: boolean;
   physicsEnabled: boolean;
+  gravityStrength: number;
+  bounciness: number;
+  throwStrength: number;
+  screensaverIntensity: number;
   /**
    * How eagerly he locks onto a beat, 0..1. Low waits for a tempo to hold steady a long while
    * before he moves; high starts almost at once. Loudness plays no part: a beat is a beat at any
@@ -93,6 +97,10 @@ export const DEFAULT_SETTINGS: Settings = {
   musicEnabled: true,
   mouseEnabled: true,
   physicsEnabled: true,
+  gravityStrength: 1,
+  bounciness: 0.26,
+  throwStrength: 1,
+  screensaverIntensity: 70,
   musicBeatLock: 0.7,
   clickThrough: "pixel",
   autostart: false,
@@ -103,7 +111,7 @@ export const DEFAULT_SETTINGS: Settings = {
   screensaverBackdrop: "",
   screensaverBackdropMode: "",
   screensaverAfterMin: 0,
-  screensaverErosionStyle: "tiles",
+  screensaverErosionStyle: "cracks",
   screensaverErosionSpeed: 20,
   screensaverVoidSeconds: 6,
   bubblesEnabled: true,

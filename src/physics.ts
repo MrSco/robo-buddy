@@ -19,6 +19,11 @@ const FLOOR_FRICTION = 6; // 1/s
 const SETTLE_SPEED = 40; // px/s
 
 export class WindowPhysics {
+  gravityStrength = 1;
+  bounciness = BOUNCE;
+  throwStrength = 1;
+  private get gravityAcceleration() { return GRAVITY * Math.max(0.25, Math.min(2, this.gravityStrength)); }
+  private get restitution() { return Math.max(0, Math.min(0.65, this.bounciness)); }
   mode: Mode = "rest";
   x = 0;
   y = 0;
@@ -162,8 +167,8 @@ export class WindowPhysics {
       const b = recent[recent.length - 1];
       const dt = (b.t - a.t) / 1000;
       if (dt > 0) {
-        this.vx = (b.x - a.x) / dt;
-        this.vy = (b.y - a.y) / dt;
+        this.vx = (b.x - a.x) / dt * Math.max(0.25, Math.min(2, this.throwStrength));
+        this.vy = (b.y - a.y) / dt * Math.max(0.25, Math.min(2, this.throwStrength));
       }
     }
     // A fast sideways throw sets him tumbling; the renderer integrates and damps it.
@@ -440,7 +445,7 @@ export class WindowPhysics {
     this.support = null;
     this.mode = "falling";
     this.launchKind = "up";
-    this.vy = -Math.min(this.roam ? 2600 : 1900, Math.sqrt(2 * GRAVITY * rise));
+    this.vy = -Math.min(this.roam ? 2600 : 1900, Math.sqrt(2 * this.gravityAcceleration * rise));
     this.vx = 0;
   }
 
@@ -497,8 +502,20 @@ export class WindowPhysics {
     this.support = null;
     this.mode = "falling";
     this.launchKind = "off";
-    this.vy = -600;
+    this.vy = -600 * Math.sqrt(this.gravityStrength);
     this.vx = (dir >= 0 ? 1 : -1) * 1500;
+    this.spin = 0;
+  }
+
+  /** Untargeted screensaver leap; jump height remains coherent with the gravity slider. */
+  spring(dir: number) {
+    if (this.mode !== "rest" || !this.opts.gravity) return;
+    this.departedSurface = this.support;
+    this.support = null;
+    this.mode = "falling";
+    this.launchKind = "up";
+    this.vy = -Math.sqrt(2 * this.gravityAcceleration * Math.min(330, this.h * .5));
+    this.vx = dir * 520;
     this.spin = 0;
   }
 
@@ -577,7 +594,7 @@ export class WindowPhysics {
       this.samples.push({ t: performance.now(), x: this.x, y: this.y });
       if (this.samples.length > 12) this.samples.shift();
     } else if (this.mode === "falling") {
-      this.vy += GRAVITY * dt;
+      this.vy += this.gravityAcceleration * dt;
       this.x += this.vx * dt;
       this.y += this.vy * dt;
       this.area = this.areaAt(this.x + this.w / 2, this.y + this.h / 2);
@@ -601,7 +618,7 @@ export class WindowPhysics {
         // Slow arrivals settle at once; only a real fall bounces (and squashes more than once).
         if (Math.abs(this.vy) > 1100) {
           this.onLand?.(Math.abs(this.vy));
-          this.vy = -this.vy * BOUNCE;
+          this.vy = -this.vy * this.restitution;
         } else {
           if (Math.abs(this.vy) > 120) this.onLand?.(Math.abs(this.vy));
           this.vy = 0;
@@ -614,17 +631,17 @@ export class WindowPhysics {
       if (this.ceilingFree <= 0 && this.y + this.crownNow < this.area.top) {
         this.y = this.area.top - this.crownNow;
         if (this.vy < -250) this.onBounce?.(-this.vy, "top");
-        this.vy = Math.abs(this.vy) * BOUNCE;
+        this.vy = Math.abs(this.vy) * this.restitution;
       }
       if (this.x < left) {
         this.x = left;
         if (this.vx < -250) this.onBounce?.(-this.vx, "left");
-        this.vx = Math.abs(this.vx) * BOUNCE;
+        this.vx = Math.abs(this.vx) * this.restitution;
         this.spin = -this.spin * 0.8;
       } else if (this.x > right) {
         this.x = right;
         if (this.vx > 250) this.onBounce?.(this.vx, "right");
-        this.vx = -Math.abs(this.vx) * BOUNCE;
+        this.vx = -Math.abs(this.vx) * this.restitution;
         this.spin = -this.spin * 0.8;
       }
       if (this.y === floor && Math.abs(this.vx) < SETTLE_SPEED && this.vy === 0) {

@@ -261,3 +261,27 @@ describe("a jump is told apart from a fall", () => {
     expect(p.launch).toBe(null);
   });
 });
+
+it("adjusts gravity and jump velocity coherently at both slider extremes", () => {
+  const slow=buddyOn(AREAS[1],1200),fast=buddyOn(AREAS[1],1200);
+  slow.gravityStrength=.25;fast.gravityStrength=2;
+  slow.spring(1);fast.spring(1);
+  expect(fast.vy/slow.vy).toBeCloseTo(Math.sqrt(8));
+  const sv=slow.vy,fv=fast.vy;slow.step(.01);fast.step(.01);
+  expect((fast.vy-fv)/(slow.vy-sv)).toBeCloseTo(8);
+});
+it("zero bounce removes rebound and maximum bounce retains a bounded fraction", () => {
+  for(const bounce of [0,.65]) {
+    const p=buddyOn(AREAS[1],1200);p.bounciness=bounce;p.mode="falling";p.vy=1500;p.y-=1;
+    p.step(.01);expect(p.vy).toBeCloseTo(-(1500+32)*bounce);
+  }
+});
+it("throw strength scales release velocity without changing the grip position", () => {
+  for(const strength of [.25,2]) {
+    const p=buddyOn(AREAS[1],1200);p.opts.throwable=true;p.throwStrength=strength;p.grab();
+    const now=performance.now();
+    const internal=p as unknown as {samples:Array<{t:number;x:number;y:number}>;release():void};
+    internal.samples=[{t:now-60,x:0,y:0},{t:now-10,x:50,y:-25}];
+    const pos={x:p.x,y:p.y};internal.release();expect(p.vx).toBeCloseTo(1000*strength);expect(p.vy).toBeCloseTo(-500*strength);expect({x:p.x,y:p.y}).toEqual(pos);
+  }
+});

@@ -1,3 +1,4 @@
+import { applyAttack } from "./pose";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { loadCharacter, refreshSkins, rodReport, type BoneName, type Character } from "./character";
@@ -246,7 +247,7 @@ export class Renderer3D implements Renderer {
   private syncClip(input: FrameInput) {
     const c = this.character!;
     const want = input.clip;
-    const key = want ? want.name + "|" + input.state : null;
+    const key = want ? want.name + "|" + input.state + "|" + (input.attack?.start ?? "") : null;
     if (key === this.playing && input.state === this.state) return;
     if (want && c.hasClip(want.name)) {
       c.play(want.name, {
@@ -417,6 +418,7 @@ export class Renderer3D implements Renderer {
     // keep the mixer weighted, so the slump still goes over it.
     const posedAsleep = input.state === "sleep" && clipDriven && !input.clip?.base;
     if (!posedAsleep) applySleep(c, input.t, input.sleepAmount);
+    if (input.attack?.procedural) applyAttack(c, input.attack.kind, input.attack.progress);
     c.update(input.dt);
     this.detectTpose(c, input);
     this.fitCamera(input.dt);

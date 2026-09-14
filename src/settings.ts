@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, ask } from "@tauri-apps/plugin-dialog";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { listPacks, savePackPersona, type Manifest, type PackRef } from "./packs";
 import { LivePreview, thumbnailFor } from "./preview";
@@ -35,6 +35,11 @@ const els = {
   paused: $<HTMLInputElement>("paused"),
   mouse: $<HTMLInputElement>("mouse"),
   physics: $<HTMLInputElement>("physics"),
+  gravityStrength: $<HTMLInputElement>("gravity-strength"),
+  bounciness: $<HTMLInputElement>("bounciness"),
+  throwStrength: $<HTMLInputElement>("throw-strength"),
+  physicsReset: $<HTMLButtonElement>("physics-reset"),
+  ssIntensity: $<HTMLInputElement>("ss-intensity"),
   music: $<HTMLInputElement>("music"),
   sensitivity: $<HTMLInputElement>("sensitivity"),
   sensOut: $<HTMLOutputElement>("sens-out"),
@@ -173,7 +178,9 @@ function showLightingFor(character: string) {
   if (live) live.lighting = v;
 }
 
+let previewSelection = 0;
 async function previewPack(id: string) {
+  const selection = ++previewSelection;
   const pack = packs.find((p) => p.id === id);
   if (!pack) return;
   previewing = id;
@@ -181,12 +188,13 @@ async function previewPack(id: string) {
   for (const b of els.gallery.querySelectorAll("button")) b.classList.toggle("previewing", b.dataset.id === id);
   els.removePack.hidden = pack.bundled;
   els.removePack.textContent = `Remove "${pack.name}"`;
-  const m = await manifestFor(pack);
   try {
+    const m = await manifestFor(pack);
+    if (selection !== previewSelection) return;
     await getLive().show(pack, m);
-    if (m.renderer === "3d") status(`Rig: ${getLive().rigReport}`);
+    if (selection === previewSelection && m.renderer === "3d") status(`Rig: ${getLive().rigReport}`);
   } catch (err) {
-    status(`Preview failed: ${err}`);
+    if (selection === previewSelection) status(`Preview failed: ${err}`);
   }
 }
 
@@ -223,7 +231,7 @@ async function renderGallery() {
     }
   }
   // Thumbnails borrowed the live canvas; show the active pack in it now.
-  await previewPack(settings.character);
+  if (previewing === null) await previewPack(settings.character);
 }
 
 let libraryClips: LibraryClip[] = [];
@@ -264,7 +272,7 @@ async function renderLibrary() {
     play.type = "button";
     play.textContent = "▶";
     play.title = "Preview on the selected character (click again to stop)";
-    play.addEventListener("click", () => void getLive().playClip(c.name, c.url));
+    play.addEventListener("click", () => void getLive().playClip(c.name, c.url).catch(err => status(`Preview failed: ${err}`)));
     playButtons.set(c.name, play);
     const card = document.createElement("div");
     card.className = "clip";
@@ -451,7 +459,7 @@ function render() {
   els.ssSpeed.value = String(settings.screensaverErosionSpeed ?? 20);
   els.ssSpeedOut.value = `${els.ssSpeed.value}%`;
   els.ssVoid.value = String(settings.screensaverVoidSeconds ?? 6);
-  els.ssErosionStyle.value = settings.screensaverErosionStyle ?? "tiles";
+  els.ssErosionStyle.value = settings.screensaverErosionStyle ?? "cracks";
   els.ssSounds.checked = settings.screensaverSounds ?? false;
   els.ssBackdrop.value = settings.screensaverBackdrop ?? "";
   els.ssAfter.value = String(settings.screensaverAfterMin ?? 0);
@@ -461,6 +469,11 @@ function render() {
   els.paused.checked = settings.paused;
   els.mouse.checked = settings.mouseEnabled;
   els.physics.checked = settings.physicsEnabled;
+  els.gravityStrength.value = String(settings.gravityStrength ?? 1);
+  els.bounciness.value = String(settings.bounciness ?? 0.26);
+  els.throwStrength.value = String(settings.throwStrength ?? 1);
+  els.ssIntensity.value = String(settings.screensaverIntensity ?? 70);
+  renderPhysicsLabels();
   els.music.checked = settings.musicEnabled;
   els.sensitivity.value = String(settings.musicBeatLock);
   els.sensOut.value = beatLockLabel(settings.musicBeatLock);
@@ -801,7 +814,18 @@ function wireVoicePreview() {
 
 /** The screensaver options: its sounds, another screensaver to play behind it, and whether it
  * is the one Windows runs on idle. */
+function renderPhysicsLabels() {
+  $<HTMLOutputElement>("gravity-out").value = `${Math.round(Number(els.gravityStrength.value) * 100)}%`;
+  $<HTMLOutputElement>("bounce-out").value = `${Math.round(Number(els.bounciness.value) * 100)}%`;
+  $<HTMLOutputElement>("throw-out").value = `${Math.round(Number(els.throwStrength.value) * 100)}%`;
+  $<HTMLOutputElement>("ss-intensity-out").value = `${els.ssIntensity.value}%`;
+}
 function wireScreensaver() {
+  for (const [element, key] of [[els.gravityStrength, "gravityStrength"], [els.bounciness, "bounciness"], [els.throwStrength, "throwStrength"], [els.ssIntensity, "screensaverIntensity"]] as const) {
+    element.addEventListener("input", renderPhysicsLabels);
+    element.addEventListener("change", () => void commit({ [key]: Number(element.value) }));
+  }
+  els.physicsReset.addEventListener("click", () => void commit({ gravityStrength: 1, bounciness: 0.26, throwStrength: 1 }));
   els.ssSpeed.addEventListener("input", () => { els.ssSpeedOut.value = `${els.ssSpeed.value}%`; });
   els.ssSpeed.addEventListener("change", () => void commit({ screensaverErosionSpeed: Number(els.ssSpeed.value) }));
   els.ssVoid.addEventListener("change", () => void commit({ screensaverVoidSeconds: Math.max(0, Math.min(120, Number(els.ssVoid.value) || 0)) }));
@@ -876,6 +900,11 @@ function wireTalk() {
   els.chatVoice.addEventListener("change", () => void commit({ chatVoice: els.chatVoice.checked }));
   els.chatLines.addEventListener("change", () => void commit({ chatGenerateLines: els.chatLines.checked }));
   els.chatCap.addEventListener("change", () => void commit({ chatDailyCap: Math.max(0, Math.round(Number(els.chatCap.value) || 0)) }));
+  $<HTMLSelectElement>("speech-setup").addEventListener("change", async e => {
+    if ((e.target as HTMLSelectElement).value !== "vibe") return;
+    await commit({chatSttEndpoint: "http://127.0.0.1:51136/v1", chatSttModel: "whisper-1"});
+    status("Vibe selected. Check its API server port and load a model in Vibe before using the microphone.");
+  });
   els.chatSttEndpoint.addEventListener("change", () => void commit({ chatSttEndpoint: els.chatSttEndpoint.value.trim() }));
   wireScreensaver();
   wireVoicePreview();
@@ -921,9 +950,22 @@ function wireTalk() {
     }
   });
   els.chatModelsRefresh.addEventListener("click", () => void refreshModels());
-  els.personality.addEventListener("change", () => {
+  els.personality.addEventListener("change", async () => {
+    const previous = settings.personality;
+    const selected = els.personality.value;
+    els.personality.disabled = true;
+    try {
+    if (!els.pedit.hidden && editorDirty() && !(await ask("Discard unsaved personality edits and switch profiles?", { title: "Unsaved personality edits", kind: "warning", okLabel: "Discard and switch", cancelLabel: "Cancel" }))) {
+      els.personality.value = previous;
+      return;
+    }
+    await commit({ personality: selected });
     els.personalityHint.textContent = els.personality.selectedOptions[0]?.dataset.desc ?? "";
-    void commit({ personality: els.personality.value });
+    if (!els.pedit.hidden) {
+      const profile = profiles.find(p => p.id === selected);
+      if (profile) showEditor(profile);
+    }
+    } finally { els.personality.disabled = false; }
   });
   void fillPersonalities();
   wirePersonalityEditor();
@@ -1143,6 +1185,11 @@ function editorToProfile(id: string): Personality {
   };
 }
 
+let editorBaseline = "";
+function editorSnapshot() {
+  return JSON.stringify(Array.from(els.pedit.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>("input, textarea")).map(el => el.value));
+}
+function editorDirty() { return editorSnapshot() !== editorBaseline; }
 function showEditor(p: Personality) {
   els.pedit.hidden = false;
   // "As the character" shows what the current pack actually uses, so it can be copied and tweaked.
@@ -1184,6 +1231,7 @@ function showEditor(p: Personality) {
       : p.id === "pack"
         ? "This character ships with the app, so its own personality is read-only. Copy it to a new profile to change anything."
         : "Built in and read-only. Copy it to a new profile to change anything.";
+  editorBaseline = editorSnapshot();
 }
 
 /** The current character when it is one the user imported, whose manifest we may write to. */

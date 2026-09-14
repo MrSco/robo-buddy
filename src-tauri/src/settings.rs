@@ -22,6 +22,10 @@ pub struct Settings {
     pub music_enabled: bool,
     pub mouse_enabled: bool,
     pub physics_enabled: bool,
+    pub gravity_strength: f64,
+    pub bounciness: f64,
+    pub throw_strength: f64,
+    pub screensaver_intensity: f64,
     /// Level (0..1) a track must exceed before dancing starts.
     /// How eagerly he locks onto a beat, 0..1; loudness no longer gates dancing.
     pub music_beat_lock: f64,
@@ -105,6 +109,10 @@ impl Default for Settings {
             music_enabled: true,
             mouse_enabled: true,
             physics_enabled: true,
+            gravity_strength: 1.0,
+            bounciness: 0.26,
+            throw_strength: 1.0,
+            screensaver_intensity: 70.0,
             music_beat_lock: 0.7,
             click_through: "pixel".into(),
             autostart: false,
@@ -115,7 +123,7 @@ impl Default for Settings {
             screensaver_backdrop: String::new(),
             screensaver_backdrop_mode: String::new(),
             screensaver_after_min: 0.0,
-            screensaver_erosion_style: "tiles".into(),
+            screensaver_erosion_style: "cracks".into(),
             screensaver_erosion_speed: 20.0,
             screensaver_void_seconds: 6.0,
             bubbles_enabled: true,
@@ -184,6 +192,10 @@ pub fn get_settings(state: tauri::State<SettingsState>) -> Settings {
 
 #[tauri::command]
 pub fn set_settings(app: AppHandle, state: tauri::State<SettingsState>, mut settings: Settings) {
+    settings.gravity_strength = settings.gravity_strength.clamp(0.25, 2.0);
+    settings.bounciness = settings.bounciness.clamp(0.0, 0.65);
+    settings.throw_strength = settings.throw_strength.clamp(0.25, 2.0);
+    settings.screensaver_intensity = settings.screensaver_intensity.clamp(0.0, 100.0);
     {
         let mut cur = state.0.lock().unwrap();
         settings.screensaver_after_min = cur.screensaver_after_min;

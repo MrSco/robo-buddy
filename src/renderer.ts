@@ -51,6 +51,7 @@ export interface FrameInput {
   flail: boolean;
   /** Webcam pose to copy this frame (M7), or null. */
   mirror: MirrorPose | null;
+  attack?: { kind: "punch" | "kick" | "throw"; progress: number; procedural: boolean; start: number } | null;
 }
 
 export interface Renderer {

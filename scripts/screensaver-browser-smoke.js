@@ -4,7 +4,7 @@ async page => {
     const tab = await page.context().newPage();
     await tab.addInitScript(({ index }) => {
       const callbacks = new Map(); let id = 0;
-      window.smoke = { now: 100000, events: {}, surfaces: [], logs: [] };
+      window.smoke = { now: 100000, events: {}, surfaces: [], targets: [], logs: [] };
       Date.now = () => window.smoke.now;
       window.__TAURI_INTERNALS__ = {
         metadata: { currentWindow: { label: `screensaver-${index}` } },
@@ -19,6 +19,8 @@ async page => {
           }
           if (cmd === 'get_settings') return {screensaverErosionStyle:'cracks',screensaverErosionSpeed:0};
           if (cmd === 'plugin:event|listen') {window.smoke.events[args.event]=callbacks.get(args.handler);return 1;}
+          if (cmd === 'buddy_rect') return {x:(index-1)*600+100,y:(index===1?0:-20)+100,width:100,height:200,punch:0,punchSeq:0,barging:false};
+          if (cmd === 'plugin:event|emit_to' && args.event === 'screensaver-targets') window.smoke.targets=args.payload.targets;
           if (cmd === 'screensaver_surfaces') window.smoke.surfaces=args.surfaces;
           if (cmd === 'append_log') window.smoke.logs.push(args.line);
           return null;
@@ -34,6 +36,11 @@ async page => {
     });
     const initial=await sample();
     if (!initial.lit) throw new Error('Snapshot missing');
+    await tab.waitForTimeout(180);
+    await tab.evaluate(() => window.smoke.events['buddy-strike']({payload:{kind:'punch',dir:1}}));
+    await tab.waitForFunction(() => window.smoke.targets.some(t=>t.debris));
+    const debrisCount=await tab.evaluate(()=>window.smoke.targets.filter(t=>t.debris).length);
+    if(await tab.evaluate(()=>window.smoke.surfaces.some(s=>s.hwnd%1000>=100)))throw Error('Debris became climbable');
     await tab.evaluate(() => window.smoke.events['screensaver-crt']({payload:{startedAt:100000,voidSeconds:2}}));
     await tab.evaluate(() => {window.smoke.now=101100;});
     await tab.waitForTimeout(100);
@@ -46,8 +53,9 @@ async page => {
     await tab.evaluate(() => {window.smoke.now=103351;});
     await tab.waitForTimeout(180);
     const restored=await sample();
+    if(await tab.evaluate(()=>window.smoke.targets.some(t=>t.debris)))throw Error('Restore retained debris');
     if(!restored.lit || !restored.surfaces) throw new Error('Snapshot/surfaces did not restore');
-    results.push({index,initial,dot,hold,restored});await tab.close();
+    results.push({index,debrisCount,initial,dot,hold,restored});await tab.close();
   }
   return results;
 }

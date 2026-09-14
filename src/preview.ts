@@ -1,3 +1,4 @@
+import { PreviewLoading } from "./preview-loading";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { loadCharacter, refreshSkins, type Character } from "./character";
@@ -23,12 +24,15 @@ export class LivePreview {
   private clock = new THREE.Clock();
   private raf = 0;
   private token = 0;
+  private clipToken = 0;
+  private loading: PreviewLoading;
   private img: HTMLImageElement | null = null;
   /** Latest webcam pose to show instead of the idle, or null. */
   mirror: MirrorPose | null = null;
   private applier: MirrorApplier | null = null;
 
   constructor(private canvas: HTMLCanvasElement) {
+    this.loading = new PreviewLoading(canvas);
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -69,8 +73,11 @@ export class LivePreview {
 
   /** Show a pack. 3D packs animate; 2D packs show their first frame as an image. */
   async show(pack: PackRef, manifest: Manifest) {
-    const token = ++this.token;
     this.stop();
+    const token = this.token;
+    const ticket = this.loading.begin();
+    let failure: unknown;
+    try {
     if (manifest.renderer !== "3d") {
       const src = await thumbnail2d(pack, manifest);
       if (token !== this.token) return;
@@ -104,6 +111,8 @@ export class LivePreview {
       this.raf = requestAnimationFrame(loop);
     };
     loop();
+    } catch (error) { failure = error; throw error; }
+    finally { if (token === this.token) this.loading.finish(ticket, failure); }
   }
 
   /** Name of the library clip being previewed, or null while the idle plays. */
@@ -113,6 +122,8 @@ export class LivePreview {
 
   /** Back to the pack's idle clip. */
   stopPreview() {
+    ++this.clipToken;
+    this.loading.cancel();
     clearTimeout(this.revertTimer);
     const c = this.character;
     this.previewing = null;
@@ -133,16 +144,22 @@ export class LivePreview {
       this.stopPreview();
       return;
     }
+    const clipToken = ++this.clipToken;
+    const ticket = this.loading.begin();
+    let failure: unknown;
+    try {
     if (!c.hasClip(name)) {
       const { loadModel } = await import("./character");
       const { buildRig, canonicalRig, hasOwnSkeleton } = await import("./retarget");
       const extra = await loadModel(url);
       const first = extra.animations[0];
-      if (!first || c !== this.character) return;
+      if (!first) throw new Error("This file contains no animation.");
+      if (c !== this.character || clipToken !== this.clipToken) return;
       const source = hasOwnSkeleton(extra.root) ? buildRig(extra.root) : await canonicalRig();
+      if (c !== this.character || clipToken !== this.clipToken) return;
       c.addClip(name, first, source);
     }
-    if (c !== this.character) return;
+    if (c !== this.character || clipToken !== this.clipToken) return;
     clearTimeout(this.revertTimer);
     c.play(name, { loop: true });
     this.previewing = name;
@@ -151,6 +168,8 @@ export class LivePreview {
     this.revertTimer = window.setTimeout(() => {
       if (this.previewing === name) this.stopPreview();
     }, seconds * 1000);
+    } catch (error) { failure = error; throw error; }
+    finally { this.loading.finish(ticket, failure); }
   }
 
   /** Render one posed frame of a character (idle clip advanced a little) and return a PNG. */
@@ -194,8 +213,16 @@ export class LivePreview {
   }
 
   stop() {
+    ++this.token;
+    this.previewing = null;
+    this.onPreviewChange?.(null);
+    ++this.clipToken;
+    clearTimeout(this.revertTimer);
+    this.loading.cancel();
+    this.hideImage();
     cancelAnimationFrame(this.raf);
     if (this.character) {
+      this.scene.remove(this.character.root);
       this.character.dispose();
       this.character = null;
     }

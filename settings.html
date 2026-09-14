@@ -62,6 +62,11 @@
               <label class="check" title="Freeze everything: no dancing, no looking at the mouse, no wandering. He still shows and can be dragged."><input id="paused" type="checkbox" /> Pause all reactions</label>
               <label class="check" title="He turns his head to follow the mouse pointer anywhere on the desktop."><input id="mouse" type="checkbox" /> Watch the mouse</label>
               <label class="check" title="Drop him and he falls to the taskbar; fling him and he flies, tumbles and lands. Off: he stays where you put him."><input id="physics" type="checkbox" /> Gravity and throwing</label>
+              <label class="field"><span>Gravity <output id="gravity-out"></output></span><input id="gravity-strength" type="range" min="0.25" max="2" step="0.05" /></label>
+              <label class="field"><span>Bounciness <output id="bounce-out"></output></span><input id="bounciness" type="range" min="0" max="0.65" step="0.01" /></label>
+              <label class="field"><span>Throw strength <output id="throw-out"></output></span><input id="throw-strength" type="range" min="0.25" max="2" step="0.05" /></label>
+              <button id="physics-reset" type="button">Reset physics</button>
+              <p class="hint">These control Buddy on the desktop and in the screensaver. Window pieces keep their own weight.</p>
               <label class="check" title="Short sound effects on pokes, landings, waking and greetings, when the character pack ships them."><input id="sounds" type="checkbox" /> Sounds</label>
               <label class="check" title="The little speech bubble above his head: greetings, reactions, idle remarks and chat replies."><input id="bubbles" type="checkbox" /> Speech bubbles</label>
               <label class="check" title="He notices when you type a lot (he texts along) and reacts to Ctrl+S and Ctrl+Z. Only key counts and those two shortcuts are seen, never what you type."><input id="keyboard" type="checkbox" /> React to typing</label>
@@ -213,6 +218,8 @@
 
               <div class="group">
                 <h2>Ears</h2>
+                <label class="field"><span>Speech setup</span><select id="speech-setup"><option value="current">Current / custom endpoint</option><option value="vibe">Vibe (local API server)</option></select></label>
+                <p class="hint">For Vibe, enable its API server and load a model in Vibe. Copy its server address below, ending in /v1; the port may change. You can also focus Buddy's chat input and press Windows + H to dictate with Windows, then press Send.</p>
                 <label class="field" title="A Whisper-style model at the speech endpoint. Groq offers whisper-large-v3-turbo. Leave blank to hide the microphone button."><span>Speech model (blank = no microphone)</span>
                   <div class="row">
                     <input id="chat-stt" type="text" list="stt-models" spellcheck="false" class="grow" />
@@ -350,6 +357,8 @@
               <label class="field"><span>Start after idle (minutes; 0 = off)</span><input id="ss-after" type="number" min="0" max="120" step="1" /></label>
               <p class="hint">While Buddy runs, he handles the screensaver. When he closes, Windows runs your usual saver. Password-protected Windows screensavers keep control.</p>
               <p class="hint" id="ss-win-status"></p>
+              <label class="field"><span>Havoc intensity <output id="ss-intensity-out"></output></span><input id="ss-intensity" type="range" min="0" max="100" step="1" /></label>
+              <p class="hint">Higher means more frequent jumps and attacks. He still roams across your screens.</p>
               <label class="field"><span>Desktop destruction</span><select id="ss-erosion-style"><option value="tiles">Falling grid tiles</option><option value="cracks">Cracked glass cutouts</option></select></label>
               <label class="field"><span>Ambient erosion speed <output id="ss-speed-out">20%</output></span><input id="ss-speed" type="range" min="0" max="100" step="1" /></label>
               <p class="hint">Slow lets the buddy do most of the damage. At 0%, only his hits break the desktop.</p>

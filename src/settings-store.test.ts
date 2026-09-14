@@ -72,3 +72,13 @@ describe("lightingFor", () => {
     expect(lightingFor(old, "rocco")).toBe(DEFAULT_SETTINGS.lighting);
   });
 });
+
+it("keeps fresh-profile polish defaults aligned with native persistence", () => {
+  expect(DEFAULT_SETTINGS.screensaverErosionStyle).toBe("cracks");
+  expect(DEFAULT_SETTINGS.screensaverErosionSpeed).toBe(20);
+  for (const [key, field, value] of [["gravityStrength","gravity_strength",1],["bounciness","bounciness",.26],["throwStrength","throw_strength",1],["screensaverIntensity","screensaver_intensity",70]] as const) {
+    expect(DEFAULT_SETTINGS[key]).toBe(value);
+    expect(RUST).toMatch(new RegExp(`${field}: ${value}(?:\\.0)?[,]`));
+  }
+  expect(RUST).toContain('screensaver_erosion_style: "cracks".into()');
+});

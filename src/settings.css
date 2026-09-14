@@ -677,3 +677,8 @@ details.adv summary {
 }
 
 #ss-custom-backdrop[hidden] { display: none; }
+
+.preview-loading { position: absolute; inset: 0; display: grid; place-content: center; gap: 12px; text-align: center; background: #20242ddd; color: #eee; z-index: 2; pointer-events: none; }
+.preview-loading[hidden] { display: none; }
+.preview-loading:not(.failed)::before { content: ""; width: 25px; height: 25px; margin: auto; border: 3px solid #ffffff35; border-top-color: #a6c8ff; border-radius: 50%; animation: preview-spin .8s linear infinite; }
+@keyframes preview-spin { to { transform: rotate(360deg); } }

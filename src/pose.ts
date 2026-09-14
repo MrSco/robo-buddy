@@ -285,3 +285,25 @@ export function applyCrouch(c: Character, drop: number) {
   rotateWorld(c.bone("chest") ?? c.bone("spine"), crouchAxis, a * 0.3);
   c.root.position.y -= len * (1 - Math.cos(a));
 }
+
+/** A bounded action overlay for rigs without a dedicated kick/throw clip. */
+export function applyAttack(c: Character, kind: "punch" | "kick" | "throw", progress: number) {
+  const p = Math.max(0, Math.min(1, progress));
+  const pulse = Math.sin(Math.PI * (p <= .8 ? p / 1.6 : .5 + (p - .8) * 2.5));
+  if (kind === "kick") {
+    poseLocal(c, c.bone("rightUpperLeg"), -1.15 * pulse, 0, 0);
+    poseLocal(c, c.bone("rightLowerLeg"), .35 * pulse, 0, 0);
+    poseLocal(c, c.bone("chest") ?? c.bone("spine"), .12 * pulse, 0, 0);
+  } else if (kind === "throw") {
+    poseLocal(c, c.bone("leftUpperArm"), -1.3 * pulse, 0, -.8);
+    poseLocal(c, c.bone("rightUpperArm"), -1.3 * pulse, 0, .8);
+    poseLocal(c, c.bone("leftLowerArm"), -.6 * pulse, 0, 0);
+    poseLocal(c, c.bone("rightLowerArm"), -.6 * pulse, 0, 0);
+  } else {
+    const arm = c.bone("rightUpperArm");
+    if (arm) {
+      poseLocal(c, arm, -1.1 * pulse, 0, .65);
+      poseLocal(c, c.bone("rightLowerArm"), -.3 * pulse, 0, 0);
+    }
+  }
+}

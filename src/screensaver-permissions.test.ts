@@ -7,3 +7,9 @@ it("grants native screensaver windows access to the event bridge", () => {
   expect(capability.windows).toContain("screensaver-*");
   expect(capability.permissions).toContain("core:event:default");
 });
+
+it("permits the native unsaved-edit dialog", () => {
+  const capability = JSON.parse(readFileSync(new URL("../src-tauri/capabilities/default.json", import.meta.url), "utf8"));
+  expect(capability.windows).toContain("settings");
+  expect(capability.permissions).toContain("dialog:allow-message");
+});

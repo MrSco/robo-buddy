@@ -1,7 +1,9 @@
+import { Havoc, STRIKE_CONTACT, type StrikeKind, type AttackTarget, type HavocAction } from "./havoc";
+import { SimulationClock } from "./simulation-clock";
 import { ScreensaverDance } from "./screensaver-dance";
 import * as THREE from "three";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { listen, emit } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { Music } from "./audio";
 import { Behavior, type ClipChoice } from "./behavior";
@@ -108,6 +110,14 @@ let dancedThisSession = false;
 let screensaverOn = false;
 let hopCount = 0;
 let punchCount = 0;
+function attackClip(kind: StrikeKind) {
+  const names = kind === "kick" ? ["Kick", "Kick_Front"] : kind === "throw" ? ["Throw", "Throw_Object"] : ["Punch_Cross", "Punch_Jab", "Sword_Attack"];
+  return names.find(n => (renderer?.clipDuration(n) ?? 0) > 0);
+}
+const havoc = new Havoc(Math.random, kind => {const name=attackClip(kind);return name ? renderer!.clipDuration(name) : kind === "throw" ? 1.25 : .85;});
+let timedPunch: { dir: number; contact: number; end: number; fired: boolean } | null = null;
+let havocAction: HavocAction | null = null;
+const attackTargets = new Map<number, AttackTarget[]>();
 /**
  * He is running at a window to shove it, and the screensaver has been told so. Only then does
  * his speed move anything: told nothing, the page would knock a window loose every time he
@@ -227,12 +237,18 @@ async function boot() {
       mirrorPose = e.payload;
       lastPoseAt = clock.elapsedTime;
     });
+    await listen<{ index: number; targets: AttackTarget[] }>("screensaver-targets", e => {
+      if (screensaverOn) attackTargets.set(e.payload.index, e.payload.targets);
+    });
     await onSurfaces((list) => {
       if (physics) physics.surfaces = list;
     });
     // Screensaver: nobody is watching a desk toy stand still, so he puts on a show.
     await listen<boolean>("screensaver", (e) => {
       screensaverOn = e.payload;
+      attackTargets.clear();
+      havocAction = null;
+      timedPunch = null;
       behavior.energetic = e.payload;
       if (physics) physics.roam = e.payload;
       // A screensaver runs in an empty room; thuds and boings there are just noise.
@@ -252,6 +268,7 @@ async function boot() {
       }
     });
     await onKeys((k) => {
+      if (hiddenByFullscreen) return;
       keyEvents++;
       typingRate = typingRate * 0.6 + (k.presses / 0.25) * 0.4;
       if (k.presses > 0) activity();
@@ -402,9 +419,14 @@ async function applyVisibility() {
   const shouldHide = fullscreenActive && settings.hideWhenFullscreen && !settings.paused && !screensaverOn;
   if (shouldHide && !hiddenByFullscreen) {
     hiddenByFullscreen = true;
+    clock.setPaused(true);
+    sounds.enabled = false;
+    if (!talk.open && !voice.speaking && !live.speaking) bubble.hide();
     await win.hide();
   } else if (!shouldHide && hiddenByFullscreen) {
     hiddenByFullscreen = false;
+    clock.setPaused(false);
+    sounds.enabled = settings.soundsEnabled && (!screensaverOn || settings.screensaverSounds);
     await win.show();
   }
 }
@@ -447,13 +469,16 @@ async function importDropped(path: string) {
 
 function applySettings(s: Settings) {
   if (physics) {
+    physics.gravityStrength = Math.max(0.25, Math.min(2, s.gravityStrength ?? 1));
+    physics.bounciness = Math.max(0, Math.min(0.65, s.bounciness ?? 0.26));
+    physics.throwStrength = Math.max(0.25, Math.min(2, s.throwStrength ?? 1));
     const phys = manifest?.reactions.physics ?? {};
     physics.opts.gravity = s.physicsEnabled && (phys.gravity ?? true);
     physics.opts.throwable = s.physicsEnabled && (phys.throwable ?? true);
     if (physics.opts.gravity && physics.mode === "rest") physics.mode = "falling";
   }
   if (music) music.lockSeconds = beatLockSeconds(s.musicBeatLock);
-  sounds.enabled = s.soundsEnabled && (!screensaverOn || s.screensaverSounds);
+  sounds.enabled = !hiddenByFullscreen && s.soundsEnabled && (!screensaverOn || s.screensaverSounds);
   voice.enabled = s.chatVoice;
   voice.engine = s.ttsEngine === "piper" ? "piper" : "windows";
   behavior.opts = { wander: s.wanderEnabled, danceMode: s.danceMode };
@@ -465,7 +490,7 @@ function applySettings(s: Settings) {
 }
 
 function speak(event: NonNullable<Manifest["lines"]> extends Partial<Record<infer K, string[]>> ? K : never, seconds = 2.5) {
-  if (!settings.bubblesEnabled || !manifest) return;
+  if (hiddenByFullscreen || !settings.bubblesEnabled || !manifest) return;
   bubble.say(linesFor(event), seconds, clock.elapsedTime);
 }
 
@@ -832,6 +857,11 @@ function resolveState(t: number, act: ReturnType<Behavior["update"]>): { state: 
     const hangFirst = physics.mantleKind === "pull" && physics.mantleProgress < 0.45;
     return { state: "mantle", clip: hangFirst ? behavior.stateClip("hang") : (behavior.stateClip("land") ?? behavior.stateClip("idle")) };
   }
+  if (havocAction) {
+    const name = attackClip(havocAction.kind);
+    flailNow = false;
+    return { state: "fidget", clip: name ? { name, loop: false } : behavior.stateClip("idle") };
+  }
   if (physics?.airborne) {
     if (airborneSince < 0) airborneSince = t;
     // A push-off of his own reads as a jump from the very first frame: the crouch and the
@@ -911,7 +941,7 @@ function debugTitle(t: number) {
   getCurrentWindow().setTitle(title).catch(() => {});
 }
 
-const clock = new THREE.Clock();
+const clock = new SimulationClock();
 function frame() {
   const dt = Math.min(clock.getDelta(), 0.1);
   const t = clock.elapsedTime;
@@ -994,8 +1024,25 @@ function frame() {
     }
   }
 
+  if (timedPunch) {
+    if (!screensaverOn || paused || asleep || physics?.mode === "held" || danceAmount >= .5 || t >= timedPunch.end) timedPunch = null;
+    else if (!timedPunch.fired && t >= timedPunch.contact) {
+      timedPunch.fired=true; punchCount++; sounds.play("bump");
+      void emit("buddy-strike", {kind:"punch",dir:timedPunch.dir}).catch(() => {});
+    }
+  }
+  havocAction = havoc.update(t, !timedPunch && screensaverOn && !paused && !asleep && !!physics &&
+    (physics.mode === "rest" || (physics.airborne && !!physics.launch)) && danceAmount < .5,
+    settings.screensaverIntensity ?? 70, physics?.x ?? 0, physics?.y ?? 0, physics?.w ?? 320, physics?.h ?? 440,
+    [...attackTargets.values()].flat(), physics?.airborne ?? false);
+  if (havocAction?.jump && physics) physics.spring(havocAction.dir);
+  if (havocAction?.impact) {
+    punchCount++;
+    sounds.play("bump");
+    void emit("buddy-strike", { kind: havocAction.kind, dir: havocAction.dir }).catch(() => {});
+  }
   // Idle-time behaviour: variants, fidgets, wandering.
-  const free =
+  const free = !havocAction &&
     !paused && !asleep && !!physics && physics.mode === "rest" && !physics.airborne && danceAmount < 0.5 && pokeUntil <= t;
   const act = behavior.update({
     t,
@@ -1018,7 +1065,7 @@ function frame() {
   lastAct = act.kind;
   lastFree = free;
   lastClip = resolved.clip?.name ?? "-";
-  let targetFacing = 0;
+  let targetFacing = havocAction ? havocAction.dir * Math.PI / 2 : 0;
   if (currentState === "walk" && act.kind === "walk" && physics) {
     const dir = Math.sign(act.targetX - physics.x) || 1;
     targetFacing = (dir * Math.PI) / 2;
@@ -1037,17 +1084,14 @@ function frame() {
   if (behavior.pendingPunch !== null) {
     const dir = behavior.pendingPunch;
     behavior.pendingPunch = null;
-    punchCount++;
+    const duration = Math.max(.4, resolved.clip ? renderer?.clipDuration(resolved.clip.name) ?? .85 : .85);
+    timedPunch = {dir, contact:t+duration*STRIKE_CONTACT, end:t+duration, fired:false};
     holdFacing = (dir * Math.PI) / 2;
-    holdFacingUntil = t + 1.2;
-    sounds.play("bump");
-    // The screensaver reads this on its next poll and sends whatever he hit flying. Outside the
-    // screensaver nothing is listening, and the punch is just a punch.
-    void invoke("buddy_punch", { dir }).catch(() => {});
+    holdFacingUntil = t + duration;
   }
-  if (t < holdFacingUntil) targetFacing = holdFacing;
+  if (!havocAction && t < holdFacingUntil) targetFacing = holdFacing;
   facing = targetFacing;
-  const bargeNow = screensaverOn && act.kind === "walk" && act.then === "barge";
+  const bargeNow = screensaverOn && !havocAction && !timedPunch && act.kind === "walk" && act.then === "barge";
   if (bargeNow !== barging) {
     barging = bargeNow;
     void invoke("buddy_barge", { on: barging }).catch(() => {});
@@ -1077,6 +1121,7 @@ function frame() {
       talking: voice.speaking || live.speaking,
       flail: flailNow,
       mirror: currentState === "mirror" ? mirrorPose : null,
+      attack: havocAction ? { start: havocAction.start, kind: havocAction.kind, procedural: !attackClip(havocAction.kind), progress: (t - havocAction.start) / havocAction.duration } : null,
     };
     renderer.frame(input);
   }
@@ -1105,6 +1150,12 @@ function frame() {
 let frameErrors = 0;
 let frameSkip = 0;
 function loop() {
+  if (hiddenByFullscreen) {
+    clock.getDelta();
+    // Conversations use their own audio/network callbacks and remain active.
+    requestAnimationFrame(loop);
+    return;
+  }
   // Power saving: asleep or hidden, only every third frame is processed.
   const lazy = (asleep && sleepAmount > 0.99) || hiddenByFullscreen;
   if (lazy && frameSkip++ % 3 !== 0) {

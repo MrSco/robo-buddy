@@ -290,6 +290,7 @@ export class TalkBox {
     this.input.type = "text";
     this.input.placeholder = "Say something… (Esc closes)";
     this.input.maxLength = 400;
+    this.input.title = "Type here, or focus this box and press Windows + H to use Windows voice typing.";
     this.send = document.createElement("button");
     this.send.type = "button";
     this.send.textContent = "➤";
@@ -421,11 +422,13 @@ export class TalkBox {
   private async submit(text = this.input.value) {
     const line = text.trim();
     if (!line || this.busy || !this.onSend) return;
-    this.input.value = "";
+    this.input.value = line;
+    this.input.title = `You: ${line}`;
     this.setBusy(true);
     this.remember({ who: "you", text: line });
     try {
       await this.onSend(line);
+      this.input.value = "";
     } finally {
       this.setBusy(false);
       this.touch();

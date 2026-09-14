@@ -15,7 +15,12 @@ const DEFAULT_SOUNDS: Partial<Record<SoundEvent, string>> = {
 /** Preloaded per-pack sound effects, with the app's defaults behind them. */
 export class Sounds {
   private clips = new Map<SoundEvent, HTMLAudioElement>();
-  enabled = true;
+  private active = true;
+  get enabled() { return this.active; }
+  set enabled(value: boolean) {
+    this.active = value;
+    if (!value) for (const clip of this.clips.values()) { clip.pause(); clip.currentTime = 0; }
+  }
   volume = 0.6;
   /** Dev: the last few events played, newest last, for the status line. */
   last = "-";

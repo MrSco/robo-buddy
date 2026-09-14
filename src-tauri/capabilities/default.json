@@ -19,6 +19,7 @@
     "core:window:allow-set-title",
     "core:window:allow-scale-factor",
     "dialog:allow-open",
+    "dialog:allow-message",
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
