@@ -50,6 +50,15 @@ export class Renderer3D implements Renderer {
   /** Pendulum state while held: angle and angular velocity (radians). */
   private swing = 0;
   private swingVel = 0;
+  /**
+   * How far above his feet the cursor has hold of him, while it has hold of his head or his
+   * body. The swing turns the whole model about its own origin, which sits at his feet, so
+   * without this the one point the cursor is holding is the one that travels furthest: grab
+   * him by the chest, drag sideways, and his chest slid out from under the pointer while his
+   * feet stayed put. A grip on a limb does not need it, because the held limb is re-aimed at
+   * the cursor and a leg hold already moves the pivot to the top.
+   */
+  private gripPivot = 0;
   private heldAmount = 0;
   private flipAmount = 0;
   private springs = new LimbSprings();
@@ -269,6 +278,8 @@ export class Renderer3D implements Renderer {
     const grab = input.state === "dragged" ? input.grab : null;
     if (grab) this.lastGrab = grab.part;
     const limbHold = !!grab && grab.part !== "head" && grab.part !== "torso";
+    const gripTarget = grab && !limbHold ? this.baseSize.y * (grab.part === "head" ? 0.92 : 0.6) : 0;
+    this.gripPivot += (gripTarget - this.gripPivot) * Math.min(1, input.dt * 10);
     const down = input.state === "down";
     // Held by a limb the hanging clip still gives the body its slack base; the held limb and
     // the free ones are re-aimed on top of it, so the dance never keeps going in his hands.
@@ -383,6 +394,12 @@ export class Renderer3D implements Renderer {
     }
     // Keep the feet on the floor when upright; when flipped, the pivot moves to the top.
     root.position.y += this.flipAmount * (this.baseSize.y * 0.98);
+    // Swing about the point being held rather than about his feet, so what the cursor has hold
+    // of stays under the cursor and the rest of him is what swings.
+    if (this.gripPivot > 0.001) {
+      root.position.x += this.gripPivot * Math.sin(root.rotation.z);
+      root.position.y += this.gripPivot * (1 - Math.cos(root.rotation.z));
+    }
     // Turn to face along the floor while walking, back to the viewer otherwise.
     this.facing += (input.facing - this.facing) * Math.min(1, input.dt * 8);
     root.rotation.y = this.facing;
