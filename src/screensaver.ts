@@ -426,17 +426,10 @@ function carve(s: Sprite) {
   if (s.carved) return;
   s.carved = true;
   if (!s.outline) return;
-  // Clipped where it stands, so whatever cracks it has already taken survive being reshaped;
-  // rebuilding from the original picture wiped them.
-  const cc = s.cut.getContext("2d")!;
-  cc.save();
-  cc.globalCompositeOperation = "destination-in";
-  cc.fill(outlinePath(s.outline, s.cut.width, s.cut.height));
-  cc.restore();
-  // The corners it did not take with it stay stuck to the screen, so the gap left behind is the
-  // same broken shape as the piece rather than the square the window used to occupy. Painted
-  // from the damaged copy, not the original picture, so cracks it already had are in the
-  // remnant too. Only the working copy: a restore puts the pristine picture back, whole.
+  // What the piece does not take with it stays stuck to the screen, so the gap it leaves is its
+  // own broken shape rather than the square the window filled. Taken before the clip below:
+  // built afterwards it is the clipped window minus the very shape it was clipped to, which is
+  // nothing at all, and the corners of every square hole stayed black.
   if (erodedCtx) {
     const remnant = surface(s.w, s.h);
     const rc = remnant.getContext("2d")!;
@@ -446,6 +439,13 @@ function carve(s: Sprite) {
     erodedCtx.drawImage(remnant, s.homeX, s.homeY);
     remnant.width = remnant.height = 1;
   }
+  // Now the piece itself, clipped where it stands so cracks it has already taken survive being
+  // reshaped; rebuilding it from the original picture wiped them.
+  const cc = s.cut.getContext("2d")!;
+  cc.save();
+  cc.globalCompositeOperation = "destination-in";
+  cc.fill(outlinePath(s.outline, s.cut.width, s.cut.height));
+  cc.restore();
 }
 
 /**
