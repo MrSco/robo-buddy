@@ -1,5 +1,5 @@
 import { Debris } from "./screensaver-debris";
-import { windowOutline, outlinePath, windowGlass, maskedWindow, fractureImage } from "./screensaver-fracture";
+import { windowOutline, outlinePath, windowGlass, maskedWindow, fractureImage, surface } from "./screensaver-fracture";
 import type { StrikeKind } from "./havoc";
 import { cyclePhase, shatterProgress, crtStartsAt, SHATTER_SECONDS, drawCrtSlice, erosionSeconds, type CrtCycle, type DesktopRect } from "./screensaver-cycle";
 import { loadCrackTextures, type CrackTexture } from "./screensaver-cracks";
@@ -191,9 +191,17 @@ async function start() {
       reveal: 0,
     });
   }
-  // No holes yet. Each window sits exactly over its own pixels in the picture, so the desk
-  // looks like the desk; the hole is cut at the moment the piece is, and to the same shape, so
-  // the two can never disagree. A square hole behind a jagged piece was the mismatch on screen.
+  // Every window is taken out of the picture, square, because the piece covering it is square
+  // too. It has to come out now rather than when the piece is first hit: leaving it in meant a
+  // crack punched through a window revealed the desktop's own copy of that same window sitting
+  // behind it, so the cracks looked painted on instead of broken through. What the piece leaves
+  // behind when it is later cut to a smaller shape is put back by the carve.
+  hctx.save();
+  hctx.globalCompositeOperation = "destination-out";
+  for (const s of sprites) hctx.fillRect(s.homeX, s.homeY, s.w, s.h);
+  hctx.restore();
+  erodedCtx.clearRect(0, 0, screen.width, screen.height);
+  erodedCtx.drawImage(desktopSrc, 0, 0);
   log(`drew ${sprites.length} sprites for ${screen.width}x${screen.height}`);
   loading.hidden = true;
   resize();
@@ -425,15 +433,62 @@ function carve(s: Sprite) {
   cc.globalCompositeOperation = "destination-in";
   cc.fill(outlinePath(s.outline, s.cut.width, s.cut.height));
   cc.restore();
-  // The same shape out of the desktop, so what is left behind matches what came away. Only the
-  // working copy: the pristine picture is what a restore puts back, whole.
+  // The corners it did not take with it stay stuck to the screen, so the gap left behind is the
+  // same broken shape as the piece rather than the square the window used to occupy. Painted
+  // from the damaged copy, not the original picture, so cracks it already had are in the
+  // remnant too. Only the working copy: a restore puts the pristine picture back, whole.
   if (erodedCtx) {
-    erodedCtx.save();
-    erodedCtx.globalCompositeOperation = "destination-out";
-    erodedCtx.translate(s.homeX, s.homeY);
-    erodedCtx.fill(outlinePath(s.outline, s.w, s.h));
-    erodedCtx.restore();
+    const remnant = surface(s.w, s.h);
+    const rc = remnant.getContext("2d")!;
+    rc.drawImage(s.cut, 0, 0, s.w, s.h);
+    rc.globalCompositeOperation = "destination-out";
+    rc.fill(outlinePath(s.outline, s.w, s.h));
+    erodedCtx.drawImage(remnant, s.homeX, s.homeY);
+    remnant.width = remnant.height = 1;
   }
+}
+
+/**
+ * Break what is left of the desktop picture into pieces that fall and fade with everything
+ * else. Without this only the windows came apart at the end and the picture behind them simply
+ * stopped being drawn, which is not the desk being destroyed, it is the desk being switched off.
+ *
+ * Coarse pieces, and not at full resolution: they are tumbling and fading within a few seconds,
+ * and a screen's worth of full-size canvases would swamp the debris budget on its own.
+ */
+function shatterDesktop() {
+  if (!eroded || !erodedCtx || !screen) return;
+  const across = 4;
+  const down = 3;
+  const cw = Math.ceil(screen.width / across);
+  const ch = Math.ceil(screen.height / down);
+  for (let row = 0; row < down; row++) {
+    for (let col = 0; col < across; col++) {
+      const sx = col * cw;
+      const sy = row * ch;
+      const w = Math.min(cw, screen.width - sx);
+      const h = Math.min(ch, screen.height - sy);
+      if (w < 2 || h < 2) continue;
+      const scale = Math.min(1, 384 / Math.max(w, h));
+      const img = surface(w * scale, h * scale);
+      img.getContext("2d")!.drawImage(eroded, sx, sy, w, h, 0, 0, img.width, img.height);
+      // Thrown outward from the middle of the screen, so the desk blows apart rather than
+      // sliding off the bottom in one sheet.
+      const away = (sx + w / 2) / screen.width - 0.5;
+      debris.add({
+        img,
+        x: sx + w / 2,
+        y: sy + h / 2,
+        w,
+        h,
+        vx: away * 1100 + (Math.random() - 0.5) * 260,
+        vy: -240 - Math.random() * 280,
+        angle: 0,
+        spin: (Math.random() - 0.5) * 2.2,
+      });
+    }
+  }
+  erodedCtx.clearRect(0, 0, screen.width, screen.height);
 }
 
 /** Artwork partitions are rasterized only on impact, never in the render loop. */
@@ -751,7 +806,9 @@ function frame(now: number) {
         phase = "shatter";
         held = null;
         for (const s of sprites) if (!s.broken) shatterQueue.add(s);
-        for (let i = 0; i < reveal.length; i++) nudgeCell(i);
+        // The picture itself goes too, in pieces. Cells are left alone from here: they punch
+        // holes in a picture that is no longer being drawn.
+        shatterDesktop();
         sendSurfaces();
       }
       // Faded as one, over what is left of this stretch: the usual rule ages each piece on its
