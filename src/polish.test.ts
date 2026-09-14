@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Havoc } from "./havoc";
+import { Havoc, contactFraction } from "./havoc";
 import { SimulationClock } from "./simulation-clock";
 import { LoadingOwner } from "./preview-loading";
 import { Debris, MAX_DEBRIS, MAX_DEBRIS_PIXELS } from "./screensaver-debris";
@@ -33,13 +33,14 @@ describe("havoc", () => {
   it("applies one contact per attack and cancels when grabbed", () => {
     const h = new Havoc(() => 0.2);
     const tick = (t: number, available = true) => h.update(t, available, 70, 0, 0, 320, 660, [target], false);
+    // Early seconds of a cycle belong to travel; the strike starts once that window has passed.
     expect(tick(1)).toBeNull();
-    expect(tick(3)?.kind).toBe("throw");
-    expect(tick(3.3)?.impact).toBe(false);
-    expect(tick(4.01)?.impact).toBe(true);
-    expect(tick(4.1)?.impact).toBe(false);
-    expect(tick(4.15, false)).toBeNull();
-    expect(tick(4.2)).toBeNull();
+    expect(tick(5)?.kind).toBe("throw");
+    expect(tick(5.3)?.impact).toBe(false);
+    expect(tick(5.8)?.impact).toBe(true);
+    expect(tick(5.9)?.impact).toBe(false);
+    expect(tick(5.95, false)).toBeNull();
+    expect(tick(6)).toBeNull();
   });
   it("increases attacks while retaining travel intervals", () => {
     function count(intensity: number) {
@@ -47,9 +48,9 @@ describe("havoc", () => {
       let hits = 0,
         travel = 0;
       for (let t = 0; t < 120; t += 0.05) {
-        const a = h.update(t, true, intensity, 0, 0, 320, 660, [], false);
+        const a = h.update(t, true, intensity, 0, 0, 320, 660, [target], false);
         if (a?.impact) hits++;
-        if (!a && t % 14 < 3) travel++;
+        if (!a && t % 12 < 4) travel++;
       }
       return { hits, travel };
     }
@@ -57,6 +58,48 @@ describe("havoc", () => {
       high = count(100);
     expect(high.hits).toBeGreaterThan(low.hits * 1.5);
     expect(high.travel).toBeGreaterThan(300);
+  });
+  it("stops swinging at nothing so the travel scheduler gets the screen back", () => {
+    // Nothing within reach anywhere: he is allowed a swing or two and then has to go looking,
+    // or he roots himself in the gap a window left and shadow-boxes there for good.
+    const h = new Havoc(() => 0.6);
+    let started = 0;
+    let previous = false;
+    for (let t = 0; t < 120; t += 0.05) {
+      const action = h.update(t, true, 100, 0, 0, 320, 660, [], false);
+      if (action && !previous) started++;
+      previous = !!action;
+    }
+    expect(started).toBeGreaterThan(0);
+    expect(started).toBeLessThan(20);
+    // With something to hit, the same two minutes are busy.
+    const busy = new Havoc(() => 0.6);
+    let withTarget = 0;
+    previous = false;
+    for (let t = 0; t < 120; t += 0.05) {
+      const action = busy.update(t, true, 100, 0, 0, 320, 660, [target], false);
+      if (action && !previous) withTarget++;
+      previous = !!action;
+    }
+    expect(withTarget).toBeGreaterThan(started * 2);
+  });
+  it("lands the blow halfway through a strike, and later for a throw", () => {
+    // Halfway is where a strike is fully extended; a thrown object leaves the hand later.
+    expect(contactFraction("punch")).toBeCloseTo(0.5);
+    expect(contactFraction("kick")).toBeCloseTo(0.5);
+    expect(contactFraction("throw")).toBeGreaterThan(contactFraction("punch"));
+    const h = new Havoc(() => 0.6, () => 1);
+    const tick = (t: number) => h.update(t, true, 100, 0, 0, 320, 660, [target], false);
+    let contact = -1;
+    for (let t = 4; t < 9; t += 0.01) {
+      const action = tick(t);
+      if (action?.impact) {
+        contact = t - action.start;
+        break;
+      }
+    }
+    expect(contact).toBeGreaterThan(0.45);
+    expect(contact).toBeLessThan(0.72);
   });
 });
 function shard(x = 300) {

@@ -63,6 +63,11 @@ export class Bubble {
     this.hideAt = Infinity;
   }
 
+  /** True while a heard line is showing, so a caller can leave it up instead of talking over it. */
+  get listening(): boolean {
+    return !this.el.hidden && this.el.classList.contains("listening");
+  }
+
   /** Leave the listening state; a reply that already replaced it is left alone. */
   stopListening() {
     if (!this.el.classList.contains("listening")) return;

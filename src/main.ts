@@ -1,4 +1,4 @@
-import { Havoc, STRIKE_CONTACT, type StrikeKind, type AttackTarget, type HavocAction } from "./havoc";
+import { Havoc, contactFraction, type StrikeKind, type AttackTarget, type HavocAction } from "./havoc";
 import { SimulationClock } from "./simulation-clock";
 import { ScreensaverDance } from "./screensaver-dance";
 import * as THREE from "three";
@@ -661,13 +661,17 @@ talk.onSend = async (text) => {
   behavior.interrupt(clock.elapsedTime);
   if (liveMode()) {
     // Live voice: typed text goes into the same conversation; the reply comes back spoken.
+    // It keeps its own running transcript in this bubble, so the recorder's must step aside.
+    bubble.stopListening();
     if (live.state !== "on") await startLive();
     if (!live.sendText(text)) bubble.say(["Live voice is not connected."], 4, clock.elapsedTime, 1);
     return;
   }
   // Replies outrank quips: a "This slaps" cannot wipe an answer, and while the strip is open
-  // the answer stays until the next one (or the strip closes).
-  bubble.say(["…"], 40, clock.elapsedTime, 2);
+  // the answer stays until the next one (or the strip closes). A spoken message leaves the
+  // words he heard on screen instead of the dots, so you can see what was understood while he
+  // composes; the reply replaces either one.
+  if (!bubble.listening) bubble.say(["…"], 40, clock.elapsedTime, 2);
   // Plain commands act at once; the model is still asked so he can acknowledge in character.
   const local = parseCommand(text, behavior.danceNames, Object.keys(manifest?.clips ?? {}));
   const note = local ? runCommand(local) : null;
@@ -681,10 +685,25 @@ talk.onSend = async (text) => {
     bubble.say([reply], talk.open ? 600 : Math.min(24, 3 + words * 0.45), clock.elapsedTime, 2);
     if (settings.chatVoice) voice.say(reply);
   } catch (err) {
+    // The heard line outranks this and never expires on its own, so it has to go first, or the
+    // failure is never seen and the microphone bubble stays up for good.
+    bubble.stopListening();
     bubble.say([`Can't talk right now: ${String(err).slice(0, 90)}`], 6, clock.elapsedTime, 1);
   }
 };
 talk.onStatus = (text) => bubble.say([text], 4, clock.elapsedTime, 1);
+/**
+ * The microphone, shown over his head: that he is listening, then what he made of it, left
+ * there until the reply replaces it. Without this there is no sign a recording was understood
+ * at all unless the talk box happens to be open.
+ */
+talk.onHeard = (text) => {
+  if (text === null || !settings.bubblesEnabled) {
+    bubble.stopListening();
+    return;
+  }
+  bubble.listen(text ? text.slice(-120) : "Listening…", 2);
+};
 talk.onOpenChange = (open) => {
   ignoringCursor = null; // re-evaluate click-through now that the strip is (in)visible
   if (open && IN_TAURI) getCurrentWindow().setFocus().catch(() => {});
@@ -1085,7 +1104,7 @@ function frame() {
     const dir = behavior.pendingPunch;
     behavior.pendingPunch = null;
     const duration = Math.max(.4, resolved.clip ? renderer?.clipDuration(resolved.clip.name) ?? .85 : .85);
-    timedPunch = {dir, contact:t+duration*STRIKE_CONTACT, end:t+duration, fired:false};
+    timedPunch = {dir, contact:t+duration*contactFraction("punch"), end:t+duration, fired:false};
     holdFacing = (dir * Math.PI) / 2;
     holdFacingUntil = t + duration;
   }

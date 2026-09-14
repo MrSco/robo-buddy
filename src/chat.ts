@@ -267,6 +267,13 @@ export class TalkBox {
   onSend?: (text: string) => Promise<void>;
   onOpenChange?: (open: boolean) => void;
   onStatus?: (text: string) => void;
+  /**
+   * What the microphone is doing, for feedback outside this box: an empty string while it is
+   * recording, the recognised words once they arrive, and null when there is nothing to show.
+   * The talk box may well be closed, and the bubble over his head is then the only feedback
+   * there is that anything was heard at all.
+   */
+  onHeard?: (text: string | null) => void;
   micEnabled = true;
   /** Live voice: when set, the mic button toggles mute instead of recording; returns the new muted state. */
   onMicToggle?: () => boolean;
@@ -478,6 +485,7 @@ export class TalkBox {
     };
     rec.onstop = () => void this.finishRecording(mime);
     rec.start(250);
+    this.onHeard?.("");
     this.recorder = rec;
     this.mic.classList.add("rec");
     this.input.placeholder = "Listening… click the mic again when done";
@@ -511,6 +519,7 @@ export class TalkBox {
   }
 
   private stopRecording(discard: boolean) {
+    if (discard) this.onHeard?.(null);
     const rec = this.recorder;
     clearInterval(this.sttTimer);
     try {
@@ -533,7 +542,10 @@ export class TalkBox {
   private async finishRecording(mime: string) {
     const blob = new Blob(this.chunks, { type: mime });
     this.chunks = [];
-    if (blob.size < 2000) return;
+    if (blob.size < 2000) {
+      this.onHeard?.(null);
+      return;
+    }
     this.setBusy(true);
     this.input.placeholder = "Transcribing…";
     try {
@@ -542,12 +554,17 @@ export class TalkBox {
       this.setBusy(false);
       if (text) {
         this.input.value = text;
+        this.onHeard?.(text);
         await this.submit(text);
       } else {
+        // Cleared first: a status line is lower priority than the heard line and would be
+        // suppressed by it, leaving the microphone bubble up with nothing to replace it.
+        this.onHeard?.(null);
         this.onStatus?.("Didn't catch that.");
       }
     } catch (err) {
       this.setBusy(false);
+      this.onHeard?.(null);
       this.onStatus?.(String(err).slice(0, 80));
     } finally {
       this.input.placeholder = "Say something… (Esc closes)";
