@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Havoc, contactFraction } from "./havoc";
+import { traceOutline } from "./screensaver-fracture";
 import { SimulationClock } from "./simulation-clock";
 import { LoadingOwner } from "./preview-loading";
 import { Debris, MAX_DEBRIS, MAX_DEBRIS_PIXELS } from "./screensaver-debris";
@@ -30,6 +31,16 @@ it("stale preview success/failure cannot own a newer load or cancelled preview",
 });
 describe("havoc", () => {
   const target = { id: 1, x: 140, y: 550, w: 100, h: 50, debris: true };
+  /** Several pieces within reach, as a real desk offers: he works across them rather than
+   * hitting one of them over and over. */
+  const field = Array.from({ length: 6 }, (_, i) => ({
+    id: i + 1,
+    x: -120 + i * 100,
+    y: 550,
+    w: 90,
+    h: 50,
+    debris: i % 2 === 0,
+  }));
   it("applies one contact per attack and cancels when grabbed", () => {
     const h = new Havoc(() => 0.2);
     const tick = (t: number, available = true) => h.update(t, available, 70, 0, 0, 320, 660, [target], false);
@@ -48,7 +59,7 @@ describe("havoc", () => {
       let hits = 0,
         travel = 0;
       for (let t = 0; t < 120; t += 0.05) {
-        const a = h.update(t, true, intensity, 0, 0, 320, 660, [target], false);
+        const a = h.update(t, true, intensity, 0, 0, 320, 660, field, false);
         if (a?.impact) hits++;
         if (!a && t % 12 < 4) travel++;
       }
@@ -77,7 +88,7 @@ describe("havoc", () => {
     let withTarget = 0;
     previous = false;
     for (let t = 0; t < 120; t += 0.05) {
-      const action = busy.update(t, true, 100, 0, 0, 320, 660, [target], false);
+      const action = busy.update(t, true, 100, 0, 0, 320, 660, field, false);
       if (action && !previous) withTarget++;
       previous = !!action;
     }
@@ -165,4 +176,89 @@ it("derives shard boundaries from a bent artwork crack, not a square grid", () =
   expect(labels[5 * w + 20]).toBe(labels[5 * w + 35]);
   expect(labels[30 * w + 20]).toBe(labels[30 * w + 5]);
   expect(Array.from(labels).every((l) => l >= 0)).toBe(true);
+});
+
+describe("cutout silhouette", () => {
+  /** A filled disc, optionally hollowed out in the middle the way the artwork is. */
+  function disc(w: number, h: number, radius: number, hollow = 0) {
+    const p = new Uint8ClampedArray(w * h * 4);
+    const cx = w / 2,
+      cy = h / 2;
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const d = Math.hypot(x - cx, y - cy);
+        if (d <= radius && d >= hollow) p.fill(255, (y * w + x) * 4, (y * w + x) * 4 + 4);
+      }
+    return p;
+  }
+  function radii(outline: Float32Array) {
+    const out: number[] = [];
+    for (let i = 0; i < outline.length; i += 2) out.push(Math.hypot(outline[i] - 0.5, outline[i + 1] - 0.5));
+    return out;
+  }
+
+  it("follows the edge of the artwork rather than its bounding box", () => {
+    const { outline, x0, x1 } = traceOutline(disc(64, 64, 24), 64, 64, 64);
+    expect(x0).toBeLessThanOrEqual(16);
+    expect(x1).toBeGreaterThanOrEqual(47);
+    // Every point sits on the boundary of its own box, so a round blast stays round.
+    for (const r of radii(outline)) expect(r).toBeGreaterThan(0.4);
+    for (let i = 0; i < outline.length; i++) expect(outline[i]).toBeGreaterThanOrEqual(0);
+    for (let i = 0; i < outline.length; i++) expect(outline[i]).toBeLessThanOrEqual(1);
+  });
+
+  it("is not speared by a gap inside the blast", () => {
+    // The centre is empty, as it is in artwork whose middle is punched clean through. Stopping
+    // at the first gap on each ray would collapse the shape onto that hole and throw spikes
+    // across the slice, which is how an earlier attempt at this failed.
+    const { outline } = traceOutline(disc(64, 64, 24, 10), 64, 64, 64);
+    const all = radii(outline);
+    const smallest = Math.min(...all);
+    const largest = Math.max(...all);
+    expect(smallest).toBeGreaterThan(0.4);
+    expect(largest / smallest).toBeLessThan(1.3);
+  });
+
+  it("falls back to the whole rectangle when the artwork says nothing", () => {
+    const { outline } = traceOutline(new Uint8ClampedArray(32 * 32 * 4), 32, 32, 8);
+    for (let i = 0; i < outline.length; i++) expect(outline[i] === 0 || outline[i] === 1).toBe(true);
+  });
+});
+
+it("works across the pieces in front of him instead of hitting one of them repeatedly", () => {
+  // One piece, struck once, is passed over while he looks for something else. Without that he
+  // plants himself over a broken window or a settled shard and keeps swinging at it.
+  const h = new Havoc(() => 0.6);
+  const one = [{ id: 7, x: 140, y: 550, w: 100, h: 50, debris: false }];
+  let starts = 0;
+  let previous = false;
+  for (let t = 0; t < 30; t += 0.05) {
+    const action = h.update(t, true, 100, 0, 0, 320, 660, one, false);
+    if (action && !previous) starts++;
+    previous = !!action;
+  }
+  expect(starts).toBeLessThan(8);
+});
+
+it("keeps its reach to his own arm, not to how wide the window happens to be", () => {
+  // A window wide enough to fill the screen used to count as within reach from most of the way
+  // across it, because reach was measured from its centre against its own half-width. He could
+  // then stand still and keep hitting it from across the desk. Far away it should now occupy
+  // him no more than an empty screen does; beside him it should occupy him a great deal more.
+  function starts(targets: { id: number; x: number; y: number; w: number; h: number; debris: boolean }[]) {
+    const h = new Havoc(() => 0.6);
+    let count = 0;
+    let previous = false;
+    for (let t = 0; t < 120; t += 0.05) {
+      const action = h.update(t, true, 100, 0, 0, 320, 660, targets, false);
+      if (action && !previous) count++;
+      previous = !!action;
+    }
+    return count;
+  }
+  const huge = { id: 9, y: 200, w: 2400, h: 900, debris: false };
+  const far = starts([{ ...huge, x: 1400 }]);
+  const beside = starts([{ ...huge, x: -1000 }]);
+  expect(far).toBeLessThanOrEqual(starts([]));
+  expect(beside).toBeGreaterThan(far);
 });

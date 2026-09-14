@@ -36,6 +36,13 @@ export class Havoc {
   /** Swings at thin air since he last had something within reach. */
   private missed = 0;
   /**
+   * What he has just hit, by id, and when. A piece he has already struck is passed over for a
+   * while, so he works his way across the desk instead of standing over one broken window or
+   * one settled shard hitting it again and again.
+   */
+  private struck = new Map<number, number>();
+  private static readonly FORGET = 9;
+  /**
    * How many unanswered swings he is allowed before he has to go and find something. Without a
    * cap he plants himself wherever he happens to be, most visibly in the gap a window has been
    * knocked out of, and shadow-boxes there for the rest of the screensaver: an attack is chosen
@@ -64,6 +71,7 @@ export class Havoc {
     if (!available) {
       this.action = null;
       this.missed = 0;
+      this.struck.clear();
       this.next = t + 1;
       return null;
     }
@@ -81,8 +89,16 @@ export class Havoc {
     const power = Math.max(0, Math.min(100, intensity)) / 100;
     this.next = t + 1.5 + (1 - power) * 4 + this.random() * 1.8;
     const cx = x + w / 2;
+    // Measured to the nearest edge and against his own reach, not against the target's width.
+    // Comparing centres let a window wide enough to fill the screen count as within reach from
+    // most of the way across it, so he could stand still and keep hitting the same one.
+    const reach = w * 0.7;
     const nearby = targets.filter(
-      (s) => Math.abs(s.x + s.w / 2 - cx) < s.w / 2 + w * 0.75 && s.y < y + h + 50 && s.y + s.h > y - h * 0.4,
+      (s) =>
+        Math.max(s.x - (cx + w / 2), cx - w / 2 - (s.x + s.w), 0) < reach &&
+        s.y < y + h + 50 &&
+        s.y + s.h > y - h * 0.4 &&
+        !(t - (this.struck.get(s.id) ?? -Infinity) < Havoc.FORGET),
     );
     const target = nearby.sort((a, b) => Math.abs(a.x + a.w / 2 - cx) - Math.abs(b.x + b.w / 2 - cx))[0];
     if (target) this.missed = 0;
@@ -104,6 +120,11 @@ export class Havoc {
       : low
         ? "kick"
         : "punch";
+    if (target) {
+      this.struck.set(target.id, t);
+      // The map only ever holds what is still being passed over.
+      for (const [id, at] of this.struck) if (t - at >= Havoc.FORGET) this.struck.delete(id);
+    }
     this.action = {
       kind,
       dir,

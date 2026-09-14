@@ -104,51 +104,147 @@ function fractureMasks(tex: CrackTexture): HTMLCanvasElement[] {
   return masks;
 }
 
-const outlines = new WeakMap<CrackTexture, { mask: HTMLCanvasElement; glass: HTMLCanvasElement }>();
+const outlines = new WeakMap<CrackTexture, { outline: Float32Array; glass: HTMLCanvasElement }>();
+
+/** How many rays the silhouette is sampled along. */
+const RAYS = 192;
+/**
+ * The longest side a window's working raster is allowed. It only has to be sharp on screen, and
+ * a window is redrawn at its own size, so anything under that size is visible softness. The old
+ * cap was low enough to blur the window's own contents as well as its edge.
+ */
+const CUT_MAX = 1600;
+
+/** The glass artwork cropped to the blast, at its own resolution rather than resampled. */
 export function windowGlass(tex: CrackTexture) {
-  windowMask(tex);
+  windowOutline(tex);
   return outlines.get(tex)!.glass;
 }
 
-/** A cached shape fitted from the enclosed impact silhouette in the supplied PNG. */
-export function windowMask(tex: CrackTexture): HTMLCanvasElement {
+/**
+ * The silhouette of the blast in the supplied artwork, as a closed polygon in 0..1 of its own
+ * bounding box.
+ *
+ * A polygon and not a bitmap, because a window is several times the size of the artwork. A mask
+ * baked at the artwork's resolution arrives at the window soft, and one baked square arrives
+ * stretched unevenly as well, which is what made displaced windows look smeared. A polygon
+ * scales to any size and any aspect exactly.
+ *
+ * Sampled by marching out from the centroid and keeping the furthest solid pixel on each ray
+ * rather than stopping at the first gap: the artwork is full of gaps inside the blast, and
+ * stopping at one throws a long spike across the slice. Taking a median of each ray with its
+ * neighbours removes the single-sample noise that survives that.
+ */
+export function windowOutline(tex: CrackTexture): Float32Array {
   const cached = outlines.get(tex);
-  if (cached) return cached.mask;
-  const hc = tex.hole.getContext("2d")!,
-    w = tex.hole.width,
+  if (cached) return cached.outline;
+  const w = tex.hole.width,
     h = tex.hole.height;
-  const pixels = hc.getImageData(0, 0, w, h).data;
+  const traced = traceOutline(tex.hole.getContext("2d")!.getImageData(0, 0, w, h).data, w, h);
+  const glass = surface(Math.max(1, traced.x1 - traced.x0 + 1), Math.max(1, traced.y1 - traced.y0 + 1));
+  if (traced.x1 >= traced.x0)
+    glass
+      .getContext("2d")!
+      .drawImage(tex.glass, traced.x0, traced.y0, glass.width, glass.height, 0, 0, glass.width, glass.height);
+  outlines.set(tex, { outline: traced.outline, glass });
+  return traced.outline;
+}
+
+export interface TracedOutline {
+  outline: Float32Array;
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/** The silhouette trace itself, over raw pixels, so it can be exercised without a canvas. */
+export function traceOutline(pixels: Uint8ClampedArray, w: number, h: number, rays = RAYS): TracedOutline {
+  const solid = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && pixels[(y * w + x) * 4 + 3] > 100;
   let x0 = w,
     y0 = h,
     x1 = -1,
-    y1 = -1;
+    y1 = -1,
+    sumX = 0,
+    sumY = 0,
+    count = 0;
   for (let y = 0; y < h; y++)
     for (let x = 0; x < w; x++)
-      if (pixels[(y * w + x) * 4 + 3] > 100) {
-        x0 = Math.min(x0, x);
-        y0 = Math.min(y0, y);
-        x1 = Math.max(x1, x);
-        y1 = Math.max(y1, y);
+      if (solid(x, y)) {
+        if (x < x0) x0 = x;
+        if (y < y0) y0 = y;
+        if (x > x1) x1 = x;
+        if (y > y1) y1 = y;
+        sumX += x;
+        sumY += y;
+        count++;
       }
-  const mask = surface(256, 256),
-    mc = mask.getContext("2d")!;
-  if (x1 < 0) mc.fillRect(0, 0, 256, 256);
-  else mc.drawImage(tex.hole, x0, y0, x1 - x0 + 1, y1 - y0 + 1, 0, 0, 256, 256);
-  const glass = surface(256, 256);
-  if (x1 >= 0) glass.getContext("2d")!.drawImage(tex.glass, x0, y0, x1 - x0 + 1, y1 - y0 + 1, 0, 0, 256, 256);
-  outlines.set(tex, { mask, glass });
-  return mask;
+  const outline = new Float32Array(rays * 2);
+  if (count === 0) {
+    // Nothing legible in the artwork: a plain rectangle, so the window still appears at all.
+    for (let i = 0; i < rays; i++) {
+      const a = (i / rays) * Math.PI * 2;
+      outline[i * 2] = Math.cos(a) < 0 ? 0 : 1;
+      outline[i * 2 + 1] = Math.sin(a) < 0 ? 0 : 1;
+    }
+    return { outline, x0: 0, y0: 0, x1: -1, y1: -1 };
+  }
+  const cx = sumX / count,
+    cy = sumY / count;
+  const reach = Math.ceil(Math.hypot(w, h));
+  const radii = new Float32Array(rays);
+  for (let i = 0; i < rays; i++) {
+    const a = (i / rays) * Math.PI * 2,
+      dx = Math.cos(a),
+      dy = Math.sin(a);
+    let far = 0;
+    for (let r = 1; r <= reach; r++) {
+      const x = Math.round(cx + dx * r),
+        y = Math.round(cy + dy * r);
+      if (x < 0 || y < 0 || x >= w || y >= h) break;
+      if (solid(x, y)) far = r;
+    }
+    radii[i] = far;
+  }
+  const bw = x1 - x0 + 1,
+    bh = y1 - y0 + 1;
+  for (let i = 0; i < rays; i++) {
+    const a = (i / rays) * Math.PI * 2;
+    const trio = [radii[(i - 1 + rays) % rays], radii[i], radii[(i + 1) % rays]].sort((p, q) => p - q);
+    const r = trio[1];
+    const x = (cx + Math.cos(a) * r - x0) / bw,
+      y = (cy + Math.sin(a) * r - y0) / bh;
+    outline[i * 2] = Math.min(1, Math.max(0, x));
+    outline[i * 2 + 1] = Math.min(1, Math.max(0, y));
+  }
+  return { outline, x0, y0, x1, y1 };
 }
-export function maskedWindow(img: ImageBitmap, mask: HTMLCanvasElement | null): HTMLCanvasElement {
-  const scale = Math.min(1, 640 / Math.max(img.width, img.height));
+
+/** The silhouette as a path over a rectangle of this size, ready to clip, fill or stroke. */
+export function outlinePath(outline: Float32Array, w: number, h: number): Path2D {
+  const path = new Path2D();
+  for (let i = 0; i < outline.length; i += 2) {
+    const x = outline[i] * w,
+      y = outline[i + 1] * h;
+    if (i === 0) path.moveTo(x, y);
+    else path.lineTo(x, y);
+  }
+  path.closePath();
+  return path;
+}
+
+export function maskedWindow(img: ImageBitmap, outline: Float32Array | null): HTMLCanvasElement {
+  const scale = Math.min(1, CUT_MAX / Math.max(img.width, img.height));
   const canvas = surface(img.width * scale, img.height * scale),
     c = canvas.getContext("2d")!;
-  c.drawImage(img, 0, 0, canvas.width, canvas.height);
-  if (mask) {
-    c.globalCompositeOperation = "destination-in";
-    c.drawImage(mask, 0, 0, canvas.width, canvas.height);
-    c.globalCompositeOperation = "source-over";
+  // Clipped rather than composited against a bitmap: the edge is then as sharp as this raster,
+  // instead of as sharp as a few hundred pixels of artwork stretched over the whole window.
+  if (outline) {
+    c.save();
+    c.clip(outlinePath(outline, canvas.width, canvas.height));
   }
+  c.drawImage(img, 0, 0, canvas.width, canvas.height);
+  if (outline) c.restore();
   return canvas;
 }
 export interface FragmentImage {

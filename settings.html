@@ -218,8 +218,6 @@
 
               <div class="group">
                 <h2>Ears</h2>
-                <label class="field"><span>Speech setup</span><select id="speech-setup"><option value="current">Current / custom endpoint</option><option value="vibe">Vibe (local API server)</option></select></label>
-                <p class="hint">For Vibe, enable its API server and load a model in Vibe. Copy its server address below, ending in /v1; the port may change. You can also focus Buddy's chat input and press Windows + H to dictate with Windows, then press Send.</p>
                 <label class="field" title="A Whisper-style model at the speech endpoint. Groq offers whisper-large-v3-turbo. Leave blank to hide the microphone button."><span>Speech model (blank = no microphone)</span>
                   <div class="row">
                     <input id="chat-stt" type="text" list="stt-models" spellcheck="false" class="grow" />
@@ -227,7 +225,7 @@
                   </div>
                 </label>
                 <label class="field" title="Send recordings somewhere other than the chat endpoint, such as a local Vibe server. The key is never sent here."><span>Speech endpoint (blank = same as the chat endpoint)</span><input id="chat-stt-endpoint" type="text" spellcheck="false" placeholder="e.g. a local Vibe server: http://127.0.0.1:PORT/v1" /></label>
-                <p class="hint">The microphone sends a short recording to the speech endpoint. A local Whisper server such as Vibe's works there and never sees the key.</p>
+                <p class="hint">The microphone sends a short recording to the speech endpoint, which speaks the Whisper API. Leave it blank to use the chat endpoint. To keep audio on this PC, run a local server such as Vibe: enable its API server, load a model in it, and paste its address here ending in /v1. Its port changes between runs. The key is never sent to it. You can also focus Buddy's chat input and press Windows + H to dictate with Windows, then press Send.</p>
 
                 <h2>Voice</h2>
                 <label class="check" title="Read every reply out loud."><input id="chat-voice" type="checkbox" /> Speak replies out loud</label>

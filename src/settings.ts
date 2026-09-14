@@ -188,13 +188,21 @@ async function previewPack(id: string) {
   for (const b of els.gallery.querySelectorAll("button")) b.classList.toggle("previewing", b.dataset.id === id);
   els.removePack.hidden = pack.bundled;
   els.removePack.textContent = `Remove "${pack.name}"`;
+  // Claimed here rather than inside show(), so the wait for the manifest is covered too.
+  const ticket = getLive().beginLoading();
+  let failure: unknown;
   try {
     const m = await manifestFor(pack);
     if (selection !== previewSelection) return;
     await getLive().show(pack, m);
     if (selection === previewSelection && m.renderer === "3d") status(`Rig: ${getLive().rigReport}`);
   } catch (err) {
+    failure = err;
     if (selection === previewSelection) status(`Preview failed: ${err}`);
+  } finally {
+    // show() owns a newer ticket once it starts, and finishes it itself; this only matters when
+    // the manifest never arrived, which would otherwise leave the overlay spinning for good.
+    getLive().finishLoading(ticket, failure);
   }
 }
 
@@ -900,11 +908,6 @@ function wireTalk() {
   els.chatVoice.addEventListener("change", () => void commit({ chatVoice: els.chatVoice.checked }));
   els.chatLines.addEventListener("change", () => void commit({ chatGenerateLines: els.chatLines.checked }));
   els.chatCap.addEventListener("change", () => void commit({ chatDailyCap: Math.max(0, Math.round(Number(els.chatCap.value) || 0)) }));
-  $<HTMLSelectElement>("speech-setup").addEventListener("change", async e => {
-    if ((e.target as HTMLSelectElement).value !== "vibe") return;
-    await commit({chatSttEndpoint: "http://127.0.0.1:51136/v1", chatSttModel: "whisper-1"});
-    status("Vibe selected. Check its API server port and load a model in Vibe before using the microphone.");
-  });
   els.chatSttEndpoint.addEventListener("change", () => void commit({ chatSttEndpoint: els.chatSttEndpoint.value.trim() }));
   wireScreensaver();
   wireVoicePreview();

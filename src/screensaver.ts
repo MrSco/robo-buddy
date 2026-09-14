@@ -1,5 +1,5 @@
 import { Debris } from "./screensaver-debris";
-import { windowMask, windowGlass, maskedWindow, fractureImage } from "./screensaver-fracture";
+import { windowOutline, outlinePath, windowGlass, maskedWindow, fractureImage } from "./screensaver-fracture";
 import type { StrikeKind } from "./havoc";
 import { cyclePhase, drawCrtSlice, erosionSeconds, type CrtCycle, type DesktopRect } from "./screensaver-cycle";
 import { loadCrackTextures, type CrackTexture } from "./screensaver-cracks";
@@ -44,7 +44,8 @@ interface Sprite {
   /** Stable for the life of the screensaver; his physics tracks what he stands on by it. */
   id: number;
   img: ImageBitmap;
-  mask: HTMLCanvasElement | null;
+  /** The broken silhouette it was cut to, in 0..1 of its own rectangle, so it scales exactly. */
+  outline: Float32Array | null;
   cut: HTMLCanvasElement;
   damage: number;
   broken: boolean;
@@ -167,9 +168,9 @@ async function start() {
   // picture, so a window that was buried still looks like itself once he knocks it loose.
   for (const r of screen.sprites.slice().reverse()) {
     const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${r.png}`)).blob());
-    const mask = crackTextures.length ? windowMask(crackTextures[sprites.length % crackTextures.length]) : null;
+    const outline = crackTextures.length ? windowOutline(crackTextures[sprites.length % crackTextures.length]) : null;
     sprites.push({
-      mask, cut: maskedWindow(img, mask), damage: 0, broken: false,
+      outline, cut: maskedWindow(img, outline), damage: 0, broken: false,
       id: sprites.length,
       img,
       homeX: r.x,
@@ -189,8 +190,13 @@ async function start() {
   hctx.save();
   hctx.globalCompositeOperation = "destination-out";
   for (const s of sprites) {
-    if (s.mask) hctx.drawImage(s.mask, s.homeX, s.homeY, s.w, s.h);
-    else hctx.fillRect(s.homeX, s.homeY, s.w, s.h);
+    if (s.outline) {
+      // The same silhouette the window itself was cut to, so the hole and the piece agree.
+      hctx.save();
+      hctx.translate(s.homeX, s.homeY);
+      hctx.fill(outlinePath(s.outline, s.w, s.h));
+      hctx.restore();
+    } else hctx.fillRect(s.homeX, s.homeY, s.w, s.h);
   }
   hctx.restore();
   erodedCtx.clearRect(0, 0, screen.width, screen.height);
@@ -269,7 +275,9 @@ function sendSurfaces() {
       bottom: Math.round(screen!.y + s.y + s.h),
     }));
   const targets = phase === "erode" ? [
-    ...sprites.filter(s => !s.broken).map(s => ({id: s.id, x: screen!.x+s.x, y: screen!.y+s.y, w:s.w, h:s.h, debris:false})),
+    // Mostly eroded is as good as gone: the same cut-off the standable list uses, so he is not
+    // sent to swing at a window that has already broken away to an empty hole.
+    ...sprites.filter(s => !s.broken && s.reveal < 0.6).map(s => ({id: s.id, x: screen!.x+s.x, y: screen!.y+s.y, w:s.w, h:s.h, debris:false})),
     ...debris.bodies.filter(b => b.fade>.3).map(b => ({id:10000+b.id, x:screen!.x+b.x-b.w/2, y:screen!.y+b.y-b.h/2, w:b.w,h:b.h,debris:true})),
   ] : [];
   void emitTo("buddy", "screensaver-targets", {index:screenIndex, targets}).catch(() => {});
@@ -484,7 +492,7 @@ function initErosion(w: number, h: number) {
 /** Everything back to the snapshot, whole: the desktop repainted, every window returned to
  * where it was cut from, resting and solid. Called the instant the tube-off collapse finishes. */
 function restoreDesktop() {
-  debris.clear(); shatterQueue.clear();
+  debris.clear(); shatterQueue.clear(); rimPatterns.clear();
   if (erodedCtx && eroded && desktopSrc) {
     erodedCtx.clearRect(0, 0, eroded.width, eroded.height);
     erodedCtx.drawImage(desktopSrc, 0, 0);
@@ -502,7 +510,7 @@ function restoreDesktop() {
   carry = 0;
   for (const s of sprites) {
     s.broken=false; s.damage=0;
-    s.cut.width=s.cut.height=1; s.cut=maskedWindow(s.img,s.mask);
+    s.cut.width=s.cut.height=1; s.cut=maskedWindow(s.img,s.outline);
     s.reveal = 0;
     s.x = s.homeX;
     s.y = s.homeY;
@@ -632,10 +640,30 @@ function punchSprite(s: Sprite) {
  * behind counts as exposed. */
 const MOVED_AWAY = 12;
 
-/** The glass rim and cutout share the same crop of the supplied artwork. */
+/** How wide the broken glass rides along the edge of a cutout, in screen pixels. */
+const RIM = 44;
+/** One pattern per artwork, kept rather than rebuilt for every cutout on every frame. */
+const rimPatterns = new Map<number, CanvasPattern | null>();
+
+/**
+ * The broken glass around a cutout, laid along its edge rather than stretched across the whole
+ * window. Stretched, a few hundred pixels of artwork had to cover a window several times that
+ * wide and arrived as a soft grey smear; as a pattern stroked along the silhouette it keeps its
+ * own pixel density however large the window is.
+ */
 function drawCutoutEdges(target: CanvasRenderingContext2D, s: Sprite, rx: number, ry: number) {
-  if (!crackTextures.length) return;
-  target.drawImage(windowGlass(crackTextures[s.id % crackTextures.length]), rx, ry, s.w, s.h);
+  if (!crackTextures.length || !s.outline) return;
+  const slot = s.id % crackTextures.length;
+  if (!rimPatterns.has(slot)) rimPatterns.set(slot, target.createPattern(windowGlass(crackTextures[slot]), "repeat"));
+  const pattern = rimPatterns.get(slot);
+  if (!pattern) return;
+  target.save();
+  target.translate(rx, ry);
+  target.strokeStyle = pattern;
+  target.lineWidth = RIM;
+  target.lineJoin = "round";
+  target.stroke(outlinePath(s.outline, s.w, s.h));
+  target.restore();
 }
 
 function updateErosion(dt: number) {

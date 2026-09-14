@@ -416,6 +416,7 @@ details.adv summary {
   flex-wrap: wrap;
 }
 .preview {
+  position: relative; /* the loading overlay is absolute against this, not against the page */
   width: 220px;
   height: 300px;
   flex: none;

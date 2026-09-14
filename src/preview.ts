@@ -71,6 +71,20 @@ export class LivePreview {
     this.camera.updateProjectionMatrix();
   }
 
+  /**
+   * Claim the loading overlay before the caller starts fetching. A preview begins with work
+   * that happens before `show` is reached, and without this the overlay only appeared for the
+   * tail of it, which reads as the window having hung and then thought better of it.
+   */
+  beginLoading() {
+    return this.loading.begin();
+  }
+
+  /** Release an overlay claimed by `beginLoading`; ignored once something newer owns it. */
+  finishLoading(ticket: number, error?: unknown) {
+    this.loading.finish(ticket, error);
+  }
+
   /** Show a pack. 3D packs animate; 2D packs show their first frame as an image. */
   async show(pack: PackRef, manifest: Manifest) {
     this.stop();
