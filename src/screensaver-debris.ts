@@ -1,5 +1,6 @@
 import type { StrikeKind } from "./havoc";
-export const MAX_DEBRIS = 48;
+/** Enough for a whole desk in shards at the end of a cycle, not just a few windows' worth. */
+export const MAX_DEBRIS = 96;
 export const MAX_DEBRIS_PIXELS = 2500000;
 export interface Shard {
   id: number;

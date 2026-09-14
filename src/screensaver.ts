@@ -458,8 +458,8 @@ function carve(s: Sprite) {
  */
 function shatterDesktop() {
   if (!eroded || !erodedCtx || !screen) return;
-  const across = 4;
-  const down = 3;
+  const across = 3;
+  const down = 2;
   const cw = Math.ceil(screen.width / across);
   const ch = Math.ceil(screen.height / down);
   for (let row = 0; row < down; row++) {
@@ -469,23 +469,31 @@ function shatterDesktop() {
       const w = Math.min(cw, screen.width - sx);
       const h = Math.min(ch, screen.height - sy);
       if (w < 2 || h < 2) continue;
-      const scale = Math.min(1, 384 / Math.max(w, h));
-      const img = surface(w * scale, h * scale);
-      img.getContext("2d")!.drawImage(eroded, sx, sy, w, h, 0, 0, img.width, img.height);
-      // Thrown outward from the middle of the screen, so the desk blows apart rather than
-      // sliding off the bottom in one sheet.
-      const away = (sx + w / 2) / screen.width - 0.5;
-      debris.add({
-        img,
-        x: sx + w / 2,
-        y: sy + h / 2,
-        w,
-        h,
-        vx: away * 1100 + (Math.random() - 0.5) * 260,
-        vy: -240 - Math.random() * 280,
-        angle: 0,
-        spin: (Math.random() - 0.5) * 2.2,
-      });
+      const scale = Math.min(1, 512 / Math.max(w, h));
+      const chunk = surface(w * scale, h * scale);
+      chunk.getContext("2d")!.drawImage(eroded, sx, sy, w, h, 0, 0, chunk.width, chunk.height);
+      // Broken along the cracks in the artwork, the same way a window is, so the desk comes
+      // apart in shards. Cut into a grid of rectangles it read as a floor being tiled.
+      const texture = crackTextures.length ? crackTextures[(row * across + col) % crackTextures.length] : null;
+      const parts = texture ? fractureImage(chunk, texture, w, h) : [];
+      chunk.width = chunk.height = 1;
+      for (const part of parts) {
+        // Thrown outward from the middle of the screen, so the desk blows apart rather than
+        // sliding off the bottom in one sheet.
+        const px = sx + part.x + part.w / 2;
+        const away = px / screen.width - 0.5;
+        debris.add({
+          img: part.img,
+          x: px,
+          y: sy + part.y + part.h / 2,
+          w: part.w,
+          h: part.h,
+          vx: away * 1100 + (Math.random() - 0.5) * 300,
+          vy: -240 - Math.random() * 300,
+          angle: 0,
+          spin: (Math.random() - 0.5) * 2.6,
+        });
+      }
     }
   }
   erodedCtx.clearRect(0, 0, screen.width, screen.height);
@@ -746,6 +754,10 @@ function drawCutoutEdges(target: CanvasRenderingContext2D, s: Sprite, rx: number
   target.strokeStyle = pattern;
   target.lineWidth = RIM;
   target.lineJoin = "round";
+  // Only over glass that is still there, the same rule the cracks follow. Drawn plainly it also
+  // landed in the empty space a window used to fill, and on one that has shattered altogether,
+  // leaving a crisp jagged ring hanging in the dark with nothing inside it.
+  target.globalCompositeOperation = "source-atop";
   target.stroke(outlinePath(s.outline, s.w, s.h));
   target.restore();
 }
