@@ -182,6 +182,8 @@ pub struct MonitorShot {
     /// Every monitor's rectangle in virtual-screen pixels, in index order. A page needs the
     /// others to work out which screen a piece it has knocked off its own edge is flying onto.
     pub screens: Vec<DesktopRect>,
+    /// Height of a bottom taskbar on this monitor in pixels.
+    pub taskbar_height: i32,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -477,7 +479,20 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
                     Some(Sprite { x: x - mx, y: y - my, width, height, png: encode(&rgba, width, height).ok()? })
                 })
                 .collect();
-            shots.push(MonitorShot { virtual_desktop: virtual_desktop.clone(), x: mx, y: my, width: mw, height: mh, png, sprites, see_through: false, screens: screens.clone() });
+            let wa = crate::input::work_area(mx + mw / 2, my + mh / 2);
+            let taskbar_height = (wa.monitor_bottom - wa.bottom).max(0);
+            shots.push(MonitorShot {
+                virtual_desktop: virtual_desktop.clone(),
+                x: mx,
+                y: my,
+                width: mw,
+                height: mh,
+                png,
+                sprites,
+                see_through: false,
+                screens: screens.clone(),
+                taskbar_height,
+            });
         }
         Ok(shots)
     })();

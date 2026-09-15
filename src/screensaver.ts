@@ -40,6 +40,8 @@ interface MonitorShot {
   seeThrough: boolean;
   /** Every monitor's rectangle in virtual pixels, in index order. */
   screens: DesktopRect[];
+  /** Height of a bottom taskbar on this monitor in pixels. */
+  taskbarHeight?: number;
 }
 
 /** A piece of one screen's desk, on its way to the screen it has been knocked onto. */
@@ -153,6 +155,19 @@ async function start() {
   // The window is labelled "screensaver-<n>", one per monitor.
   screenIndex = Number(/(\d+)$/.exec(getCurrentWindow().label)?.[1] ?? 0);
   screen = await invoke<MonitorShot>("capture_desktop", { index: screenIndex });
+  if (screen.taskbarHeight == null) {
+    try {
+      const wa = await invoke<{ bottom: number; monitorBottom?: number }>("work_area", {
+        x: screen.x + Math.floor(screen.width / 2),
+        y: screen.y + Math.floor(screen.height / 2),
+      });
+      if (wa && typeof wa.bottom === "number") {
+        screen.taskbarHeight = Math.max(0, (wa.monitorBottom ?? screen.height + screen.y) - wa.bottom);
+      }
+    } catch {
+      screen.taskbarHeight = 0;
+    }
+  }
   // The layer behind the desktop shows through wherever a cell is broken away: black when there
   // is nothing underneath, or see-through to the screensaver playing under us. Making it the
   // page's own background means a hole is just a cleared pixel, the same for the desktop and for
@@ -671,7 +686,8 @@ function chairRect() {
   const h = hisHeight * CHAIR_OF_HIM;
   const canvasEl = chair.render(h);
   const w = (canvasEl.width / canvasEl.height) * h;
-  return { x: screen.width / 2 - w / 2, y: screen.height - h, w, h, img: canvasEl };
+  const floorY = screen.height - (screen.taskbarHeight ?? 0);
+  return { x: screen.width / 2 - w / 2, y: floorY - h, w, h, img: canvasEl };
 }
 let crtCycle: CrtCycle | null = null;
 let crtRequested = false;
