@@ -25,17 +25,19 @@ export class Debris {
   get pixels() {
     return this.bodies.reduce((n, b) => n + b.img.width * b.img.height, 0);
   }
-  add(body: Omit<Shard, "id" | "age" | "touched" | "asleep" | "fade">) {
+  add(body: Omit<Shard, "id" | "age" | "touched" | "asleep" | "fade">): Shard | null {
     const pixels = body.img.width * body.img.height;
     if (pixels > MAX_DEBRIS_PIXELS) {
       body.img.width = body.img.height = 1;
-      return;
+      return null;
     }
     while (this.bodies.length >= MAX_DEBRIS || this.pixels + pixels > MAX_DEBRIS_PIXELS) {
       const old = this.bodies.reduce((a, b) => (b.age - b.touched > a.age - a.touched ? b : a));
       this.remove(old);
     }
-    this.bodies.push({ ...body, id: ++this.serial, age: 0, touched: 0, asleep: false, fade: 1 });
+    const made: Shard = { ...body, id: ++this.serial, age: 0, touched: 0, asleep: false, fade: 1 };
+    this.bodies.push(made);
+    return made;
   }
   private remove(b: Shard) {
     this.bodies.splice(this.bodies.indexOf(b), 1);
@@ -71,7 +73,13 @@ export class Debris {
       if (b.fade <= 0) this.remove(b);
     }
   }
-  step(dt: number, width: number, height: number) {
+  /**
+   * `escape` is offered every piece about to bounce off a side, and says whether it took it on.
+   * A screen is one window of several, so a piece knocked off the side of this one belongs to
+   * the neighbour rather than to the wall it used to bounce off. Pieces it declines — because
+   * there is no screen that way — bounce as they always did.
+   */
+  step(dt: number, width: number, height: number, escape?: (b: Shard, edge: 1 | -1) => boolean) {
     dt = Math.max(0, Math.min(0.05, dt));
     for (const b of [...this.bodies]) {
       b.age += dt;
@@ -104,6 +112,15 @@ export class Debris {
           b.vx = b.vy = b.spin = 0;
           b.asleep = true;
         }
+      }
+      // Against a side and still travelling that way. Offered here rather than once it is
+      // properly outside, because the bounce below never lets it get that far; and only while
+      // it is still moving outward, so a piece that has just come in from next door cannot be
+      // handed straight back the way it came.
+      const leaving = b.x > width - b.w * 0.2 && b.vx > 0 ? 1 : b.x < b.w * 0.2 && b.vx < 0 ? -1 : 0;
+      if (leaving && escape && escape(b, leaving)) {
+        this.remove(b);
+        continue;
       }
       if (b.x < b.w * 0.2) {
         b.x = b.w * 0.2;

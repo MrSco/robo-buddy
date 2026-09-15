@@ -1,5 +1,5 @@
-import { Debris } from "./screensaver-debris";
-import { windowOutline, outlinePath, windowGlass, maskedWindow, fractureImage, surface } from "./screensaver-fracture";
+import { Debris, MAX_DEBRIS_PIXELS, type Shard } from "./screensaver-debris";
+import { windowOutline, outlinePath, windowGlass, maskedWindow, fractureImage, shatterPlane, surface } from "./screensaver-fracture";
 import { Prop } from "./screensaver-prop";
 import type { StrikeKind } from "./havoc";
 import { cyclePhase, shatterProgress, crtStartsAt, SHATTER_SECONDS, drawCrtSlice, erosionSeconds, type CrtCycle, type DesktopRect } from "./screensaver-cycle";
@@ -38,6 +38,24 @@ interface MonitorShot {
   sprites: SpriteRect[];
   /** Another screensaver is playing underneath; leave the holes see-through. */
   seeThrough: boolean;
+  /** Every monitor's rectangle in virtual pixels, in index order. */
+  screens: DesktopRect[];
+}
+
+/** A piece of one screen's desk, on its way to the screen it has been knocked onto. */
+interface Caught {
+  /** The shard's own pixels, as a data URL. */
+  png: string;
+  /** Where it has got to, in virtual-screen pixels, so either end can place it. */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  vx: number;
+  vy: number;
+  angle: number;
+  spin: number;
+  fade: number;
 }
 
 /** One piece of the desktop he can push about. */
@@ -160,6 +178,7 @@ async function start() {
   try {
     await listen<{kind: StrikeKind; dir: number}>("buddy-strike", e => punched(e.payload.dir, e.payload.kind));
     await listen<CrtCycle>("screensaver-crt", (event) => beginCycle(event.payload));
+    await listen<Caught>("screensaver-catch", (event) => void caught(event.payload));
   } catch (err) {
     log(`no crt sync: ${String(err).slice(0, 120)}`);
   }
@@ -467,45 +486,108 @@ function carve(s: Sprite) {
  */
 function shatterDesktop() {
   if (!eroded || !erodedCtx || !screen) return;
-  const across = 3;
-  const down = 2;
-  const cw = Math.ceil(screen.width / across);
-  const ch = Math.ceil(screen.height / down);
-  for (let row = 0; row < down; row++) {
-    for (let col = 0; col < across; col++) {
-      const sx = col * cw;
-      const sy = row * ch;
-      const w = Math.min(cw, screen.width - sx);
-      const h = Math.min(ch, screen.height - sy);
-      if (w < 2 || h < 2) continue;
-      const scale = Math.min(1, 512 / Math.max(w, h));
-      const chunk = surface(w * scale, h * scale);
-      chunk.getContext("2d")!.drawImage(eroded, sx, sy, w, h, 0, 0, chunk.width, chunk.height);
-      // Broken along the cracks in the artwork, the same way a window is, so the desk comes
-      // apart in shards. Cut into a grid of rectangles it read as a floor being tiled.
-      const texture = crackTextures.length ? crackTextures[(row * across + col) % crackTextures.length] : null;
-      const parts = texture ? fractureImage(chunk, texture, w, h) : [];
-      chunk.width = chunk.height = 1;
-      for (const part of parts) {
-        // Thrown outward from the middle of the screen, so the desk blows apart rather than
-        // sliding off the bottom in one sheet.
-        const px = sx + part.x + part.w / 2;
-        const away = px / screen.width - 0.5;
-        debris.add({
-          img: part.img,
-          x: px,
-          y: sy + part.y + part.h / 2,
-          w: part.w,
-          h: part.h,
-          vx: away * 1100 + (Math.random() - 0.5) * 300,
-          vy: -240 - Math.random() * 300,
-          angle: 0,
-          spin: (Math.random() - 0.5) * 2.6,
-        });
-      }
-    }
+  // Broken as one pane along cracks drawn across the whole screen, rather than a square at a
+  // time. Cut into a grid the desk came apart in tiles, and no amount of jaggedness inside a
+  // tile hid that: the impact artwork is a blast in the middle of an otherwise empty square, so
+  // the one region it marks out on a square of desktop is everything *around* the blast. That
+  // region is the tile, whatever shape the bite taken out of it happens to be.
+  //
+  // Half of what is left of the debris allowance: the windows still standing are shed into the
+  // same pile a moment later, and taking all of it here would evict them as they arrived.
+  const budget = Math.max(250000, (MAX_DEBRIS_PIXELS - debris.pixels) * 0.55);
+  // One break per screen, and the same one every time that screen breaks.
+  const parts = shatterPlane(eroded, screen.width, screen.height, 1013 + screenIndex * 977, DESKTOP_SHARDS, budget);
+  for (const part of parts) {
+    // Thrown outward from the middle of the screen, so the desk blows apart rather than
+    // sliding off the bottom in one sheet.
+    const px = part.x + part.w / 2;
+    const away = px / screen.width - 0.5;
+    debris.add({
+      img: part.img,
+      x: px,
+      y: part.y + part.h / 2,
+      w: part.w,
+      h: part.h,
+      vx: away * 1100 + (Math.random() - 0.5) * 300,
+      vy: -240 - Math.random() * 300,
+      angle: 0,
+      spin: (Math.random() - 0.5) * 2.6,
+    });
   }
   erodedCtx.clearRect(0, 0, screen.width, screen.height);
+}
+
+/** How many shards the desk comes apart into, per screen. */
+const DESKTOP_SHARDS = 22;
+/**
+ * Pieces handed to another screen in one frame. Sending one encodes its pixels, so the burst at
+ * the moment everything blows apart is worth spreading over a few frames.
+ */
+const HANDOFF_PER_FRAME = 3;
+let handedOn = 0;
+
+/**
+ * A piece has left this screen. If another screen covers where it has got to it carries on over
+ * there; if there is no screen that way it stays here and bounces off the edge as it used to.
+ *
+ * Each screen is its own window with its own canvas, so this is the only way across: the piece
+ * is encoded, sent, and rebuilt on the other side. Positions travel in virtual-screen pixels,
+ * which both ends can convert to and from without knowing how the screens are arranged.
+ */
+function handOn(b: Shard, edge: 1 | -1): boolean {
+  if (!screen || ended || handedOn >= HANDOFF_PER_FRAME) return false;
+  // What lies just past the edge it is leaving by, at the height it is leaving at. Not where
+  // the piece itself has got to: it is still a little inside this screen when it is offered up,
+  // so asking which screen covers the piece would always answer this one.
+  const px = edge === 1 ? screen.x + screen.width + 1 : screen.x - 1;
+  const py = screen.y + b.y;
+  const to = screen.screens.findIndex(
+    (m, i) => i !== screenIndex && px >= m.x && px < m.x + m.width && py >= m.y && py < m.y + m.height,
+  );
+  if (to < 0) return false;
+  const target = screen.screens[to];
+  handedOn++;
+  const carry: Caught = {
+    png: b.img.toDataURL("image/webp", 0.9),
+    // Far enough in that the far side's own edge does not immediately bounce it: arriving
+    // right on the boundary it would be clamped back and lose most of its speed on landing.
+    x: edge === 1 ? target.x + b.w * 0.2 + 1 : target.x + target.width - b.w * 0.2 - 1,
+    y: py,
+    w: b.w,
+    h: b.h,
+    vx: b.vx,
+    vy: b.vy,
+    angle: b.angle,
+    spin: b.spin,
+    fade: b.fade,
+  };
+  void emitTo("screensaver-" + to, "screensaver-catch", carry).catch(() => {});
+  return true;
+}
+
+/** A piece knocked off a neighbouring screen, arriving on this one. */
+async function caught(p: Caught) {
+  // Only while there is still a scene to join. Once the desk has gone the pile is cleared, and
+  // a straggler landing after that would hang in the dark on its own.
+  if (!screen || ended || (phase !== "erode" && phase !== "shatter")) return;
+  const bitmap = await createImageBitmap(await (await fetch(p.png)).blob());
+  const img = surface(bitmap.width, bitmap.height);
+  img.getContext("2d")!.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  const landed = debris.add({
+    img,
+    x: p.x - screen.x,
+    y: p.y - screen.y,
+    w: p.w,
+    h: p.h,
+    vx: p.vx,
+    vy: p.vy,
+    angle: p.angle,
+    spin: p.spin,
+  });
+  // It keeps whatever it had faded to, so a crossing at the end of a cycle does not come back
+  // to full strength halfway through everything going out.
+  if (landed) landed.fade = p.fade;
 }
 
 /** Artwork partitions are rasterized only on impact, never in the render loop. */
@@ -1001,7 +1083,8 @@ function frame(now: number) {
       ctx.drawImage(tile.img, -tile.img.width / 2, -tile.img.height / 2); ctx.restore();
     }
     tiles = tiles.filter(tile => tile.y - CELL <= screen!.height);
-    debris.step(dt, screen.width, screen.height);
+    handedOn = 0;
+    debris.step(dt, screen.width, screen.height, handOn);
     debris.draw(ctx);
     drawChair();
     ctx.setTransform(1, 0, 0, 1, 0, 0);

@@ -78,7 +78,8 @@ function fractureMasks(tex: CrackTexture): HTMLCanvasElement[] {
     ac = art.getContext("2d")!;
   ac.drawImage(tex.glass, 0, 0, 160, 160);
   const labels = artworkRegions(ac.getImageData(0, 0, 160, 160).data, 160, 160);
-  const count = Math.max(...labels) + 1;
+  let count = 0;
+  for (const label of labels) if (label + 1 > count) count = label + 1;
   const masks: HTMLCanvasElement[] = [];
   if (count < 2) {
     // Some slices contain only an impact pocket: its artwork supplies a two-piece split.
@@ -247,6 +248,175 @@ export function maskedWindow(img: ImageBitmap, outline: Float32Array | null): HT
   if (outline) c.restore();
   return canvas;
 }
+/** Longest side of the working raster a pane's crack field is traced at. */
+const FIELD_MAX = 720;
+/** Impact points struck into a whole pane, and the radial cracks each one throws off. */
+const IMPACTS = 9;
+const ARMS = 6;
+/** How far a crack is allowed to wander off true, in radians per step. Glass breaks nearly
+ * straight: more than this and the shards come out as rounded cells rather than splinters. */
+const WOBBLE = 0.15;
+
+/** Repeatable noise, so one screen's break is the same every time it is asked for. */
+function noise(seed: number) {
+  let s = seed >>> 0 || 1;
+  return () => {
+    s ^= s << 13;
+    s ^= s >>> 17;
+    s ^= s << 5;
+    return (s >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Crack lines across a whole pane, white on black, for artworkRegions to partition.
+ *
+ * The impact artwork cannot do this job. A slice is a blast with a hole in the middle of an
+ * otherwise empty square, so the one region the labelling finds is everything *around* the
+ * blast: a full rectangle with a bite out of it. Stretched over a piece of desktop that is
+ * exactly the tile it looked like. Stamping several slices does not help either, because their
+ * arms end in mid air and never cut the background into anything.
+ *
+ * So the field is drawn rather than photographed. Every arm runs from its impact right off the
+ * edge of the pane, which is what makes this a partition and not a pattern: a curve that ends
+ * on the boundary divides the face it crosses, so no region can span the whole pane however
+ * the arms happen to fall. Arms from neighbouring impacts cross each other, and a few ragged
+ * hops between consecutive arms stand in for the lateral cracks that stop real glass breaking
+ * into nothing but long wedges.
+ */
+export function crackField(w: number, h: number, seed: number): HTMLCanvasElement {
+  const field = surface(w, h);
+  const c = field.getContext("2d")!;
+  c.fillStyle = "#000";
+  c.fillRect(0, 0, w, h);
+  c.strokeStyle = "#fff";
+  c.lineCap = "round";
+  c.lineJoin = "round";
+  const random = noise(seed);
+  const span = Math.hypot(w, h);
+  const width = Math.max(1.4, span / 250);
+  const cols = Math.max(1, Math.round(Math.sqrt((IMPACTS * w) / Math.max(1, h))));
+  const rows = Math.max(1, Math.ceil(IMPACTS / cols));
+  const points: { x: number; y: number }[] = [];
+  for (let r = 0; r < rows && points.length < IMPACTS; r++)
+    for (let q = 0; q < cols && points.length < IMPACTS; q++)
+      points.push({ x: ((q + 0.15 + random() * 0.7) * w) / cols, y: ((r + 0.15 + random() * 0.7) * h) / rows });
+  const run = (x0: number, y0: number, aim: number, length: number) => {
+    c.lineWidth = width;
+    c.beginPath();
+    c.moveTo(x0, y0);
+    let x = x0,
+      y = y0;
+    const step = Math.max(14, length / 9);
+    for (let d = 0; d < length; d += step) {
+      const angle = aim + (random() - 0.5) * WOBBLE;
+      x += Math.cos(angle) * step;
+      y += Math.sin(angle) * step;
+      c.lineTo(x, y);
+    }
+    c.stroke();
+  };
+  for (const p of points) {
+    const base = random() * Math.PI * 2;
+    const arms = ARMS + Math.floor(random() * 3);
+    const aims: number[] = [];
+    for (let i = 0; i < arms; i++) {
+      const aim = base + (i * 2 * Math.PI) / arms + (random() - 0.5) * 0.7;
+      aims.push(aim);
+      run(p.x, p.y, aim, span);
+    }
+    for (let i = 0; i < arms; i++) {
+      if (random() < 0.45) continue;
+      const radius = (0.08 + random() * 0.3) * span;
+      const x0 = p.x + Math.cos(aims[i]) * radius;
+      const y0 = p.y + Math.sin(aims[i]) * radius;
+      const far = radius * (0.7 + random() * 0.6);
+      const x1 = p.x + Math.cos(aims[(i + 1) % arms]) * far;
+      const y1 = p.y + Math.sin(aims[(i + 1) % arms]) * far;
+      c.lineWidth = width * 0.8;
+      c.beginPath();
+      c.moveTo(x0, y0);
+      for (let s = 1; s <= 5; s++) {
+        const t = s / 5;
+        c.lineTo(x0 + (x1 - x0) * t + (random() - 0.5) * radius * 0.25, y0 + (y1 - y0) * t + (random() - 0.5) * radius * 0.25);
+      }
+      c.stroke();
+    }
+  }
+  return field;
+}
+
+/**
+ * A whole pane broken into shards: the desktop at the end of a cycle, rather than a window.
+ *
+ * `budget` is the raster the caller can afford in total; every piece is scaled by the same
+ * factor to fit inside it, so the break is as sharp as the debris allowance permits and never
+ * arrives so heavy that adding the last pieces evicts the first.
+ */
+export function shatterPlane(
+  src: CanvasImageSource,
+  worldW: number,
+  worldH: number,
+  seed: number,
+  pieces: number,
+  budget: number,
+): FragmentImage[] {
+  const scale = Math.min(1, FIELD_MAX / Math.max(worldW, worldH));
+  const fw = Math.max(8, Math.round(worldW * scale));
+  const fh = Math.max(8, Math.round(worldH * scale));
+  const field = crackField(fw, fh, seed);
+  const labels = artworkRegions(field.getContext("2d")!.getImageData(0, 0, fw, fh).data, fw, fh, pieces);
+  field.width = field.height = 1;
+  let count = 0;
+  for (const label of labels) if (label + 1 > count) count = label + 1;
+  if (count < 1) return [];
+  // One pass for every region's bounds, rather than a full-size mask each.
+  const x0 = new Int32Array(count).fill(fw),
+    y0 = new Int32Array(count).fill(fh),
+    x1 = new Int32Array(count).fill(-1),
+    y1 = new Int32Array(count).fill(-1);
+  for (let y = 0; y < fh; y++)
+    for (let x = 0; x < fw; x++) {
+      const id = labels[y * fw + x];
+      if (id < 0) continue;
+      if (x < x0[id]) x0[id] = x;
+      if (y < y0[id]) y0[id] = y;
+      if (x > x1[id]) x1[id] = x;
+      if (y > y1[id]) y1[id] = y;
+    }
+  let area = 0;
+  for (let id = 0; id < count; id++)
+    if (x1[id] >= x0[id]) area += ((x1[id] - x0[id] + 1) / scale) * ((y1[id] - y0[id] + 1) / scale);
+  const raster = Math.min(1, Math.sqrt(budget / Math.max(1, area)));
+  const out: FragmentImage[] = [];
+  for (let id = 0; id < count; id++) {
+    if (x1[id] < x0[id]) continue;
+    const mw = x1[id] - x0[id] + 1,
+      mh = y1[id] - y0[id] + 1;
+    const mask = surface(mw, mh);
+    const mc = mask.getContext("2d")!;
+    const bits = mc.createImageData(mw, mh);
+    for (let y = 0; y < mh; y++)
+      for (let x = 0; x < mw; x++)
+        if (labels[(y + y0[id]) * fw + x + x0[id]] === id) bits.data[(y * mw + x) * 4 + 3] = 255;
+    mc.putImageData(bits, 0, 0);
+    const wx = x0[id] / scale,
+      wy = y0[id] / scale,
+      ww = mw / scale,
+      wh = mh / scale;
+    const pw = Math.max(1, Math.round(ww * raster)),
+      ph = Math.max(1, Math.round(wh * raster));
+    const piece = surface(pw, ph);
+    const pc = piece.getContext("2d")!;
+    pc.drawImage(src, wx, wy, ww, wh, 0, 0, pw, ph);
+    pc.globalCompositeOperation = "destination-in";
+    pc.drawImage(mask, 0, 0, pw, ph);
+    mask.width = mask.height = 1;
+    out.push({ img: piece, x: wx, y: wy, w: ww, h: wh });
+  }
+  return out;
+}
+
 export interface FragmentImage {
   img: HTMLCanvasElement;
   x: number;

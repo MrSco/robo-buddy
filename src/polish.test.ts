@@ -160,6 +160,49 @@ it("settles debris, then kicks and throws it awake, and eventually fades it", ()
   for (let i = 0; i < 2400; i++) d.step(1 / 60, 1000, 800);
   expect(d.bodies).toHaveLength(0);
 });
+it("hands a shard to the next screen along, and bounces it where there is none", () => {
+  const monitors = [
+    { x: 0, y: 0, width: 1000, height: 800 },
+    { x: 1000, y: 0, width: 1000, height: 800 },
+  ];
+  // Standing in for one screensaver page: it owns monitor 0 and can only see its own pixels.
+  const mine = monitors[0];
+  const sent: { to: number; x: number }[] = [];
+  const handOn = (b: { x: number; y: number }, edge: 1 | -1) => {
+    const px = edge === 1 ? mine.x + mine.width + 1 : mine.x - 1;
+    const py = mine.y + b.y;
+    const to = monitors.findIndex((m, i) => i !== 0 && px >= m.x && px < m.x + m.width && py >= m.y && py < m.y + m.height);
+    if (to < 0) return false;
+    sent.push({ to, x: monitors[to].x + 1 });
+    return true;
+  };
+  const d = new Debris();
+  // Thrown right, off the inner edge: monitor 1 is that way, so it goes over.
+  const right = d.add(shard(80))!;
+  right.x = 900;
+  right.y = 200;
+  right.vx = 3000;
+  right.vy = -200;
+  for (let i = 0; i < 120 && d.bodies.length; i++) d.step(1 / 60, mine.width, mine.height, handOn);
+  expect(sent).toHaveLength(1);
+  expect(sent[0].to).toBe(1);
+  expect(sent[0].x).toBeGreaterThanOrEqual(1000);
+  expect(d.bodies).toHaveLength(0);
+
+  // Thrown left, off the outer edge: nothing over there, so it stays and bounces. Kept short,
+  // because a piece that bounces off the far wall will cross the screen and leave by the inner
+  // edge like the first one did.
+  const left = d.add(shard(80))!;
+  left.x = 100;
+  left.y = 200;
+  left.vx = -3000;
+  left.vy = -200;
+  for (let i = 0; i < 30; i++) d.step(1 / 60, mine.width, mine.height, handOn);
+  expect(sent).toHaveLength(1);
+  expect(d.bodies).toHaveLength(1);
+  expect(d.bodies[0].x).toBeGreaterThanOrEqual(0);
+  expect(d.bodies[0].vx).toBeGreaterThan(0);
+});
 it("derives shard boundaries from a bent artwork crack, not a square grid", () => {
   const w = 40,
     h = 40,

@@ -179,6 +179,9 @@ pub struct MonitorShot {
     /// True when another screensaver is playing underneath, so the holes are left see-through
     /// instead of being painted black.
     pub see_through: bool,
+    /// Every monitor's rectangle in virtual-screen pixels, in index order. A page needs the
+    /// others to work out which screen a piece it has knocked off its own edge is flying onto.
+    pub screens: Vec<DesktopRect>,
 }
 
 #[derive(serde::Serialize, Clone)]
@@ -436,6 +439,10 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
     // Everything he plays with is cut from these pictures, taken while the desktop is still the
     // desktop; the windows are listed at the same moment for the same reason.
     let windows = list_windows();
+    let screens: Vec<DesktopRect> = monitors
+        .iter()
+        .map(|m| DesktopRect { x: m.position().x, y: m.position().y, width: m.size().width as i32, height: m.size().height as i32 })
+        .collect();
     let taken = (|| -> Result<Vec<MonitorShot>, String> {
         let mut shots = Vec::new();
         for m in &monitors {
@@ -470,7 +477,7 @@ pub fn screensaver_start(app: tauri::AppHandle) -> Result<(), String> {
                     Some(Sprite { x: x - mx, y: y - my, width, height, png: encode(&rgba, width, height).ok()? })
                 })
                 .collect();
-            shots.push(MonitorShot { virtual_desktop: virtual_desktop.clone(), x: mx, y: my, width: mw, height: mh, png, sprites, see_through: false });
+            shots.push(MonitorShot { virtual_desktop: virtual_desktop.clone(), x: mx, y: my, width: mw, height: mh, png, sprites, see_through: false, screens: screens.clone() });
         }
         Ok(shots)
     })();
