@@ -44,15 +44,19 @@ export class Prop {
     this.aspect = size.x / size.y;
 
     // Front on and a little above, so the seat reads as a seat rather than as a wall.
+    //
+    // Viewed from behind -Z, because a model authored in Blender faces that way once exported:
+    // the exporter maps Blender's forward axis to glTF's -Z. Sitting the camera on +Z instead
+    // showed the back of the chair, which is a featureless slab of leather.
     const dist = 1 / (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2)));
-    this.camera.position.set(0, 0.52, dist * 1.08);
+    this.camera.position.set(0, 0.52, -dist * 1.08);
     this.camera.lookAt(0, 0.46, 0);
 
     const key = new THREE.DirectionalLight(0xffffff, 2.2);
-    key.position.set(-1.2, 2.2, 1.8);
+    key.position.set(1.2, 2.2, -1.8);
     this.scene.add(key);
     const fill = new THREE.DirectionalLight(0xbcd2ff, 0.8);
-    fill.position.set(1.6, 0.8, 1.2);
+    fill.position.set(-1.6, 0.8, -1.2);
     this.scene.add(fill);
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.35));
   }
