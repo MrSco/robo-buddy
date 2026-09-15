@@ -892,13 +892,15 @@ function frame(now: number) {
         sendSurfaces();
       }
       phase = next;
-      chairAlpha = 0;
-      if (chairTold) {
-        chairTold = false;
-        void emitTo("buddy", "screensaver-sit", null).catch(() => {});
-      }
+      // He stays in the chair through the tube going off and the dark that follows, until the
+      // desk comes back. Released at the tube he stood up and went back to swinging at an empty
+      // screen for the rest of the cycle.
       // The tube's own stretch begins after the collapse, not when the cycle did.
       drawCrtSlice(ctx, screen, screen.virtualDesktop, (Date.now() - crtCycle.startedAt) / 1000 - crtStartsAt(crtCycle));
+      // He is in his own window and stays visible throughout, so the chair stays under him
+      // throughout as well; hiding it for the second the tube takes to collapse left him sitting
+      // on nothing. The desk goes off behind the pair of them.
+      drawChair();
       requestAnimationFrame(frame);
       return;
     }

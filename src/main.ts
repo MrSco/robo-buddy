@@ -631,7 +631,7 @@ function sitDown(t: number, act: Activity) {
     return;
   }
   seated = true;
-  if (act.kind !== "fidget" || act.clip.name !== SIT_CLIP) behavior.forceFidget(t, SIT_CLIP);
+  behavior.forceLoop(SIT_CLIP);
 }
 
 /** Start a Live voice session for the open talk box; failures land in the bubble. */

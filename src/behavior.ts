@@ -191,6 +191,22 @@ export class Behavior {
   }
 
   /** Play one clip once, now (a chat "do the X"). */
+  /**
+   * Hold a clip, looping, until something else takes over. Re-issuing a one-shot instead let
+   * him fall back to standing for a moment between repeats and then fade into the clip again,
+   * which is a visible hitch every time round.
+   */
+  forceLoop(name: string) {
+    const d = this.durations(name);
+    if (d <= 0) return false;
+    if (this.activity.kind === "fidget" && this.activity.clip.name === name && this.activity.clip.loop) return true;
+    this.fidgetQueue = [];
+    this.activity = { kind: "fidget", clip: { name, loop: true } };
+    this.activityEnds = Infinity;
+    this.nextEvent = Infinity;
+    return true;
+  }
+
   forceFidget(t: number, name: string) {
     const d = this.durations(name);
     if (d <= 0) return false;
