@@ -430,7 +430,13 @@ function carve(s: Sprite) {
   // own broken shape rather than the square the window filled. Taken before the clip below:
   // built afterwards it is the clipped window minus the very shape it was clipped to, which is
   // nothing at all, and the corners of every square hole stayed black.
-  if (erodedCtx) {
+  //
+  // Only while there is still a desk to stick to. At the end of the cycle the picture has
+  // already been broken into its own pieces before the windows are shed, and each window shed
+  // after that painted its leftover frame back onto the empty canvas, where it stayed: those
+  // were the remnants of window cutouts sitting there after everything else had gone. From here
+  // the whole window goes into the debris instead, which is what the rest of the desk is doing.
+  if (erodedCtx && phase === "erode") {
     const remnant = surface(s.w, s.h);
     const rc = remnant.getContext("2d")!;
     rc.drawImage(s.cut, 0, 0, s.w, s.h);
