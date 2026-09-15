@@ -44,6 +44,13 @@ interface MonitorShot {
 
 /** A piece of one screen's desk, on its way to the screen it has been knocked onto. */
 interface Caught {
+  /**
+   * Which screen it is for. Carried in the message because a listener made with listen() takes
+   * events sent to *any* target, so emitTo names the screen without excusing the others: every
+   * screensaver window received every hand-off, caught its own copy, and passed that on in
+   * turn. One piece knocked off an edge became a fan of them within a few frames.
+   */
+  to: number;
   /** The shard's own pixels, as a data URL. */
   png: string;
   /** Where it has got to, in virtual-screen pixels, so either end can place it. */
@@ -548,7 +555,9 @@ function handOn(b: Shard, edge: 1 | -1): boolean {
   const target = screen.screens[to];
   handedOn++;
   const carry: Caught = {
-    png: b.img.toDataURL("image/webp", 0.9),
+    to,
+    // Lossless, and measured faster here than webp at 0.9 as well: 3ms against 7 for a shard.
+    png: b.img.toDataURL("image/png"),
     // Far enough in that the far side's own edge does not immediately bounce it: arriving
     // right on the boundary it would be clamped back and lose most of its speed on landing.
     x: edge === 1 ? target.x + b.w * 0.2 + 1 : target.x + target.width - b.w * 0.2 - 1,
@@ -567,6 +576,7 @@ function handOn(b: Shard, edge: 1 | -1): boolean {
 
 /** A piece knocked off a neighbouring screen, arriving on this one. */
 async function caught(p: Caught) {
+  if (p.to !== screenIndex) return;
   // Only while there is still a scene to join. Once the desk has gone the pile is cleared, and
   // a straggler landing after that would hang in the dark on its own.
   if (!screen || ended || (phase !== "erode" && phase !== "shatter")) return;

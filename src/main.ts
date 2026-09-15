@@ -117,6 +117,8 @@ let punchCount = 0;
  */
 let sitAt: number | null = null;
 let seated = false;
+/** He is being held in the sitting clip, and has to be let out of it by hand. */
+let sitting = false;
 const SIT_CLIP = "Sitting_Laughing";
 function attackClip(kind: StrikeKind) {
   const names = kind === "kick" ? ["Kick", "Kick_Front"] : kind === "throw" ? ["Throw", "Throw_Object"] : ["Punch_Cross", "Punch_Jab", "Sword_Attack"];
@@ -617,11 +619,20 @@ function runCommand(cmd: Command): string | null {
 }
 
 /**
- * Walk him to the chair and keep him in it. The clip is re-issued when it ends rather than
- * looped, so the laugh repeats for as long as the quiet stretch lasts.
+ * Walk him to the chair and keep him in it. The clip is held looping rather than re-issued
+ * each time it ends, which used to drop him back to standing for a moment every time round.
  */
 function sitDown(t: number, act: Activity) {
-  if (sitAt === null || !physics) return;
+  if (sitAt === null || !physics) {
+    // The chair has gone: the end of a cycle, or the screensaver itself. He has to be let out
+    // of the loop by hand, because a held clip has no end of its own to arrive at. Without
+    // this he stayed in it for good, sitting in mid air over the restored desktop.
+    if (sitting) {
+      sitting = false;
+      behavior.interrupt(t);
+    }
+    return;
+  }
   behavior.energetic = false;
   if (physics.mode !== "rest") return;
   const middle = physics.x + physics.w / 2;
@@ -631,6 +642,7 @@ function sitDown(t: number, act: Activity) {
     return;
   }
   seated = true;
+  sitting = true;
   behavior.forceLoop(SIT_CLIP);
 }
 
