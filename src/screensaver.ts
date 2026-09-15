@@ -1,5 +1,6 @@
 import { Debris } from "./screensaver-debris";
 import { windowOutline, outlinePath, windowGlass, maskedWindow, fractureImage, surface } from "./screensaver-fracture";
+import { Prop } from "./screensaver-prop";
 import type { StrikeKind } from "./havoc";
 import { cyclePhase, shatterProgress, crtStartsAt, SHATTER_SECONDS, drawCrtSlice, erosionSeconds, type CrtCycle, type DesktopRect } from "./screensaver-cycle";
 import { loadCrackTextures, type CrackTexture } from "./screensaver-cracks";
@@ -166,13 +167,8 @@ async function start() {
     crackTextures = await loadCrackTextures();
     log(`loaded ${crackTextures.length} impacts`);
   }
-  if (screenIndex === 0) {
-    try {
-      chair = await createImageBitmap(await (await fetch("/chair.webp")).blob());
-    } catch {
-      // No chair: he simply has nowhere to sit, and the rest of the cycle is unaffected.
-    }
-  }
+  // Only the screen he ends up on pays for loading it.
+  if (screenIndex === 0) chair = await Prop.load("/props/chair.glb");
   initErosion(screen.width, screen.height);
 
   // Back to front, so the sprite drawn last is the one that was on top. Each carries its own
@@ -565,15 +561,25 @@ let phase: "erode" | "shatter" | "bare" | "crtOff" | "void" = "erode";
  * broken up: it fades in over the second half of the shatter, as the shrapnel fades out, and
  * stands there through the quiet stretch that follows until the tube goes off.
  */
-let chair: ImageBitmap | null = null;
+let chair: Prop | null = null;
 let chairAlpha = 0;
 let chairTold = false;
-/** Where the seat is, in this screen's pixels. */
+/**
+ * A real armchair stands a little over half the height of the person sitting in it. His height
+ * on screen is not the height of his window: the camera keeps at least a third of a body of
+ * headroom above him for the speech bubble, which is what the second figure allows for. Sized
+ * from his window rather than from the screen, so it follows whatever size he is set to.
+ */
+const CHAIR_OF_HIM = 0.62;
+const HIM_OF_HIS_WINDOW = 0.77;
+/** Where the chair stands, in this screen's pixels. */
 function chairRect() {
   if (!chair || !screen) return null;
-  const h = screen.height * 0.42;
-  const w = (chair.width / chair.height) * h;
-  return { x: screen.width / 2 - w / 2, y: screen.height - h, w, h };
+  const hisHeight = (buddy?.h ?? screen.height * 0.45) * HIM_OF_HIS_WINDOW;
+  const h = hisHeight * CHAIR_OF_HIM;
+  const canvasEl = chair.render(h);
+  const w = (canvasEl.width / canvasEl.height) * h;
+  return { x: screen.width / 2 - w / 2, y: screen.height - h, w, h, img: canvasEl };
 }
 let crtCycle: CrtCycle | null = null;
 let crtRequested = false;
@@ -1003,13 +1009,14 @@ function frame(now: number) {
 }
 
 function drawChair() {
+  if (chairAlpha <= 0.002 || !screen) return;
   const rect = chairRect();
-  if (!rect || chairAlpha <= 0.002 || !screen) return;
+  if (!rect) return;
   const scale = canvas.width / screen.width;
   ctx.save();
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.globalAlpha = chairAlpha;
-  ctx.drawImage(chair!, rect.x, rect.y, rect.w, rect.h);
+  ctx.drawImage(rect.img, rect.x, rect.y, rect.w, rect.h);
   ctx.restore();
 }
 
