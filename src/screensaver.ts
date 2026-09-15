@@ -166,6 +166,13 @@ async function start() {
     crackTextures = await loadCrackTextures();
     log(`loaded ${crackTextures.length} impacts`);
   }
+  if (screenIndex === 0) {
+    try {
+      chair = await createImageBitmap(await (await fetch("/chair.webp")).blob());
+    } catch {
+      // No chair: he simply has nowhere to sit, and the rest of the cycle is unaffected.
+    }
+  }
   initErosion(screen.width, screen.height);
 
   // Back to front, so the sprite drawn last is the one that was on top. Each carries its own
@@ -553,6 +560,21 @@ let carry = 0;
 /** "erode": desktop and windows breaking away. "crtOff": the tube-TV collapse before it all
  * snaps back whole and erodes again. */
 let phase: "erode" | "shatter" | "bare" | "crtOff" | "void" = "erode";
+/**
+ * The chair he ends up in. Drawn only on the first screen, and only once the desk has been
+ * broken up: it fades in over the second half of the shatter, as the shrapnel fades out, and
+ * stands there through the quiet stretch that follows until the tube goes off.
+ */
+let chair: ImageBitmap | null = null;
+let chairAlpha = 0;
+let chairTold = false;
+/** Where the seat is, in this screen's pixels. */
+function chairRect() {
+  if (!chair || !screen) return null;
+  const h = screen.height * 0.42;
+  const w = (chair.width / chair.height) * h;
+  return { x: screen.width / 2 - w / 2, y: screen.height - h, w, h };
+}
 let crtCycle: CrtCycle | null = null;
 let crtRequested = false;
 
@@ -813,6 +835,11 @@ function frame(now: number) {
     if (next === "erode") {
       restoreDesktop();
       phase = "erode";
+      chairAlpha = 0;
+      if (chairTold) {
+        chairTold = false;
+        void emitTo("buddy", "screensaver-sit", null).catch(() => {});
+      }
       sendSurfaces();
     } else if (next === "shatter") {
       // Everything still standing breaks into pieces, and the pieces fade out together. The
@@ -832,6 +859,9 @@ function frame(now: number) {
       // Faded as one, over what is left of this stretch: the usual rule ages each piece on its
       // own, so the last ones made hung about long after the rest had gone.
       debris.fadeAll(dt, Math.max(0.2, SHATTER_SECONDS * (1 - shatterProgress(crtCycle, Date.now()))));
+      // Coming in as the shrapnel goes out, over the back half of the breaking up.
+      chairAlpha = Math.max(0, Math.min(1, (shatterProgress(crtCycle, Date.now()) - 0.5) * 2));
+      tellHimToSit();
     } else if (next === "bare") {
       // Nothing of the desk left: just him, in front of whatever plays behind. This is the
       // stretch the void seconds actually buy, which is why the breaking up above is not part
@@ -843,8 +873,11 @@ function frame(now: number) {
         tiles = [];
         sendSurfaces();
       }
+      chairAlpha = 1;
+      tellHimToSit();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawChair();
       requestAnimationFrame(frame);
       return;
     } else if (next !== "waiting") {
@@ -853,6 +886,11 @@ function frame(now: number) {
         sendSurfaces();
       }
       phase = next;
+      chairAlpha = 0;
+      if (chairTold) {
+        chairTold = false;
+        void emitTo("buddy", "screensaver-sit", null).catch(() => {});
+      }
       // The tube's own stretch begins after the collapse, not when the cycle did.
       drawCrtSlice(ctx, screen, screen.virtualDesktop, (Date.now() - crtCycle.startedAt) / 1000 - crtStartsAt(crtCycle));
       requestAnimationFrame(frame);
@@ -957,10 +995,35 @@ function frame(now: number) {
     tiles = tiles.filter(tile => tile.y - CELL <= screen!.height);
     debris.step(dt, screen.width, screen.height);
     debris.draw(ctx);
+    drawChair();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
   }
   requestAnimationFrame(frame);
+}
+
+function drawChair() {
+  const rect = chairRect();
+  if (!rect || chairAlpha <= 0.002 || !screen) return;
+  const scale = canvas.width / screen.width;
+  ctx.save();
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.globalAlpha = chairAlpha;
+  ctx.drawImage(chair!, rect.x, rect.y, rect.w, rect.h);
+  ctx.restore();
+}
+
+/** Tell him where the seat is, once, in the coordinates his physics works in. */
+function tellHimToSit() {
+  if (chairTold || !screen) return;
+  const rect = chairRect();
+  if (!rect) return;
+  chairTold = true;
+  void emitTo("buddy", "screensaver-sit", {
+    x: Math.round(screen.x + rect.x + rect.w / 2),
+    // The seat itself, a little above the floor: what he walks to is the x, this is for reference.
+    y: Math.round(screen.y + rect.y + rect.h * 0.62),
+  }).catch(() => {});
 }
 
 /** Any sign of a person ends it, the way a screensaver should. */

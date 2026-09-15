@@ -16,6 +16,8 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon", "protocol-asset"] }
 tauri-plugin-window-state = "2"
 tauri-plugin-dialog = "2"
+# One async lock, so a warm-up already in flight is waited on rather than raced.
+tokio = { version = "1", features = ["sync"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }

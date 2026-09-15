@@ -3274,6 +3274,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-single-instance",
  "tauri-plugin-window-state",
+ "tokio",
  "wasapi",
  "windows 0.61.3",
  "winreg 0.55.0",

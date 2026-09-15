@@ -237,6 +237,7 @@ pub fn run() {
             chat::has_chat_key,
             chat::chat_complete,
             chat::transcribe,
+            chat::warm_speech_model,
             chat::speak_piper,
             chat::chat_usage,
             chat::load_phrases,

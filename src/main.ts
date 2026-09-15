@@ -6,7 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, emit } from "@tauri-apps/api/event";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { Music } from "./audio";
-import { Behavior, type ClipChoice } from "./behavior";
+import { Behavior, type Activity, type ClipChoice } from "./behavior";
 import { effectiveManifest, invalidateLibrary, listLibrary } from "./library";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Bubble } from "./bubble";
@@ -110,6 +110,14 @@ let dancedThisSession = false;
 let screensaverOn = false;
 let hopCount = 0;
 let punchCount = 0;
+/**
+ * The last act of a screensaver cycle. Once the desk has been broken up there is nothing left
+ * to attack, so he stops trying, walks to the chair that fades in on the first screen, and sits
+ * in it laughing until the tube goes off. Null whenever there is no chair to go to.
+ */
+let sitAt: number | null = null;
+let seated = false;
+const SIT_CLIP = "Sitting_Laughing";
 function attackClip(kind: StrikeKind) {
   const names = kind === "kick" ? ["Kick", "Kick_Front"] : kind === "throw" ? ["Throw", "Throw_Object"] : ["Punch_Cross", "Punch_Jab", "Sword_Attack"];
   return names.find(n => (renderer?.clipDuration(n) ?? 0) > 0);
@@ -237,6 +245,15 @@ async function boot() {
       mirrorPose = e.payload;
       lastPoseAt = clock.elapsedTime;
     });
+    await listen<{ x: number; y: number } | null>("screensaver-sit", e => {
+      sitAt = e.payload ? e.payload.x : null;
+      seated = false;
+      if (sitAt !== null) {
+        behavior.energetic = false;
+        attackTargets.clear();
+        havocAction = null;
+      }
+    });
     await listen<{ index: number; targets: AttackTarget[] }>("screensaver-targets", e => {
       if (screensaverOn) attackTargets.set(e.payload.index, e.payload.targets);
     });
@@ -249,6 +266,10 @@ async function boot() {
       attackTargets.clear();
       havocAction = null;
       timedPunch = null;
+      // The chair goes with the screensaver: without this he would still be sitting in one that
+      // is no longer there once the desk came back.
+      sitAt = null;
+      seated = false;
       behavior.energetic = e.payload;
       if (physics) physics.roam = e.payload;
       // A screensaver runs in an empty room; thuds and boings there are just noise.
@@ -595,6 +616,24 @@ function runCommand(cmd: Command): string | null {
   }
 }
 
+/**
+ * Walk him to the chair and keep him in it. The clip is re-issued when it ends rather than
+ * looped, so the laugh repeats for as long as the quiet stretch lasts.
+ */
+function sitDown(t: number, act: Activity) {
+  if (sitAt === null || !physics) return;
+  behavior.energetic = false;
+  if (physics.mode !== "rest") return;
+  const middle = physics.x + physics.w / 2;
+  if (!seated && Math.abs(middle - sitAt) > 30) {
+    // Re-issued whenever he is not walking: a charge or a fall can interrupt the trip over.
+    if (act.kind !== "walk") behavior.startWalk(t, sitAt - physics.w / 2);
+    return;
+  }
+  seated = true;
+  if (act.kind !== "fidget" || act.clip.name !== SIT_CLIP) behavior.forceFidget(t, SIT_CLIP);
+}
+
 /** Start a Live voice session for the open talk box; failures land in the bubble. */
 async function startLive() {
   if (live.state !== "off") return;
@@ -707,6 +746,11 @@ talk.onHeard = (text) => {
 talk.onOpenChange = (open) => {
   ignoringCursor = null; // re-evaluate click-through now that the strip is (in)visible
   if (open && IN_TAURI) getCurrentWindow().setFocus().catch(() => {});
+  // A local speech server may have to load its model before it will transcribe anything, which
+  // takes long enough that the first recording looks like it has failed. Started as the box
+  // opens, so the wait happens while you are getting ready to speak; a recording arriving
+  // before it has finished waits for this one rather than asking for the model again.
+  if (open && IN_TAURI && !liveMode()) void invoke("warm_speech_model").catch(() => {});
   if (open && liveMode()) void startLive();
   if (!open) {
     voice.stop();
@@ -1050,7 +1094,7 @@ function frame() {
       void emit("buddy-strike", {kind:"punch",dir:timedPunch.dir}).catch(() => {});
     }
   }
-  havocAction = havoc.update(t, !timedPunch && screensaverOn && !paused && !asleep && !!physics &&
+  havocAction = havoc.update(t, sitAt === null && !timedPunch && screensaverOn && !paused && !asleep && !!physics &&
     (physics.mode === "rest" || (physics.airborne && !!physics.launch)) && danceAmount < .5,
     settings.screensaverIntensity ?? 70, physics?.x ?? 0, physics?.y ?? 0, physics?.w ?? 320, physics?.h ?? 440,
     [...attackTargets.values()].flat(), physics?.airborne ?? false);
@@ -1079,6 +1123,7 @@ function frame() {
     deskLeft: physics?.deskBounds.left ?? 0,
     deskRight: physics?.deskBounds.right ?? 1920,
   });
+  sitDown(t, act);
   const resolved = resolveState(t, act);
   currentState = resolved.state;
   lastAct = act.kind;

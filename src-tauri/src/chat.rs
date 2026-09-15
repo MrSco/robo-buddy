@@ -260,6 +260,18 @@ pub async fn transcribe(app: AppHandle, audio: Vec<u8>, mime: String) -> Result<
 /// The speech model file this endpoint has already been told to load, so it is asked once per
 /// run rather than before every utterance.
 static LOADED_SPEECH_MODEL: std::sync::Mutex<Option<(String, String)>> = std::sync::Mutex::new(None);
+/// Held for the whole of a load, so a recording arriving mid warm-up waits for it instead of
+/// asking the server to load the same model a second time underneath the first.
+static SPEECH_MODEL_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+/// Load the speech model before it is wanted. The talk box calls this as it opens, so the wait
+/// happens while you are getting ready to speak rather than after you have finished: a large
+/// model takes long enough that the first recording otherwise looks like it has failed.
+#[tauri::command]
+pub async fn warm_speech_model(app: AppHandle) {
+    let t = target(&app);
+    load_speech_model(&app, &t.stt_endpoint, &t.stt_model_path).await;
+}
 
 /**
  * Tell a local speech server which model file to use, if one has been configured.
@@ -270,9 +282,12 @@ static LOADED_SPEECH_MODEL: std::sync::Mutex<Option<(String, String)>> = std::sy
  * which then reports whatever the server really thinks is wrong.
  */
 async fn load_speech_model(app: &AppHandle, endpoint: &str, path: &str) {
-    if path.is_empty() {
+    if path.is_empty() || endpoint.is_empty() {
         return;
     }
+    let _serialised = SPEECH_MODEL_LOCK.lock().await;
+    // Checked again now the lock is held: the warm-up this call was queued behind may well have
+    // been loading this very model.
     if let Ok(slot) = LOADED_SPEECH_MODEL.lock() {
         if slot.as_ref().is_some_and(|(e, p)| e == endpoint && p == path) {
             return;
