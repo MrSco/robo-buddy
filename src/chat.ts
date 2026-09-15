@@ -246,6 +246,39 @@ const TALK_IDLE_MS = 45_000;
 const LOG_MAX = 30;
 
 /** The input strip at his feet: type, or click the mic and talk. */
+/** How loud a moment has to be, absolutely, to count as speech rather than room noise. */
+const SPEECH_LEVEL = 0.05;
+/** ...and how far above the quietest moment of the same recording. */
+const SPEECH_OVER_ROOM = 2.5;
+/** How many such moments a recording needs before it is worth transcribing; one per 50ms. */
+const SPEECH_FRAMES = 4;
+
+/**
+ * Did anyone actually speak? Judged from the levels the meter is already measuring, one per
+ * 50ms of recording.
+ *
+ * Whisper does not answer silence with silence. It answers with whatever it has heard most
+ * often in the quiet, so an empty room comes back as "Thank you." or "Bye." and goes off to the
+ * model for a reply. Once there is text there is no telling it from something that was really
+ * said, so the recording has to be judged before it is sent.
+ *
+ * The quietest moment stands in for the room, and speech has to stand well clear of it: a hissy
+ * microphone is then judged against its own hiss rather than a number picked on someone else's
+ * desk. It has to clear a fixed level as well, for a room that is loud throughout. Wanting
+ * several such moments keeps a cough or a knock from counting as a sentence.
+ *
+ * No levels at all means the meter never ran, and a recording is never thrown away over that.
+ */
+export function heardSpeech(levels: readonly number[]): boolean {
+  if (levels.length === 0) return true;
+  let floor = 1;
+  for (const level of levels) floor = Math.min(floor, level);
+  const bar = Math.max(SPEECH_LEVEL, floor * SPEECH_OVER_ROOM);
+  let loud = 0;
+  for (const level of levels) if (level > bar) loud++;
+  return loud >= SPEECH_FRAMES;
+}
+
 export class TalkBox {
   readonly el: HTMLDivElement;
   private input: HTMLInputElement;
@@ -497,6 +530,9 @@ export class TalkBox {
     if (this.recorder) this.stopRecording(false);
   }
 
+  /** Every level the meter measured during this recording, for heardSpeech to judge. */
+  private levels: number[] = [];
+
   private async toggleRecording() {
     this.touch();
     if (this.recorder) {
@@ -522,6 +558,7 @@ export class TalkBox {
     this.mic.classList.add("rec");
     this.input.placeholder = "Listening… click the mic again when done";
 
+    this.levels = [];
     try {
       this.sttCtx = new AudioContext();
       const src = this.sttCtx.createMediaStreamSource(this.stream);
@@ -537,8 +574,9 @@ export class TalkBox {
           const v = (buf[i] - 128) / 128;
           sum += v * v;
         }
-        const rms = Math.sqrt(sum / buf.length);
-        this.updateMicLevel(Math.min(1, rms * 4));
+        const level = Math.min(1, Math.sqrt(sum / buf.length) * 4);
+        this.updateMicLevel(level);
+        this.levels.push(level);
       }, 50);
     } catch {
       // Audio level fallback
@@ -576,6 +614,13 @@ export class TalkBox {
     this.chunks = [];
     if (blob.size < 2000) {
       this.onHeard?.(null);
+      return;
+    }
+    // Nothing was said: no point paying to transcribe a quiet room, and every point in not
+    // handing the model whatever Whisper decides the silence sounded like.
+    if (!heardSpeech(this.levels)) {
+      this.onHeard?.(null);
+      this.onStatus?.("I didn't hear anything.");
       return;
     }
     this.setBusy(true);

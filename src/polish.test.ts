@@ -1,11 +1,33 @@
 import { describe, expect, it } from "vitest";
 import { Havoc, contactFraction } from "./havoc";
+import { heardSpeech } from "./chat";
 import { traceOutline } from "./screensaver-fracture";
 import { SimulationClock } from "./simulation-clock";
 import { LoadingOwner } from "./preview-loading";
 import { Debris, MAX_DEBRIS, MAX_DEBRIS_PIXELS } from "./screensaver-debris";
 import { artworkRegions } from "./screensaver-fracture";
 
+it("sends real speech to be transcribed and keeps a quiet room to itself", () => {
+  const noise = (floor: number, n = 200) => Array.from({ length: n }, () => floor + Math.random() * floor * 0.3);
+  const speech = (levels: number[], at: number, loud: number, n = 10) => {
+    const out = levels.slice();
+    for (let i = at; i < at + n; i++) out[i] = loud;
+    return out;
+  };
+  // A silent mic, and a hissy one: neither is worth transcribing.
+  expect(heardSpeech(noise(0))).toBe(false);
+  expect(heardSpeech(noise(0.02))).toBe(false);
+  // A loud room, still saying nothing.
+  expect(heardSpeech(noise(0.2))).toBe(false);
+  // Someone speaking, quietly, in each of those rooms.
+  expect(heardSpeech(speech(noise(0), 40, 0.3))).toBe(true);
+  expect(heardSpeech(speech(noise(0.02), 40, 0.2))).toBe(true);
+  expect(heardSpeech(speech(noise(0.2), 40, 0.9))).toBe(true);
+  // A cough or a knock: one moment of noise is not a sentence.
+  expect(heardSpeech(speech(noise(0.01), 40, 0.8, 2))).toBe(false);
+  // No meter ran, so there is nothing to judge and the recording goes anyway.
+  expect(heardSpeech([])).toBe(true);
+});
 it("freezes simulation deadlines across an overnight fullscreen pause", () => {
   let now = 0;
   const clock = new SimulationClock(() => now);
