@@ -465,6 +465,23 @@ export class TalkBox {
     });
   }
 
+  /**
+   * Sit just above the head, the way the bubble does. Returns the top edge taken, so the caller
+   * can put the bubble above that instead of through it. `headY` is the top of his head in CSS
+   * pixels; the strip keeps its own full width.
+   */
+  place(headY: number): number {
+    if (!this.open) return headY;
+    const top = Math.max(2, headY - this.el.offsetHeight - 8);
+    this.el.style.top = `${top}px`;
+    return top;
+  }
+
+  /** Height in CSS px while showing, else 0; the camera reserves this much above the head. */
+  stripHeight(): number {
+    return this.open ? this.el.offsetHeight + 8 : 0;
+  }
+
   /** True while the microphone is open. */
   get recording(): boolean {
     return this.recorder !== null;

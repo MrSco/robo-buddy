@@ -770,6 +770,11 @@ talk.onHeard = (text) => {
 talk.onOpenChange = (open) => {
   ignoringCursor = null; // re-evaluate click-through now that the strip is (in)visible
   if (open && IN_TAURI) getCurrentWindow().setFocus().catch(() => {});
+  // He waits while you talk to him. The strip rides above his head, so a wander mid-sentence
+  // took the box with it and you ended up chasing it around the screen to finish typing.
+  // `free` keeps him from starting anything new; this drops whatever he was already at.
+  if (open) behavior.interrupt(clock.elapsedTime);
+  if (physics) physics.roam = !open && screensaverOn;
   // A local speech server may have to load its model before it will transcribe anything, which
   // takes long enough that the first recording looks like it has failed. Started as the box
   // opens, so the wait happens while you are getting ready to speak; a recording arriving
@@ -1108,7 +1113,7 @@ function frame() {
   if (physics) physics.floorOverlap = settings.standOnTaskbar && renderer === renderer3d ? physics.taskbarHeight : 0;
   if (renderer3d) {
     renderer3d.groundPx = physics ? physics.groundOverlap / scaleFactor : 0;
-    renderer3d.bubblePx = bubble.visibleHeight();
+    renderer3d.bubblePx = bubble.visibleHeight() + talk.stripHeight();
     renderer3d.crouchPx = physics ? physics.crouchPx / scaleFactor : 0;
     const want = lightingFor(settings, settings.character);
     if (renderer3d.lighting !== want) renderer3d.lighting = want;
@@ -1173,7 +1178,7 @@ function frame() {
     void emit("buddy-strike", { kind: havocAction.kind, dir: havocAction.dir }).catch(() => {});
   }
   // Idle-time behaviour: variants, fidgets, wandering.
-  const free = !havocAction &&
+  const free = !havocAction && !talk.open &&
     !paused && !asleep && !!physics && physics.mode === "rest" && !physics.airborne && danceAmount < 0.5 && pokeUntil <= t;
   const act = behavior.update({
     t,
@@ -1265,14 +1270,15 @@ function frame() {
   if (!paused || physics?.mode === "held" || physics?.airborne) physics?.step(dt);
   if (renderer) {
     const a = renderer.bubbleAnchor();
-    bubble.update(t, a.x, a.y, cssW);
+    bubble.update(t, a.x, talk.place(a.y), cssW);
     // Where the top of his head is in the window right now, for the ceiling checks; and, while
     // he just stands there with no bubble zooming the fit out, how much window sits above his
     // head when upright, which tells the physics which windows he can stand on top of.
     if (physics && renderer === renderer3d) {
       physics.crownPx = a.y * scaleFactor;
       const plainIdle = currentState === "idle" && resolved.clip?.name === behavior.stateClip("idle")?.name;
-      if (physics.mode === "rest" && physics.crouchPx === 0 && bubble.visibleHeight() === 0 && plainIdle && a.y > 0) physics.headPx = a.y * scaleFactor;
+      if (physics.mode === "rest" && physics.crouchPx === 0 && bubble.visibleHeight() === 0 && !talk.open && plainIdle && a.y > 0)
+        physics.headPx = a.y * scaleFactor;
     }
   }
   updateClickThrough();

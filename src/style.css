@@ -73,12 +73,13 @@ html, body {
   border-top-color: #0f172a;
 }
 
-/* Talk strip at his feet. */
+/* Talk strip over his head; place() puts it just above him every frame. Anywhere near his feet
+   it ends up behind the taskbar, and it moved with him while you were trying to click it. */
 .talk {
   position: absolute;
   left: 8px;
   right: 8px;
-  bottom: 8px;
+  top: 8px;
   display: flex;
   gap: 4px;
   align-items: center;
