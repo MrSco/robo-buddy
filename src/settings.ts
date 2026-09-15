@@ -82,9 +82,6 @@ const els = {
   chatTestStatus: $<HTMLParagraphElement>("chat-teststatus"),
   personality: $<HTMLSelectElement>("personality"),
   personalityHint: $<HTMLParagraphElement>("personality-hint"),
-  chatSttEndpoint: $<HTMLInputElement>("chat-stt-endpoint"),
-  chatSttPath: $<HTMLInputElement>("chat-stt-path"),
-  chatSttBrowse: $<HTMLButtonElement>("chat-stt-browse"),
   ssSpeed: $<HTMLInputElement>("ss-speed"),
   ssSpeedOut: $<HTMLOutputElement>("ss-speed-out"),
   ssVoid: $<HTMLInputElement>("ss-void"),
@@ -106,6 +103,10 @@ const els = {
   talkHotkey: $<HTMLInputElement>("talk-hotkey"),
   talkHotkeyReset: $<HTMLButtonElement>("talk-hotkey-reset"),
   talkHotkeyStatus: $<HTMLParagraphElement>("talk-hotkey-status"),
+  pushHotkeyEnabled: $<HTMLInputElement>("push-hotkey-enabled"),
+  pushHotkey: $<HTMLInputElement>("push-hotkey"),
+  pushHotkeyReset: $<HTMLButtonElement>("push-hotkey-reset"),
+  pushHotkeyStatus: $<HTMLParagraphElement>("push-hotkey-status"),
   liveFields: $<HTMLDivElement>("live-fields"),
   pipelineFields: $<HTMLDivElement>("pipeline-fields"),
   liveKey: $<HTMLInputElement>("live-key"),
@@ -506,13 +507,14 @@ function render() {
   els.chatVoice.checked = settings.chatVoice;
   els.chatLines.checked = settings.chatGenerateLines;
   els.chatCap.value = String(settings.chatDailyCap);
-  els.chatSttEndpoint.value = settings.chatSttEndpoint;
-  els.chatSttPath.value = settings.chatSttModelPath ?? "";
   els.ttsEngine.value = settings.ttsEngine;
   els.piperFields.hidden = settings.ttsEngine !== "piper";
   els.talkHotkeyEnabled.checked = settings.talkHotkeyEnabled;
   els.talkHotkey.value = settings.talkHotkey;
   els.talkHotkey.disabled = !settings.talkHotkeyEnabled;
+  els.pushHotkeyEnabled.checked = settings.pushHotkeyEnabled;
+  els.pushHotkey.value = settings.pushHotkey;
+  els.pushHotkey.disabled = !settings.pushHotkeyEnabled;
   els.talkMode.value = settings.talkMode === "live" ? "live" : "pipeline";
   els.liveFields.hidden = settings.talkMode !== "live";
   els.pipelineFields.classList.toggle("dim", settings.talkMode === "live");
@@ -780,8 +782,37 @@ function wireTalkHotkey() {
     void commit({ talkHotkey: "Ctrl+Shift+T" });
   });
   // Rust reports what Windows made of it: the combo may already belong to another app.
-  void listen<{ key: string; ok: boolean; error: string }>("talk-hotkey", (e) => {
-    els.talkHotkeyStatus.textContent = e.payload.ok ? `${e.payload.key} is listening.` : e.payload.error;
+  els.pushHotkeyEnabled.addEventListener("change", () => {
+    els.pushHotkey.disabled = !els.pushHotkeyEnabled.checked;
+    els.pushHotkeyStatus.textContent = els.pushHotkeyEnabled.checked ? "" : "Push to talk off.";
+    void commit({ pushHotkeyEnabled: els.pushHotkeyEnabled.checked });
+  });
+  els.pushHotkey.addEventListener("focus", () => {
+    els.pushHotkeyStatus.textContent = "Press the combo you want\u2026";
+  });
+  els.pushHotkey.addEventListener("keydown", (e) => {
+    e.preventDefault();
+    if (e.key === "Escape") {
+      els.pushHotkey.blur();
+      return;
+    }
+    const combo = hotkeyFrom(e);
+    if (!combo) {
+      els.pushHotkeyStatus.textContent = "Hold Ctrl, Alt, Shift or Win, then press a key.";
+      return;
+    }
+    els.pushHotkey.value = combo;
+    els.pushHotkeyStatus.textContent = "Registering\u2026";
+    void commit({ pushHotkey: combo });
+  });
+  els.pushHotkeyReset.addEventListener("click", () => {
+    els.pushHotkey.value = "Ctrl+Shift+Space";
+    void commit({ pushHotkey: "Ctrl+Shift+Space" });
+  });
+  // Both combos report on the one event; the payload says which of them it was.
+  void listen<{ which?: string; key: string; ok: boolean; error: string }>("talk-hotkey", (e) => {
+    const where = e.payload.which === "push" ? els.pushHotkeyStatus : els.talkHotkeyStatus;
+    where.textContent = e.payload.ok ? `${e.payload.key} is listening.` : e.payload.error;
   });
 }
 
@@ -921,19 +952,6 @@ function wireTalk() {
   els.chatVoice.addEventListener("change", () => void commit({ chatVoice: els.chatVoice.checked }));
   els.chatLines.addEventListener("change", () => void commit({ chatGenerateLines: els.chatLines.checked }));
   els.chatCap.addEventListener("change", () => void commit({ chatDailyCap: Math.max(0, Math.round(Number(els.chatCap.value) || 0)) }));
-  els.chatSttEndpoint.addEventListener("change", () => void commit({ chatSttEndpoint: els.chatSttEndpoint.value.trim() }));
-  els.chatSttPath.addEventListener("change", () => void commit({ chatSttModelPath: els.chatSttPath.value.trim() }));
-  els.chatSttBrowse.addEventListener("click", async () => {
-    try {
-      const picked = await open({ multiple: false, filters: [{ name: "Speech model", extensions: ["bin", "gguf", "ggml"] }] });
-      if (typeof picked === "string") {
-        els.chatSttPath.value = picked;
-        await commit({ chatSttModelPath: picked });
-      }
-    } catch (err) {
-      status(`Could not open that: ${err}`);
-    }
-  });
   wireScreensaver();
   wireVoicePreview();
   els.ttsEngine.addEventListener("change", () => {

@@ -242,6 +242,7 @@ async function boot() {
     // Other always-on-top windows opened later sit above him in the topmost band; take the
     // top of it back every couple of seconds (no focus change, so nothing is interrupted).
     await listen("talk", () => openTalk());
+    await listen<PushKey>("talk-listen", (e) => void pushToTalk(e.payload));
     await listen<{ on: boolean }>("mirror", (e) => {
       mirrorOn = e.payload.on;
       if (mirrorOn) activity();
@@ -773,7 +774,6 @@ talk.onOpenChange = (open) => {
   // takes long enough that the first recording looks like it has failed. Started as the box
   // opens, so the wait happens while you are getting ready to speak; a recording arriving
   // before it has finished waits for this one rather than asking for the model again.
-  if (open && IN_TAURI && !liveMode()) void invoke("warm_speech_model").catch(() => {});
   if (open && liveMode()) void startLive();
   if (!open) {
     voice.stop();
@@ -796,6 +796,51 @@ function openTalk() {
     : undefined;
   talk.micEnabled = liveMode() || !!settings.chatSttModel;
   talk.toggle();
+}
+
+/** The push-to-talk key going down, and coming back up after this long. */
+interface PushKey {
+  down: boolean;
+  heldMs: number;
+}
+/** Below this a press counts as a tap, and the microphone stays on until the next one. */
+const HOLD_MS = 350;
+
+/**
+ * The push-to-talk hotkey: the talk box opens and the microphone is already listening, rather
+ * than opening and waiting to be clicked.
+ *
+ * One key does both ways of using it, told apart by how long it was held. Tap it and it toggles,
+ * so you can talk with your hands free and tap again when you are done; hold it and it listens
+ * only while you hold, like a radio. Nobody has to choose which they wanted in advance.
+ */
+async function pushToTalk(p: PushKey) {
+  if (!settings.chatEnabled) {
+    if (p.down) bubble.say(["Turn on Talk in Settings first."], 3, clock.elapsedTime);
+    return;
+  }
+  // Live voice has no recordings to start and stop: the session is the microphone, so the key
+  // works the mute instead.
+  if (liveMode()) {
+    if (p.down) {
+      if (!talk.open) openTalk();
+      live.setMuted(!live.muted);
+    } else if (p.heldMs > HOLD_MS && !live.muted) {
+      live.setMuted(true);
+    }
+    return;
+  }
+  if (!settings.chatSttModel) {
+    if (p.down) bubble.say(["Set a speech model in Settings to use the microphone."], 3.5, clock.elapsedTime);
+    return;
+  }
+  if (p.down) {
+    if (!talk.open) openTalk();
+    if (talk.recording) talk.stopListening();
+    else await talk.startListening();
+  } else if (p.heldMs > HOLD_MS) {
+    talk.stopListening();
+  }
 }
 
 /** Any interaction: resets the sleep timer and wakes him up. */

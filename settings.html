@@ -152,6 +152,15 @@
                 <button id="talk-hotkey-reset" type="button" class="self-end">Reset</button>
               </div>
               <p class="hint" id="talk-hotkey-status"></p>
+              <label class="check" title="Opens the talk box with the microphone already listening, so you can just speak."><input id="push-hotkey-enabled" type="checkbox" /> Push to talk with a hotkey</label>
+              <div class="row">
+                <label class="field small" title="Click the box and press the combo you want. It needs Ctrl, Alt, Shift or Win, or that key would stop working everywhere else."><span>Shortcut</span>
+                  <input id="push-hotkey" type="text" readonly spellcheck="false" placeholder="click, then press keys" />
+                </label>
+                <button id="push-hotkey-reset" type="button" class="self-end">Reset</button>
+              </div>
+              <p class="hint" id="push-hotkey-status"></p>
+              <p class="hint">Tap it and he listens until you tap again. Hold it and he listens until you let go.</p>
             </div>
             <div class="group">
               <h2>Personality</h2>
@@ -224,14 +233,7 @@
                     <datalist id="stt-models"></datalist>
                   </div>
                 </label>
-                <label class="field" title="Send recordings somewhere other than the chat endpoint, such as a local Vibe server. The key is never sent here."><span>Speech endpoint (blank = same as the chat endpoint)</span><input id="chat-stt-endpoint" type="text" spellcheck="false" placeholder="e.g. a local Vibe server: http://127.0.0.1:PORT/v1" /></label>
-                <label class="field" title="Some local servers will not transcribe until they have been told which model file to use, and forget between runs. Vibe is one. Leave blank for servers that need no such thing."><span>Speech model file (only if the server must load one)</span>
-                  <div class="row">
-                    <input id="chat-stt-path" type="text" spellcheck="false" class="grow" placeholder="e.g. ...\ggml-large-v3-turbo.bin" />
-                    <button id="chat-stt-browse" type="button">Choose…</button>
-                  </div>
-                </label>
-                <p class="hint">The microphone sends a short recording to the speech endpoint, which speaks the Whisper API. Leave it blank to use the chat endpoint. To keep audio on this PC, run a local server such as Vibe: enable its API server, load a model in it, and paste its address here ending in /v1. Its port changes between runs. The key is never sent to it. You can also focus Buddy's chat input and press Windows + H to dictate with Windows, then press Send.</p>
+                <p class="hint">The microphone sends a short recording to the chat endpoint's Whisper API, using the speech model above. To keep audio on this PC instead, focus Buddy's chat input and press Windows + H to dictate with Windows voice typing, then press Send.</p>
 
                 <h2>Voice</h2>
                 <label class="check" title="Read every reply out loud."><input id="chat-voice" type="checkbox" /> Speak replies out loud</label>
@@ -417,7 +419,7 @@
               </ol>
               <p><b>Personality</b> decides who he is: the persona sent to the model, the lines he says on his own, and how creative he is. Copy a built-in profile to make your own. With <b>Generate fresh speech-bubble lines</b> on, he writes himself new idle remarks once a week.</p>
               <h2>Microphone</h2>
-              <p>The mic button records until you click it again and sends the clip to the speech endpoint. Groq's <code>whisper-large-v3-turbo</code> is the default. To keep audio local, run a Whisper server such as Vibe's <code>vibe-server</code> and put its address (ending in <code>/v1</code>) in <b>Speech endpoint</b>; the key is never sent there.</p>
+              <p>The mic button records until you click it again and sends the clip to the chat endpoint for transcription. Groq's <code>whisper-large-v3-turbo</code> is the default. To keep audio on this PC, focus the chat input and press <b>Windows + H</b> for Windows voice typing instead.</p>
               <h2>Voices</h2>
               <p><b>Windows voice</b> works with no setup. <b>Piper</b> is a neural voice that runs on your PC:</p>
               <ol>

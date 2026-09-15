@@ -76,10 +76,6 @@ pub struct Settings {
     pub chat_generate_lines: bool,
     /// Requests per day, 0 = unlimited.
     pub chat_daily_cap: u32,
-    /// Separate base URL for /audio/transcriptions (a local Vibe server, say); empty = chat endpoint.
-    pub chat_stt_endpoint: String,
-    /// A speech model file for a local server that must be told to load one before it will work.
-    pub chat_stt_model_path: String,
     /// "windows" (speechSynthesis) or "piper" (local piper.exe with an .onnx voice).
     pub tts_engine: String,
     pub piper_exe: String,
@@ -99,6 +95,10 @@ pub struct Settings {
     pub talk_hotkey_enabled: bool,
     /// The hotkey itself, as "Ctrl+Shift+T": modifiers and one key, joined by pluses.
     pub talk_hotkey: String,
+    /// Open the talk box *and* start listening, from whatever app has the keyboard.
+    pub push_hotkey_enabled: bool,
+    /// The push-to-talk combo. Tapped it toggles the microphone, held it listens until released.
+    pub push_hotkey: String,
 }
 
 impl Default for Settings {
@@ -143,8 +143,6 @@ impl Default for Settings {
             chat_voice: true,
             chat_generate_lines: true,
             chat_daily_cap: 300,
-            chat_stt_endpoint: String::new(),
-            chat_stt_model_path: String::new(),
             tts_engine: "windows".into(),
             piper_exe: String::new(),
             piper_voice: String::new(),
@@ -157,6 +155,8 @@ impl Default for Settings {
             surfaces_enabled: true,
             talk_hotkey_enabled: false,
             talk_hotkey: "Ctrl+Shift+T".into(),
+            push_hotkey_enabled: false,
+            push_hotkey: "Ctrl+Shift+Space".into(),
         }
     }
 }

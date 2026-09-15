@@ -63,14 +63,6 @@ export interface Settings {
   chatVoice: boolean;
   chatGenerateLines: boolean;
   chatDailyCap: number;
-  /** Separate base URL for transcriptions (a local Vibe server); blank = chat endpoint. */
-  chatSttEndpoint: string;
-  /**
-   * A speech model file on disk, for a local server that will not transcribe until one is
-   * loaded. Vibe is the case in hand: it answers every request with "no model loaded" until
-   * told which file to use. Blank for servers that need no such thing.
-   */
-  chatSttModelPath: string;
   /** "windows" or "piper". */
   ttsEngine: string;
   /** "pipeline" (chat + speech models) or "live" (OpenAI GPT-Live, one session that listens, thinks and speaks). */
@@ -93,6 +85,10 @@ export interface Settings {
   talkHotkeyEnabled: boolean;
   /** The combo itself, as "Ctrl+Shift+T". */
   talkHotkey: string;
+  /** Open the talk box and start listening at once, without reaching for the mic button. */
+  pushHotkeyEnabled: boolean;
+  /** The push-to-talk combo: tap to toggle the microphone, hold to listen until released. */
+  pushHotkey: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -135,8 +131,6 @@ export const DEFAULT_SETTINGS: Settings = {
   chatVoice: true,
   chatGenerateLines: true,
   chatDailyCap: 300,
-  chatSttEndpoint: "",
-  chatSttModelPath: "",
   ttsEngine: "windows",
   talkMode: "pipeline",
   liveBackendModel: "gpt-5.6-luna",
@@ -149,6 +143,8 @@ export const DEFAULT_SETTINGS: Settings = {
   surfacesEnabled: true,
   talkHotkeyEnabled: false,
   talkHotkey: "Ctrl+Shift+T",
+  pushHotkeyEnabled: false,
+  pushHotkey: "Ctrl+Shift+Space",
 };
 
 export async function getSettings(): Promise<Settings> {

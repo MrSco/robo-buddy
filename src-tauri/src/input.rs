@@ -553,67 +553,119 @@ fn key_code(name: &str) -> Option<u32> {
     })
 }
 
-/// Holds the system-wide talk hotkey, re-registering it whenever the setting changes. The
+/// Holds the system-wide talk hotkeys, re-registering them whenever the setting changes. The
 /// registration belongs to this thread, so the message pump has to live here too; it reports what
 /// happened on `talk-hotkey` so the settings page can say whether the combo was taken.
+///
+/// Two combos share the thread: one opens the talk box, one opens it and starts listening.
+#[cfg(windows)]
+fn sync_hotkey(app: &AppHandle, id: i32, which: &str, want: &str, have: &mut String, vk: &mut u32) {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{RegisterHotKey, UnregisterHotKey, HOT_KEY_MODIFIERS};
+    if have.as_str() == want {
+        return;
+    }
+    if !have.is_empty() {
+        // SAFETY: unregistering our own id from the thread that took it.
+        let _ = unsafe { UnregisterHotKey(None, id) };
+    }
+    have.clear();
+    have.push_str(want);
+    *vk = 0;
+    let status = if want.is_empty() {
+        None
+    } else {
+        Some(match parse_hotkey(want) {
+            // SAFETY: a thread-owned hotkey; the thread lives as long as the app.
+            Ok((m, key)) => match unsafe { RegisterHotKey(None, id, HOT_KEY_MODIFIERS(m), key) } {
+                Ok(()) => {
+                    *vk = key;
+                    Ok(())
+                }
+                Err(_) => Err(format!("{want} is already taken by another app")),
+            },
+            Err(e) => Err(e),
+        })
+    };
+    if let Some(res) = status {
+        let _ = app.emit(
+            "talk-hotkey",
+            serde_json::json!({
+                "which": which,
+                "key": want,
+                "ok": res.is_ok(),
+                "error": res.err().unwrap_or_default(),
+            }),
+        );
+    }
+}
+
 pub fn start_hotkey_thread(app: AppHandle) {
     thread::spawn(move || {
         #[cfg(windows)]
         {
-            use windows::Win32::UI::Input::KeyboardAndMouse::{RegisterHotKey, UnregisterHotKey, HOT_KEY_MODIFIERS};
+            use windows::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState;
             use windows::Win32::UI::WindowsAndMessaging::{PeekMessageW, MSG, PM_REMOVE, WM_HOTKEY};
             use tauri::Manager;
             const ID: i32 = 0xB0DD;
+            const PUSH_ID: i32 = 0xB0DE;
             // What is registered right now, blank for nothing. Compared against the setting as a
             // string so a combo that cannot be registered is only complained about once.
             let mut have = String::new();
+            let mut have_push = String::new();
+            let mut vk = 0u32;
+            // The push combo's own key, watched for release: RegisterHotKey reports presses and
+            // nothing else, so holding one down has to be noticed by asking.
+            let mut push_vk = 0u32;
+            let mut pushed: Option<std::time::Instant> = None;
             let mut ticks = 0u32;
             loop {
                 thread::sleep(Duration::from_millis(25));
                 ticks += 1;
                 if ticks % 8 == 0 {
-                    let want = {
+                    let (want, want_push) = {
                         let state = app.state::<crate::settings::SettingsState>();
                         let s = state.0.lock().unwrap();
-                        if s.talk_hotkey_enabled { s.talk_hotkey.trim().to_string() } else { String::new() }
+                        (
+                            if s.talk_hotkey_enabled { s.talk_hotkey.trim().to_string() } else { String::new() },
+                            if s.push_hotkey_enabled { s.push_hotkey.trim().to_string() } else { String::new() },
+                        )
                     };
-                    if want != have {
-                        if !have.is_empty() {
-                            // SAFETY: unregistering our own id from the thread that took it.
-                            let _ = unsafe { UnregisterHotKey(None, ID) };
-                        }
-                        have = want.clone();
-                        let status = if want.is_empty() {
-                            None
-                        } else {
-                            Some(match parse_hotkey(&want) {
-                                // SAFETY: a thread-owned hotkey; the thread lives as long as the app.
-                                Ok((m, vk)) => match unsafe { RegisterHotKey(None, ID, HOT_KEY_MODIFIERS(m), vk) } {
-                                    Ok(()) => Ok(()),
-                                    Err(_) => Err(format!("{want} is already taken by another app")),
-                                },
-                                Err(e) => Err(e),
-                            })
-                        };
-                        if let Some(res) = status {
-                            let _ = app.emit(
-                                "talk-hotkey",
-                                serde_json::json!({
-                                    "key": want,
-                                    "ok": res.is_ok(),
-                                    "error": res.err().unwrap_or_default(),
-                                }),
-                            );
+                    sync_hotkey(&app, ID, "talk", &want, &mut have, &mut vk);
+                    sync_hotkey(&app, PUSH_ID, "push", &want_push, &mut have_push, &mut push_vk);
+                }
+                // Let go of the push key: the high bit is clear once it is up. Polled rather than
+                // hooked, because a low-level keyboard hook to catch one key going up would put us
+                // in the path of every keystroke on the machine.
+                if let Some(since) = pushed {
+                    // SAFETY: a read of the global key state; no handles involved.
+                    let down = push_vk != 0 && (unsafe { GetAsyncKeyState(push_vk as i32) } as u16 & 0x8000) != 0;
+                    if !down {
+                        pushed = None;
+                        if let Some(win) = app.get_webview_window("buddy") {
+                            let held = since.elapsed().as_millis() as u64;
+                            let _ = win.emit("talk-listen", serde_json::json!({ "down": false, "heldMs": held }));
                         }
                     }
                 }
                 let mut msg = MSG::default();
                 // SAFETY: draining this thread's own queue.
                 while unsafe { PeekMessageW(&mut msg, None, 0, 0, PM_REMOVE) }.as_bool() {
-                    if msg.message == WM_HOTKEY && msg.wParam.0 as i32 == ID {
-                        if let Some(win) = app.get_webview_window("buddy") {
-                            let _ = win.emit("talk", ());
+                    if msg.message != WM_HOTKEY {
+                        continue;
+                    }
+                    match msg.wParam.0 as i32 {
+                        ID => {
+                            if let Some(win) = app.get_webview_window("buddy") {
+                                let _ = win.emit("talk", ());
+                            }
                         }
+                        PUSH_ID if pushed.is_none() => {
+                            pushed = Some(std::time::Instant::now());
+                            if let Some(win) = app.get_webview_window("buddy") {
+                                let _ = win.emit("talk-listen", serde_json::json!({ "down": true, "heldMs": 0 }));
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }

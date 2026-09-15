@@ -465,6 +465,21 @@ export class TalkBox {
     });
   }
 
+  /** True while the microphone is open. */
+  get recording(): boolean {
+    return this.recorder !== null;
+  }
+
+  /** Open the microphone without the button, for the push-to-talk hotkey. */
+  async startListening() {
+    if (!this.recorder) await this.toggleRecording();
+  }
+
+  /** Close it again and send what was said. */
+  stopListening() {
+    if (this.recorder) this.stopRecording(false);
+  }
+
   private async toggleRecording() {
     this.touch();
     if (this.recorder) {
