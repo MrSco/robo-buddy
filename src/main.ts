@@ -119,6 +119,9 @@ let sitAt: number | null = null;
 let seated = false;
 /** He is being held in the sitting clip, and has to be let out of it by hand. */
 let sitting = false;
+/** The laugh, out loud. Lengths vary so consecutive bubbles are never the same line. */
+const CACKLE = ["MUAHAHAHAHA", "MUAHAHAHA", "MUAHAHAHAHAHA", "MUAHAHAHAHAHAHA"];
+let cackleAt = 0;
 const SIT_CLIP = "Sitting_Laughing";
 function attackClip(kind: StrikeKind) {
   const names = kind === "kick" ? ["Kick", "Kick_Front"] : kind === "throw" ? ["Throw", "Throw_Object"] : ["Punch_Cross", "Punch_Jab", "Sword_Attack"];
@@ -629,7 +632,9 @@ function sitDown(t: number, act: Activity) {
     // this he stayed in it for good, sitting in mid air over the restored desktop.
     if (sitting) {
       sitting = false;
+      cackleAt = 0;
       behavior.interrupt(t);
+      bubble.hideIf(1);
     }
     return;
   }
@@ -644,6 +649,12 @@ function sitDown(t: number, act: Activity) {
   seated = true;
   sitting = true;
   behavior.forceLoop(SIT_CLIP);
+  // Re-issued rather than left up, so it pops along with the laugh instead of hanging over him
+  // like a label. Above a quip, so the idle chatter cannot talk over him mid-cackle.
+  if (t >= cackleAt && settings.bubblesEnabled && !hiddenByFullscreen) {
+    bubble.say(CACKLE, 2.6, t, 1);
+    cackleAt = t + 3.4;
+  }
 }
 
 /** Start a Live voice session for the open talk box; failures land in the bubble. */
