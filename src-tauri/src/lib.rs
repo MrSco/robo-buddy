@@ -15,6 +15,7 @@ mod screen;
 mod idle_saver;
 mod idle_episode;
 mod settings;
+mod context;
 
 /// The tab the settings window should open on, left here until the page asks for it.
 #[derive(Default)]
@@ -70,6 +71,22 @@ fn show_settings_on(app: &tauri::AppHandle, tab: Option<&str>) {
 #[tauri::command]
 fn open_settings(app: tauri::AppHandle) {
     show_settings(&app);
+}
+
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        std::process::Command::new("cmd")
+            .args(["/c", "start", "", &url])
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        Err("unsupported platform".into())
+    }
 }
 
 /// Right-click menu on the buddy: the same items as the tray, at the cursor.
@@ -172,6 +189,7 @@ pub fn run() {
             input::start_hotkey_thread(app.handle().clone());
             idle_saver::start(app.handle().clone());
             audio::start_audio_thread(app.handle().clone());
+            context::start_context_watcher(app.handle().clone());
             Ok(())
         })
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -220,6 +238,7 @@ pub fn run() {
             piper::piper_delete_voice,
             packs::save_user_clip,
             open_settings,
+            open_url,
             screen::capture_desktop,
             screen::buddy_rect,
             screen::buddy_punch,

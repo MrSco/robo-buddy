@@ -99,6 +99,14 @@ pub struct Settings {
     pub push_hotkey_enabled: bool,
     /// The push-to-talk combo. Tapped it toggles the microphone, held it listens until released.
     pub push_hotkey: String,
+    /// Context-driven interactions (Clippy mode): chime in based on active app and activities.
+    pub context_reactions_enabled: bool,
+    /// Chattiness level: "rare", "normal", "chatty".
+    pub context_chattiness: String,
+    /// Allow passing window titles into AI prompts (false by default for privacy).
+    pub context_llm_titles: bool,
+    /// Process names excluded from context reactions.
+    pub context_blacklist: Vec<String>,
 }
 
 impl Default for Settings {
@@ -157,6 +165,15 @@ impl Default for Settings {
             talk_hotkey: "Ctrl+Shift+T".into(),
             push_hotkey_enabled: false,
             push_hotkey: "Ctrl+Shift+Space".into(),
+            context_reactions_enabled: true,
+            context_chattiness: "normal".into(),
+            context_llm_titles: false,
+            context_blacklist: vec![
+                "1Password.exe".into(),
+                "Bitwarden.exe".into(),
+                "KeePass.exe".into(),
+                "KeePassXC.exe".into(),
+            ],
         }
     }
 }

@@ -1,0 +1,183 @@
+{
+  "rules": [
+    {
+      "id": "system_late_night",
+      "category": "system_health",
+      "match": {
+        "timeRange": {
+          "startHour": 1,
+          "endHour": 5
+        }
+      },
+      "animation": "Bored",
+      "lines": [
+        "Sleep is a feature, not a bug! Your screen will still be here tomorrow.",
+        "Burning the 2 AM oil? Make sure to grab some water.",
+        "Even your buddy is getting sleepy at this hour... zzz"
+      ],
+      "chips": [
+        { "label": "Going to bed", "action": "dismiss" },
+        { "label": "5 more minutes", "action": "dismiss" }
+      ]
+    },
+    {
+      "id": "stackoverflow_github",
+      "category": "coding",
+      "match": {
+        "title": ["*Stack Overflow*", "*GitHub*", "*GitLab*"]
+      },
+      "animation": "interact",
+      "lines": [
+        "Copy-pasting from Stack Overflow again? I won't tell anyone.",
+        "The sacred scrolls of the developers! Find anything good?",
+        "Remember to test that code snippet before committing it!"
+      ],
+      "chips": [
+        { "label": "Explain Solution", "action": "ask", "prompt": "Can you explain the best solution to this problem?" },
+        { "label": "Mute for this app", "action": "mute" }
+      ]
+    },
+    {
+      "id": "youtube",
+      "category": "browsing",
+      "match": {
+        "process": ["chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "opera.exe"],
+        "title": ["*YouTube*"]
+      },
+      "animation": "Happy_Idle",
+      "lines": [
+        "Down another YouTube rabbit hole, are we?",
+        "Very educational video you've got there!",
+        "I'm keeping score: 10 minutes of research, 3 hours of videos."
+      ],
+      "chips": [
+        { "label": "Summarize Topic", "action": "ask", "prompt": "Can you summarize key insights about the topic I'm viewing?" },
+        { "label": "Mute for this app", "action": "mute" }
+      ]
+    },
+    {
+      "id": "reddit_wikipedia",
+      "category": "browsing",
+      "match": {
+        "title": ["*Reddit*", "*Wikipedia*", "*Hacker News*"]
+      },
+      "animation": "Crouch_Look_Around",
+      "lines": [
+        "Learning something fun or just enjoying the rabbit hole?",
+        "Browsing the front page of the internet again?",
+        "Don't get lost in the comment section!"
+      ],
+      "chips": [
+        { "label": "Summarize", "action": "ask", "prompt": "Can you summarize the main discussion on this topic?" },
+        { "label": "Mute for this app", "action": "mute" }
+      ]
+    },
+    {
+      "id": "code_editors",
+      "category": "coding",
+      "match": {
+        "process": [
+          "Code.exe",
+          "devenv.exe",
+          "idea64.exe",
+          "pycharm64.exe",
+          "webstorm64.exe",
+          "clion64.exe",
+          "sublime_text.exe",
+          "notepad++.exe"
+        ]
+      },
+      "animation": "Texting",
+      "lines": [
+        "Writing poetry in code? Don't forget to push before you break it!",
+        "It works on my machine... does it work on yours?",
+        "A bug is never just a bug. It's an undocumented feature.",
+        "That code is looking clean. Don't forget unit tests!"
+      ],
+      "chips": [
+        { "label": "Explain Code", "action": "ask", "prompt": "Can you review and explain what this code does?" },
+        { "label": "Regex Help", "action": "ask", "prompt": "Can you help me write or verify a regular expression for this?" },
+        { "label": "Mute for this app", "action": "mute" }
+      ]
+    },
+    {
+      "id": "terminals",
+      "category": "coding",
+      "match": {
+        "process": [
+          "WindowsTerminal.exe",
+          "powershell.exe",
+          "cmd.exe",
+          "mintty.exe",
+          "bash.exe",
+          "wt.exe"
+        ]
+      },
+      "animation": "Texting",
+      "lines": [
+        "Look at the hacker at work in the terminal!",
+        "Whatever you do, double-check that command before pressing Enter!",
+        "Real developers live in the command line."
+      ],
+      "chips": [
+        { "label": "Command Flags", "action": "ask", "prompt": "What are useful command line flags and options for this tool?" },
+        { "label": "Mute for this app", "action": "mute" }
+      ]
+    },
+    {
+      "id": "writing_productivity",
+      "category": "productivity",
+      "match": {
+        "process": [
+          "WINWORD.EXE",
+          "EXCEL.EXE",
+          "POWERPNT.EXE",
+          "Obsidian.exe",
+          "Notion.exe"
+        ],
+        "title": [
+          "*Google Docs*",
+          "*Google Sheets*",
+          "*Google Slides*",
+          "*Notion*"
+        ]
+      },
+      "animation": "Neutral_Idle",
+      "lines": [
+        "It looks like you're writing a document. Would you like some unsolicited advice?",
+        "Clippy sends his regards. Need help with a letter or a spreadsheet formula?",
+        "Pro-tip: If you don't know the answer, make the spreadsheet font smaller."
+      ],
+      "chips": [
+        { "label": "Improve Writing", "action": "ask", "prompt": "Can you suggest improvements and polish for what I'm writing?" },
+        { "label": "Formula Help", "action": "ask", "prompt": "How do I write an Excel/Sheets formula for this calculation?" },
+        { "label": "Mute for this app", "action": "mute" }
+      ]
+    },
+    {
+      "id": "creative_design",
+      "category": "creative",
+      "match": {
+        "process": [
+          "blender.exe",
+          "Photoshop.exe",
+          "Illustrator.exe",
+          "Figma.exe",
+          "AfterFX.exe",
+          "Adobe Premiere Pro.exe",
+          "resolve.exe"
+        ]
+      },
+      "animation": "fix",
+      "lines": [
+        "Save your file! Don't tempt the crash gods.",
+        "Art takes time... and lots of Ctrl+Z.",
+        "That lighting looks dramatic. Doing something fancy?"
+      ],
+      "chips": [
+        { "label": "Color/Design Idea", "action": "ask", "prompt": "Can you give me design tips or creative suggestions for this project?" },
+        { "label": "Mute for this app", "action": "mute" }
+      ]
+    }
+  ]
+}

@@ -683,3 +683,27 @@ details.adv summary {
 .preview-loading[hidden] { display: none; }
 .preview-loading:not(.failed)::before { content: ""; width: 25px; height: 25px; margin: auto; border: 3px solid #ffffff35; border-top-color: #a6c8ff; border-radius: 50%; animation: preview-spin .8s linear infinite; }
 @keyframes preview-spin { to { transform: rotate(360deg); } }
+
+.blacklist-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--fg);
+}
+.blacklist-tag button {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 10px;
+  line-height: 1;
+}
+.blacklist-tag button:hover {
+  color: #ef4444;
+}

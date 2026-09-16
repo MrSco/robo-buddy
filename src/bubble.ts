@@ -1,10 +1,20 @@
 /**
  * Speech bubble: a small DOM element positioned above the character's head.
  * It lives outside the canvas, so it never affects the pixel hit-test and is
- * always click-through.
+ * click-through by default, but supports interactive action chips when provided.
  */
+
+export interface BubbleChip {
+  label: string;
+  action: string;
+  prompt?: string;
+  data?: string;
+}
+
 export class Bubble {
   private el: HTMLDivElement;
+  private textEl: HTMLDivElement;
+  private chipsEl: HTMLDivElement;
   private hideAt = 0;
   private lastLine = "";
   /** A showing bubble with a higher priority is not replaced by a lower one (replies beat quips). */
@@ -14,11 +24,27 @@ export class Bubble {
     this.el = document.createElement("div");
     this.el.className = "bubble";
     this.el.hidden = true;
+
+    this.textEl = document.createElement("div");
+    this.textEl.className = "bubble-text";
+
+    this.chipsEl = document.createElement("div");
+    this.chipsEl.className = "bubble-chips";
+    this.chipsEl.hidden = true;
+
+    this.el.append(this.textEl, this.chipsEl);
     document.body.appendChild(this.el);
   }
 
-  /** Show one of the lines (never the same one twice in a row) for `seconds`. */
-  say(lines: string[] | undefined, seconds = 2.5, now = performance.now() / 1000, priority = 0) {
+  /** Show one of the lines (never the same one twice in a row) for `seconds`, with optional action chips. */
+  say(
+    lines: string[] | undefined,
+    seconds = 2.5,
+    now = performance.now() / 1000,
+    priority = 0,
+    chips?: BubbleChip[],
+    onChip?: (chip: BubbleChip) => void,
+  ) {
     if (!lines || lines.length === 0) return;
     if (!this.el.hidden && now < this.hideAt && this.priority > priority) return;
     this.priority = priority;
@@ -26,9 +52,33 @@ export class Bubble {
     if (lines.length > 1 && line === this.lastLine) line = lines[(lines.indexOf(line) + 1) % lines.length];
     this.lastLine = line;
     this.el.classList.remove("listening");
-    this.el.textContent = line;
+    this.textEl.textContent = line;
     this.el.classList.toggle("long", line.length > 28);
     this.el.classList.toggle("xl", line.length > 120);
+
+    this.chipsEl.innerHTML = "";
+    if (chips && chips.length > 0) {
+      this.el.classList.add("has-chips");
+      this.chipsEl.hidden = false;
+      for (const chip of chips) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "bubble-chip";
+        if (chip.action === "mute" || chip.action === "dismiss") {
+          btn.classList.add("secondary");
+        }
+        btn.textContent = chip.label;
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (onChip) onChip(chip);
+        });
+        this.chipsEl.appendChild(btn);
+      }
+    } else {
+      this.el.classList.remove("has-chips");
+      this.chipsEl.hidden = true;
+    }
+
     this.el.hidden = false;
     this.el.classList.remove("pop");
     void this.el.offsetWidth; // restart the pop animation
@@ -43,6 +93,9 @@ export class Bubble {
 
   hide() {
     this.el.hidden = true;
+    this.chipsEl.hidden = true;
+    this.chipsEl.innerHTML = "";
+    this.el.classList.remove("has-chips");
     this.hideAt = 0;
     this.priority = 0;
   }
@@ -55,7 +108,10 @@ export class Bubble {
   /** Enter or update listening state with interim text and high priority. */
   listen(text = "Listening…", priority = 10) {
     this.priority = priority;
-    this.el.textContent = `🎤 ${text}`;
+    this.textEl.textContent = `🎤 ${text}`;
+    this.chipsEl.hidden = true;
+    this.chipsEl.innerHTML = "";
+    this.el.classList.remove("has-chips");
     this.el.classList.add("listening");
     this.el.classList.toggle("long", text.length > 28);
     this.el.classList.toggle("xl", text.length > 120);
@@ -66,6 +122,24 @@ export class Bubble {
   /** True while a heard line is showing, so a caller can leave it up instead of talking over it. */
   get listening(): boolean {
     return !this.el.hidden && this.el.classList.contains("listening");
+  }
+
+  /** True while interactive chips are present in the visible bubble. */
+  get hasChips(): boolean {
+    return !this.el.hidden && !this.chipsEl.hidden && this.chipsEl.children.length > 0;
+  }
+
+  /** Hit test client (x, y) coordinates against clickable chips. */
+  hitTest(x: number, y: number): boolean {
+    if (this.el.hidden || this.chipsEl.hidden) return false;
+    const buttons = this.chipsEl.querySelectorAll<HTMLButtonElement>("button");
+    for (let i = 0; i < buttons.length; i++) {
+      const r = buttons[i].getBoundingClientRect();
+      if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /** Leave the listening state; a reply that already replaced it is left alone. */

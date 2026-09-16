@@ -89,6 +89,14 @@ export interface Settings {
   pushHotkeyEnabled: boolean;
   /** The push-to-talk combo: tap to toggle the microphone, hold to listen until released. */
   pushHotkey: string;
+  /** Context-driven interactions (Clippy mode): chime in based on active app and activities. */
+  contextReactionsEnabled: boolean;
+  /** Chattiness level: "rare", "normal", "chatty". */
+  contextChattiness: string;
+  /** Allow passing window titles into AI prompts (false by default for privacy). */
+  contextLlmTitles: boolean;
+  /** Process names excluded from context reactions. */
+  contextBlacklist: string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -145,6 +153,15 @@ export const DEFAULT_SETTINGS: Settings = {
   talkHotkey: "Ctrl+Shift+T",
   pushHotkeyEnabled: false,
   pushHotkey: "Ctrl+Shift+Space",
+  contextReactionsEnabled: true,
+  contextChattiness: "normal",
+  contextLlmTitles: false,
+  contextBlacklist: [
+    "1Password.exe",
+    "Bitwarden.exe",
+    "KeePass.exe",
+    "KeePassXC.exe",
+  ],
 };
 
 export async function getSettings(): Promise<Settings> {

@@ -62,6 +62,54 @@ html, body {
   font-weight: 500;
 }
 
+.bubble.has-chips {
+  white-space: normal;
+  max-width: min(280px, calc(100vw - 16px));
+}
+
+.bubble-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  pointer-events: none;
+}
+
+.bubble-chip {
+  pointer-events: auto;
+  appearance: none;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #2563eb;
+  color: #fff;
+  border-radius: 9999px;
+  padding: 3px 9px;
+  font: 600 11px system-ui, sans-serif;
+  cursor: pointer;
+  line-height: 1.2;
+  transition: background 0.15s ease, transform 0.1s ease;
+  user-select: none;
+}
+
+.bubble-chip:hover {
+  background: #1d4ed8;
+  transform: scale(1.04);
+}
+
+.bubble-chip:active {
+  transform: scale(0.96);
+}
+
+.bubble-chip.secondary {
+  background: #f1f5f9;
+  color: #475569;
+  border-color: #cbd5e1;
+}
+
+.bubble-chip.secondary:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
 .bubble.listening {
   background: #0f172a;
   color: #f8fafc;

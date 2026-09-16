@@ -107,6 +107,27 @@
                 <div id="idleset" class="idleset-list"></div>
               </details>
             </div>
+            <div class="group">
+              <h2>Context (Clippy Mode)</h2>
+              <label class="check" title="He notices what app you're working in (VS Code, Chrome, Office, Blender, etc.) and offers tips, quips, and matching gestures."><input id="context-reactions" type="checkbox" /> Context-driven companion</label>
+              <label class="field inline" title="How often he chimes in while active. He never interrupts while you are away.">
+                <span>Chattiness</span>
+                <select id="context-chattiness">
+                  <option value="rare">Rare (~15 min)</option>
+                  <option value="normal">Normal (~6 min)</option>
+                  <option value="chatty">Chatty (~2.5 min)</option>
+                </select>
+              </label>
+              <label class="check" title="When you click an action chip to ask AI, include the active window title in the prompt for richer context. Window titles stay 100% local on your machine otherwise."><input id="context-llm-titles" type="checkbox" /> Include window titles when asking AI</label>
+              <details class="idleset" style="margin-top: 8px;">
+                <summary title="Apps Buddy will never comment on or react to.">Excluded apps (blacklist)</summary>
+                <div id="context-blacklist" style="display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 0 6px;"></div>
+                <div style="display: flex; gap: 6px;">
+                  <input id="context-blacklist-input" type="text" placeholder="e.g. game.exe" style="flex: 1;" />
+                  <button id="context-blacklist-add" type="button" style="width: auto; padding: 4px 10px;">Add</button>
+                </div>
+              </details>
+            </div>
           </div>
         </section>
 

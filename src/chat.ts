@@ -413,6 +413,13 @@ export class TalkBox {
     setTimeout(() => this.input.focus(), 30);
   }
 
+  /** Open the talk box pre-filled with a prompt (e.g. from an action chip). */
+  openWith(prompt: string) {
+    this.show();
+    this.input.value = prompt;
+    this.input.select();
+  }
+
   hide() {
     clearTimeout(this.idleTimer);
     if (this.recorder) this.stopRecording(true);

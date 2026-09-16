@@ -30,6 +30,12 @@ export class ReactionsTab implements TabModule {
     keyboard: $<HTMLInputElement>("keyboard"),
     surfaces: $<HTMLInputElement>("surfaces"),
     idleset: $<HTMLDivElement>("idleset"),
+    contextReactions: $<HTMLInputElement>("context-reactions"),
+    contextChattiness: $<HTMLSelectElement>("context-chattiness"),
+    contextLlmTitles: $<HTMLInputElement>("context-llm-titles"),
+    contextBlacklist: $<HTMLDivElement>("context-blacklist"),
+    contextBlacklistInput: $<HTMLInputElement>("context-blacklist-input"),
+    contextBlacklistAdd: $<HTMLButtonElement>("context-blacklist-add"),
   };
 
   init(ctx: SettingsContext): void {
@@ -52,6 +58,24 @@ export class ReactionsTab implements TabModule {
     this.els.wander.addEventListener("change", () => ctx.commit({ wanderEnabled: this.els.wander.checked }));
     this.els.keyboard.addEventListener("change", () => ctx.commit({ keyboardEnabled: this.els.keyboard.checked }));
     this.els.surfaces.addEventListener("change", () => ctx.commit({ surfacesEnabled: this.els.surfaces.checked }));
+
+    this.els.contextReactions.addEventListener("change", () => ctx.commit({ contextReactionsEnabled: this.els.contextReactions.checked }));
+    this.els.contextChattiness.addEventListener("change", () => ctx.commit({ contextChattiness: this.els.contextChattiness.value }));
+    this.els.contextLlmTitles.addEventListener("change", () => ctx.commit({ contextLlmTitles: this.els.contextLlmTitles.checked }));
+    this.els.contextBlacklistAdd.addEventListener("click", () => {
+      const val = this.els.contextBlacklistInput.value.trim();
+      if (!val) return;
+      const settings = this.ctx.getSettings();
+      const current = new Set(settings.contextBlacklist || []);
+      current.add(val);
+      this.els.contextBlacklistInput.value = "";
+      void this.ctx.commit({ contextBlacklist: [...current] });
+    });
+    this.els.contextBlacklistInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        this.els.contextBlacklistAdd.click();
+      }
+    });
 
     for (const [element, key] of [
       [this.els.gravityStrength, "gravityStrength"],
@@ -96,6 +120,38 @@ export class ReactionsTab implements TabModule {
     this.els.wander.checked = settings.wanderEnabled;
     this.els.keyboard.checked = settings.keyboardEnabled;
     this.els.surfaces.checked = settings.surfacesEnabled;
+
+    this.els.contextReactions.checked = settings.contextReactionsEnabled;
+    this.els.contextChattiness.value = settings.contextChattiness || "normal";
+    this.els.contextLlmTitles.checked = settings.contextLlmTitles;
+    this.renderBlacklist(settings.contextBlacklist || []);
+  }
+
+  renderBlacklist(blacklist: string[]): void {
+    this.els.contextBlacklist.innerHTML = "";
+    if (!blacklist.length) {
+      const span = document.createElement("span");
+      span.className = "hint";
+      span.textContent = "No excluded apps.";
+      this.els.contextBlacklist.appendChild(span);
+      return;
+    }
+    for (const app of blacklist) {
+      const tag = document.createElement("span");
+      tag.className = "blacklist-tag";
+      tag.textContent = app;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "✕";
+      btn.title = `Remove ${app} from blacklist`;
+      btn.addEventListener("click", () => {
+        const settings = this.ctx.getSettings();
+        const updated = (settings.contextBlacklist || []).filter((x) => x !== app);
+        void this.ctx.commit({ contextBlacklist: updated });
+      });
+      tag.appendChild(btn);
+      this.els.contextBlacklist.appendChild(tag);
+    }
   }
 
   renderPhysicsLabels(): void {

@@ -22,7 +22,8 @@ import { WindowPhysics } from "./physics";
 import type { FrameInput, Renderer, StateName } from "./renderer";
 import { Renderer2D } from "./renderer2d";
 import { Renderer3D } from "./renderer3d";
-import { DEFAULT_SETTINGS, beatLockSeconds, getSettings, lightingFor, onSettingsChanged, type Settings } from "./settings-store";
+import { DEFAULT_SETTINGS, beatLockSeconds, getSettings, lightingFor, onSettingsChanged, setSettings, type Settings } from "./settings-store";
+import { ContextCoordinator } from "./context";
 
 const BASE_W = 320;
 const BASE_H = 440;
@@ -145,6 +146,21 @@ let holdFacingUntil = 0;
 const bubble = new Bubble();
 const sounds = new Sounds();
 const behavior = new Behavior();
+const contextCoordinator = new ContextCoordinator(
+  () => settings,
+  (processName) => {
+    const list = new Set(settings.contextBlacklist || []);
+    list.add(processName);
+    void setSettings({ ...settings, contextBlacklist: [...list] });
+  },
+  (prompt) => {
+    if (!settings.chatEnabled) {
+      bubble.say(["Turn on Talk in Settings first."], 3, clock.elapsedTime);
+      return;
+    }
+    talk.openWith(prompt);
+  },
+);
 let pokeClip: ClipChoice | null = null;
 let landClip: ClipChoice | null = null;
 /** Latched when a jump starts: stateClip picks at random, and re-picking every frame would thrash. */
@@ -351,6 +367,8 @@ async function boot() {
       if (!s.chatEnabled && talk.open) talk.hide();
     }
   });
+
+  void contextCoordinator.init(bubble, behavior);
 }
 
 /** The bundled character's manifest: the template imported models take their animations from. */
@@ -973,7 +991,7 @@ function updateClickThrough() {
   else if (settings.clickThrough === "window") shouldIgnore = false;
   else {
     const p = cursorInCanvas();
-    shouldIgnore = !p || renderer.alphaAt(p.x, p.y) < 16;
+    shouldIgnore = !p || (renderer.alphaAt(p.x, p.y) < 16 && !bubble.hitTest(p.x, p.y));
   }
   if (shouldIgnore !== ignoringCursor) {
     ignoringCursor = shouldIgnore;

@@ -217,6 +217,19 @@ export class Behavior {
     return true;
   }
 
+  /** Queue one or more fidget clips to play, transitioning immediately if idle. */
+  queueFidget(name: string | string[], t?: number) {
+    if (typeof t === "number" && typeof name === "string") {
+      return this.forceFidget(t, name);
+    }
+    const list = Array.isArray(name) ? name : [name];
+    this.fidgetQueue.push(...list);
+    if (this.activity.kind === "idle") {
+      this.activityEnds = 0;
+    }
+    return true;
+  }
+
   chooseDance(): ClipChoice | null {
     const m = this.manifest;
     const list = this.danceList;
