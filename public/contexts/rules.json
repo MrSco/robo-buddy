@@ -77,6 +77,8 @@
       "category": "coding",
       "match": {
         "process": [
+          "Notepad.exe",
+          "notepad.exe",
           "Code.exe",
           "devenv.exe",
           "idea64.exe",

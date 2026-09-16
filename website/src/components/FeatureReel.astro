@@ -13,7 +13,7 @@ const features = [
       'Works with any 3D character using real-time retargeted dance clips'
     ],
     videoFile: '/videos/music-dancing.mp4',
-    videoPoster: 'Placeholder: Audio BPM Meter & Dancing Buddy'
+    videoPoster: '/videos/music-dancing-poster.jpg'
   },
   {
     id: 'physics',
@@ -28,7 +28,7 @@ const features = [
       'Precise click-through: only his body clicks, transparent background passes clicks'
     ],
     videoFile: '/videos/window-physics.mp4',
-    videoPoster: 'Placeholder: Throwing & Title Bar Climbing'
+    videoPoster: '/videos/window-physics-poster.jpg'
   },
   {
     id: 'clippy',
@@ -43,7 +43,7 @@ const features = [
       'Anti-Annoyance dwell filter (18s dwell time) ensures zero spam while Alt-Tabbing'
     ],
     videoFile: '/videos/clippy-context.mp4',
-    videoPoster: 'Placeholder: VS Code Quip & Action Chip Interaction'
+    videoPoster: '/videos/clippy-context-poster.jpg'
   },
   {
     id: 'screensaver',
@@ -58,7 +58,7 @@ const features = [
       'Handoff to your native Windows screensaver or instant wake on any keypress'
     ],
     videoFile: '/videos/screensaver-havoc.mp4',
-    videoPoster: 'Placeholder: Desktop Tile Smashing & CRT Void'
+    videoPoster: '/videos/screensaver-havoc-poster.jpg'
   },
   {
     id: 'mocap',
@@ -73,7 +73,7 @@ const features = [
       'Camera shuts off the moment you close the capture tab—zero network usage'
     ],
     videoFile: '/videos/webcam-mocap.mp4',
-    videoPoster: 'Placeholder: Webcam Pose Mirroring Live'
+    videoPoster: '/videos/webcam-mocap-poster.jpg'
   },
   {
     id: 'voice',
@@ -88,7 +88,7 @@ const features = [
       'Takes voice & chat commands: "dance", "sleep", "climb", "be quiet for 20m"'
     ],
     videoFile: '/videos/voice-chat.mp4',
-    videoPoster: 'Placeholder: Spoken AI Voice Chat & Command Execution'
+    videoPoster: '/videos/voice-chat-poster.jpg'
   }
 ];
 ---
@@ -177,47 +177,29 @@ const features = [
                   <!-- Subtle Scanline effect -->
                   <div class="absolute inset-0 pointer-events-none bg-[radial-gradient(#22d3ee_1px,transparent_1px)] [background-size:16px_16px] opacity-10"></div>
                   
-                  <!-- Video element (loads user video if present, otherwise shows placeholder) -->
+                  <!-- Video element (loads user video recordings with instant poster frames) -->
                   <video
-                    class="feature-video absolute inset-0 w-full h-full object-cover hidden"
+                    class="feature-video absolute inset-0 w-full h-full object-cover cursor-pointer"
                     loop
                     muted
                     playsinline
                     preload="auto"
+                    poster={feat.videoPoster}
                     src={feat.videoFile}
                   ></video>
 
-                  <!-- Placeholder Overlay -->
-                  <div class="feature-placeholder relative z-10 flex flex-col items-center max-w-md space-y-3">
-                    <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-buddy-cyan to-buddy-purple p-0.5 shadow-xl group-hover:scale-110 transition-transform">
+                  <!-- Fallback Placeholder (displayed only if video fails to load) -->
+                  <div class="feature-placeholder hidden relative z-10 flex flex-col items-center max-w-md space-y-3 p-6 text-center">
+                    <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-buddy-cyan to-buddy-purple p-0.5 shadow-xl">
                       <div class="w-full h-full bg-buddy-bg/90 rounded-full flex items-center justify-center text-buddy-cyan text-xl pl-1">
                         ▶
                       </div>
                     </div>
                     <div>
-                      <h4 class="text-sm font-semibold text-white">{feat.videoPoster}</h4>
+                      <h4 class="text-sm font-semibold text-white">{feat.title}</h4>
                       <p class="text-xs text-buddy-darkMuted mt-1">
-                        Video placeholder ready for desktop screen recording
+                        Recording preview unavailable
                       </p>
-                      <code class="mt-2 inline-block text-[10px] font-mono px-2 py-1 rounded bg-white/5 border border-white/10 text-buddy-cyan">
-                        Drop into: public{feat.videoFile}
-                      </code>
-                    </div>
-                  </div>
-
-                  <!-- Fake Video Player Controls Bar at bottom (visible when showing placeholder) -->
-                  <div class="fake-controls-bar absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-black/90 to-transparent px-4 flex items-center justify-between z-10">
-                    <div class="flex items-center gap-3 text-xs text-buddy-muted font-mono">
-                      <span class="text-white hover:text-buddy-cyan cursor-pointer">▶</span>
-                      <span>0:00 / 0:45</span>
-                    </div>
-                    <div class="flex-1 mx-4 h-1 bg-white/10 rounded-full overflow-hidden">
-                      <div class="w-1/3 h-full bg-gradient-to-r from-buddy-cyan to-buddy-purple rounded-full"></div>
-                    </div>
-                    <div class="flex items-center gap-3 text-xs text-buddy-muted">
-                      <span>🔊</span>
-                      <span>HD</span>
-                      <span>⛶</span>
                     </div>
                   </div>
                 </div>
@@ -235,24 +217,35 @@ const features = [
     const tabs = document.querySelectorAll<HTMLButtonElement>('.reel-tab');
     const panels = document.querySelectorAll<HTMLElement>('.reel-panel');
 
-    // Auto-detect and play videos once video files are present in public/videos
+    // Auto-play visible video and handle play/pause on click
     document.querySelectorAll<HTMLVideoElement>('.feature-video').forEach((vid) => {
       const parent = vid.parentElement;
       const placeholder = parent?.querySelector<HTMLElement>('.feature-placeholder');
-      const fakeBar = parent?.querySelector<HTMLElement>('.fake-controls-bar');
 
       const handleVideoReady = () => {
-        vid.classList.remove('hidden');
-        if (placeholder) placeholder.classList.add('hidden');
-        if (fakeBar) fakeBar.classList.add('hidden');
         const panel = vid.closest('.reel-panel');
         if (panel && !panel.classList.contains('hidden')) {
           vid.play().catch(() => {});
         }
       };
 
+      vid.addEventListener('error', () => {
+        vid.classList.add('hidden');
+        if (placeholder) placeholder.classList.remove('hidden');
+      });
+
       vid.addEventListener('loadeddata', handleVideoReady);
       vid.addEventListener('canplay', handleVideoReady);
+
+      // Click video to toggle play/pause
+      vid.addEventListener('click', () => {
+        if (vid.paused) {
+          vid.play().catch(() => {});
+        } else {
+          vid.pause();
+        }
+      });
+
       if (vid.readyState >= 2) {
         handleVideoReady();
       }
