@@ -81,13 +81,13 @@ import DownloadCTA from '../components/DownloadCTA.astro';
               <div class="flex items-center gap-1 sm:gap-1.5 text-[11px] font-medium text-white">
                 <!-- Desktop title (hidden on mobile) -->
                 <div class="hidden sm:flex items-center gap-1.5">
-                  <img src="/images/logo-icon.png" alt="Robo Buddy" class="w-3.5 h-3.5 object-contain" />
+                  <img src="/images/logo-icon.png" alt="Robo Buddy" class="w-3.5 h-3.5 object-contain rounded" />
                   <span>Robo Buddy</span>
                 </div>
                 <!-- Mobile Tabs (shown on mobile to switch between Companion and Terminal without stacking two huge windows) -->
                 <div class="flex sm:hidden items-center gap-1 font-mono text-[10px]">
                   <button id="tab-btn-companion" type="button" class="px-2 py-0.5 rounded bg-[#161616] text-white border-t border-buddy-cyan font-sans font-medium flex items-center gap-1">
-                    <img src="/images/logo-icon.png" alt="" class="w-3 h-3 object-contain" />
+                    <img src="/images/logo-icon.png" alt="" class="w-3 h-3 object-contain rounded" />
                     <span>Companion</span>
                   </button>
                   <button id="tab-btn-terminal" type="button" class="px-2 py-0.5 rounded text-buddy-muted hover:text-white flex items-center gap-1 font-sans">
@@ -215,7 +215,7 @@ import DownloadCTA from '../components/DownloadCTA.astro';
         </div>
         <!-- Active Robo Buddy Task Tab -->
         <div class="relative flex items-center gap-1.5 px-3 py-1 rounded bg-white/10 border border-white/10 cursor-pointer" title="Robo Buddy (Active)">
-          <img src="/images/logo-icon.png" alt="Robo Buddy" class="w-4 h-4 object-contain" />
+          <img src="/images/logo-icon.png" alt="Robo Buddy" class="w-4 h-4 object-contain rounded" />
           <span class="text-xs text-white font-medium">Robo Buddy</span>
           <!-- Windows 11 Active App Underline Indicator -->
           <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-buddy-cyan"></span>
