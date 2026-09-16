@@ -19,6 +19,7 @@ export class Bubble {
   private lastLine = "";
   /** A showing bubble with a higher priority is not replaced by a lower one (replies beat quips). */
   priority = 0;
+  onShow?: () => void;
 
   constructor() {
     this.el = document.createElement("div");
@@ -79,10 +80,12 @@ export class Bubble {
       this.chipsEl.hidden = true;
     }
 
+    const wasHidden = this.el.hidden;
     this.el.hidden = false;
     this.el.classList.remove("pop");
     void this.el.offsetWidth; // restart the pop animation
     this.el.classList.add("pop");
+    if (wasHidden && this.onShow) this.onShow();
     this.hideAt = now + seconds;
   }
 

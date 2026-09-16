@@ -38,6 +38,10 @@ pub struct Settings {
     /// Minutes of inactivity before the buddy falls asleep; 0 = never.
     pub sleep_after_min: f64,
     pub sounds_enabled: bool,
+    /// Master sound effects volume (0.0 .. 1.0).
+    pub sounds_volume: f64,
+    /// Footstep sounds while walking.
+    pub footsteps_enabled: bool,
     /// Sound effects during the screensaver; off by default.
     pub screensaver_sounds: bool,
     /// A .scr to run behind the screensaver; blank means a plain black backdrop.
@@ -129,6 +133,8 @@ impl Default for Settings {
             paused: false,
             sleep_after_min: 5.0,
             sounds_enabled: true,
+            sounds_volume: 0.6,
+            footsteps_enabled: true,
             screensaver_sounds: false,
             screensaver_backdrop: String::new(),
             screensaver_backdrop_mode: String::new(),
@@ -216,6 +222,7 @@ pub fn set_settings(app: AppHandle, state: tauri::State<SettingsState>, mut sett
     settings.bounciness = settings.bounciness.clamp(0.0, 0.65);
     settings.throw_strength = settings.throw_strength.clamp(0.25, 2.0);
     settings.screensaver_intensity = settings.screensaver_intensity.clamp(0.0, 100.0);
+    settings.sounds_volume = settings.sounds_volume.clamp(0.0, 1.0);
     {
         let mut cur = state.0.lock().unwrap();
         settings.screensaver_after_min = cur.screensaver_after_min;

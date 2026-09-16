@@ -145,6 +145,8 @@ let holdFacingUntil = 0;
 
 const bubble = new Bubble();
 const sounds = new Sounds();
+bubble.onShow = () => sounds.play("bubble", 0.5);
+let walkDistance = 0;
 const behavior = new Behavior();
 const contextCoordinator = new ContextCoordinator(
   () => settings,
@@ -184,6 +186,8 @@ const headWorld = new THREE.Vector3();
 async function boot() {
   await startInput();
   settings = await getSettings();
+  sounds.volume = settings.soundsVolume ?? 0.6;
+  sounds.footstepsEnabled = settings.footstepsEnabled ?? true;
 
   const p = new WindowPhysics({ gravity: false, throwable: false });
   p.onPoke = () => {
@@ -194,7 +198,9 @@ async function boot() {
     landStrength = Math.min(1, speed / 2500);
     if (landStrength > 0.55) {
       speak("land");
-      sounds.play("land");
+      sounds.play("land", landStrength);
+    } else if (landStrength > 0.15) {
+      sounds.play("land", landStrength);
     }
     // A hard landing plays the pack's landing clip (Jump Land by default) before idling.
     // If he came in tumbling (or really hard) he first lies limp for a moment, then gets up.
@@ -524,6 +530,8 @@ function applySettings(s: Settings) {
   }
   if (music) music.lockSeconds = beatLockSeconds(s.musicBeatLock);
   sounds.enabled = !hiddenByFullscreen && s.soundsEnabled && (!screensaverOn || s.screensaverSounds);
+  sounds.volume = s.soundsVolume ?? 0.6;
+  sounds.footstepsEnabled = s.footstepsEnabled ?? true;
   voice.enabled = s.chatVoice;
   voice.engine = s.ttsEngine === "piper" ? "piper" : "windows";
   behavior.opts = { wander: s.wanderEnabled, danceMode: s.danceMode };
@@ -602,6 +610,7 @@ function runCommand(cmd: Command): string | null {
     case "sleep":
       asleep = true;
       sleepLineAt = t + 1; // armed here too, so every nap has one announcement and no more
+      sounds.play("sleep", 0.7);
       commandedSleepUntil = t + 300;
       forcedDanceUntil = -1;
       behavior.interrupt(t);
@@ -617,7 +626,10 @@ function runCommand(cmd: Command): string | null {
       if (IN_TAURI) invoke("bring_here").catch(() => {});
       return "You came over to the user's cursor.";
     case "jump":
-      if (physics.mode === "rest") physics.hop(physics.y + physics.h * 0.07 - 220);
+      if (physics.mode === "rest") {
+        physics.hop(physics.y + physics.h * 0.07 - 220);
+        sounds.play("jump", 0.7);
+      }
       return "You jumped.";
     case "climb": {
       const c = physics.climbable();
@@ -1158,6 +1170,7 @@ function frame() {
   if (!asleep && sleepAfter > 0 && !paused && t - lastActivity > sleepAfter) {
     asleep = true;
     sleepLineAt = t + 1; // a beat after his eyes close, not the same frame
+    sounds.play("sleep", 0.7);
   }
   // Once, as he drops off. The "sleep" lines are announcements ("Gonna rest my eyes"), not
   // snores, so the timer that repeated them every 6 to 10 seconds read as a stuck bubble; and
@@ -1226,15 +1239,25 @@ function frame() {
     targetFacing = (dir * Math.PI) / 2;
     const step = Math.min(Math.abs(act.targetX - physics.x), act.speed * settings.size * dt);
     physics.nudge(dir * step, act.beyond);
+    walkDistance += step;
+    const strideLength = 55 * Math.max(0.5, settings.size);
+    if (walkDistance >= strideLength) {
+      walkDistance = 0;
+      sounds.play("footstep", 0.45);
+    }
+  } else {
+    walkDistance = 0;
   }
   if (behavior.pendingHop !== null && physics) {
     physics.hop(behavior.pendingHop);
     behavior.pendingHop = null;
     hopCount++;
+    sounds.play("jump", 0.7);
   }
   if (behavior.pendingLeave !== null && physics) {
     physics.leapOff(behavior.pendingLeave);
     behavior.pendingLeave = null;
+    sounds.play("jump", 0.8);
   }
   if (behavior.pendingPunch !== null) {
     const dir = behavior.pendingPunch;

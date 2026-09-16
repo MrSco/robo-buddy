@@ -30,6 +30,10 @@ export interface Settings {
   /** Minutes of inactivity before sleeping; 0 = never. */
   sleepAfterMin: number;
   soundsEnabled: boolean;
+  /** Master sound effects volume (0.0 .. 1.0). */
+  soundsVolume: number;
+  /** Footstep sounds while walking. */
+  footstepsEnabled: boolean;
   /** Sound effects during the screensaver. Off by default: a sleeping room should stay quiet. */
   screensaverSounds: boolean;
   /**
@@ -117,6 +121,8 @@ export const DEFAULT_SETTINGS: Settings = {
   paused: false,
   sleepAfterMin: 5,
   soundsEnabled: true,
+  soundsVolume: 0.6,
+  footstepsEnabled: true,
   screensaverSounds: false,
   screensaverBackdrop: "",
   screensaverBackdropMode: "",

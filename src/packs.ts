@@ -52,8 +52,24 @@ export interface Manifest {
   llm?: { temperature?: number; maxWords?: number };
   /** Optional speech-bubble lines per event; one is picked at random. */
   lines?: Partial<Record<"greet" | "poked" | "sleep" | "wake" | "land" | "bump" | "dance" | "idle", string[]>>;
-  /** Optional sound files per event, relative to the pack. */
-  sounds?: Partial<Record<"poked" | "land" | "wake" | "greet" | "bounce" | "bump" | "grab" | "throw", string>>;
+  /** Optional sound files per event, relative to the pack. Either a single file or array of variations. */
+  sounds?: Partial<
+    Record<
+      | "poked"
+      | "land"
+      | "wake"
+      | "greet"
+      | "bounce"
+      | "bump"
+      | "grab"
+      | "throw"
+      | "footstep"
+      | "jump"
+      | "sleep"
+      | "bubble",
+      string | string[]
+    >
+  >;
   reactions: {
     music?: { enabled: boolean; threshold?: number };
     mouse?: {

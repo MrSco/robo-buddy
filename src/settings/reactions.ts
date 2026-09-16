@@ -23,6 +23,9 @@ export class ReactionsTab implements TabModule {
     meterTxt: $<HTMLSpanElement>("meter-txt"),
     meterBpm: $<HTMLSpanElement>("meter-bpm"),
     sounds: $<HTMLInputElement>("sounds"),
+    soundsVolume: $<HTMLInputElement>("sounds-volume"),
+    soundsVolumeOut: $<HTMLOutputElement>("sounds-volume-out"),
+    footsteps: $<HTMLInputElement>("footsteps"),
     bubbles: $<HTMLInputElement>("bubbles"),
     sleep: $<HTMLSelectElement>("sleep"),
     dance: $<HTMLSelectElement>("dance"),
@@ -52,6 +55,15 @@ export class ReactionsTab implements TabModule {
     this.els.sensitivity.addEventListener("change", () => ctx.commit({ musicBeatLock: Number(this.els.sensitivity.value) }));
 
     this.els.sounds.addEventListener("change", () => ctx.commit({ soundsEnabled: this.els.sounds.checked }));
+    this.els.soundsVolume.addEventListener("input", () => {
+      this.els.soundsVolumeOut.value = `${Math.round(Number(this.els.soundsVolume.value) * 100)}%`;
+    });
+    this.els.soundsVolume.addEventListener("change", () =>
+      ctx.commit({ soundsVolume: Number(this.els.soundsVolume.value) })
+    );
+    this.els.footsteps.addEventListener("change", () =>
+      ctx.commit({ footstepsEnabled: this.els.footsteps.checked })
+    );
     this.els.bubbles.addEventListener("change", () => ctx.commit({ bubblesEnabled: this.els.bubbles.checked }));
     this.els.sleep.addEventListener("change", () => ctx.commit({ sleepAfterMin: Number(this.els.sleep.value) }));
     this.els.dance.addEventListener("change", () => ctx.commit({ danceMode: this.els.dance.value }));
@@ -109,6 +121,10 @@ export class ReactionsTab implements TabModule {
     this.els.sensOut.value = this.beatLockLabel(settings.musicBeatLock);
 
     this.els.sounds.checked = settings.soundsEnabled;
+    const sfxVol = settings.soundsVolume ?? 0.6;
+    this.els.soundsVolume.value = String(sfxVol);
+    this.els.soundsVolumeOut.value = `${Math.round(sfxVol * 100)}%`;
+    this.els.footsteps.checked = settings.footstepsEnabled ?? true;
     this.els.bubbles.checked = settings.bubblesEnabled;
 
     const opts = Array.from(this.els.sleep.options).map((o) => Number(o.value));

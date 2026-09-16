@@ -68,6 +68,8 @@
               <button id="physics-reset" type="button">Reset physics</button>
               <p class="hint">These control Buddy on the desktop and in the screensaver. Window pieces keep their own weight.</p>
               <label class="check" title="Short sound effects on pokes, landings, waking and greetings, when the character pack ships them."><input id="sounds" type="checkbox" /> Sounds</label>
+              <label class="field" title="Master volume for sound effects."><span>SFX volume <output id="sounds-volume-out"></output></span><input id="sounds-volume" type="range" min="0" max="1" step="0.05" /></label>
+              <label class="check" title="Subtle footstep sounds when walking along the taskbar or windows."><input id="footsteps" type="checkbox" /> Footsteps</label>
               <label class="check" title="The little speech bubble above his head: greetings, reactions, idle remarks and chat replies."><input id="bubbles" type="checkbox" /> Speech bubbles</label>
               <label class="check" title="He notices when you type a lot (he texts along) and reacts to Ctrl+S and Ctrl+Z. Only key counts and those two shortcuts are seen, never what you type."><input id="keyboard" type="checkbox" /> React to typing</label>
               <label class="check" title="Drop him on another window and he lands on its title bar; drop him a little short and he grabs the edge and pulls himself up. He rides along when it moves, wanders along its top edge, climbs nearby windows on his own and walks off when bored. Windows too close to the top of the screen: he ducks a little to fit, or bangs his head and falls."><input id="surfaces" type="checkbox" /> Stand on and climb other windows</label>
