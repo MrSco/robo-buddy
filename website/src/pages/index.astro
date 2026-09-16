@@ -68,60 +68,106 @@ import DownloadCTA from '../components/DownloadCTA.astro';
           </div>
         </div>
 
-        <!-- Center & Right Mock Desktop Windows (Climbable & Punchable) -->
-        <div class="lg:col-span-6 flex flex-col sm:flex-row lg:flex-row items-center justify-end gap-4 min-h-[380px] pointer-events-none pt-4 lg:pt-0">
-          <!-- Center Mock Widget: Audio / Beat Visualizer Card -->
+        <!-- Center & Right Mock Desktop Windows (Windows 11 Skin, Climbable & Punchable) -->
+        <div class="lg:col-span-6 flex flex-col sm:flex-row items-end justify-center lg:justify-end gap-4 min-h-[380px] pointer-events-none pt-4 pb-4">
+          <!-- Center Mock Widget: Windows 11 Robo Buddy Companion Card -->
           <div
             id="mock-window-widget"
-            class="mock-desktop-window w-44 sm:w-48 p-3 rounded-2xl bg-buddy-card/80 border border-buddy-border shadow-xl backdrop-blur-md transition-all duration-200 hover:scale-105 pointer-events-auto cursor-pointer select-none"
-            title="Music Beat Visualizer (Buddy can climb or kick this!)"
+            class="mock-desktop-window w-full sm:w-60 lg:w-64 rounded-lg bg-[#161616]/90 border border-white/15 shadow-2xl backdrop-blur-2xl overflow-hidden transition-all duration-200 hover:scale-[1.01] pointer-events-auto select-none"
+            title="Robo Buddy Companion Status (Climb or kick this window!)"
           >
-            <div class="flex items-center justify-between pb-1.5 border-b border-white/10 mb-2 text-[10px] font-mono text-buddy-muted">
-              <span class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span class="text-white font-semibold">Beat Detect</span>
-              </span>
-              <span class="text-buddy-cyan font-mono text-[9px] px-1 rounded bg-buddy-cyan/10">128 BPM</span>
+            <!-- Windows 11 Title Bar -->
+            <div class="flex items-center justify-between px-3 py-1.5 bg-[#202020]/90 border-b border-white/10 text-xs">
+              <div class="flex items-center gap-1.5 text-[11px] font-medium text-white">
+                <img src="/images/logo-icon.png" alt="Robo Buddy" class="w-3.5 h-3.5 object-contain" />
+                <span>Robo Buddy</span>
+              </div>
+              <!-- Windows 11 Title Controls -->
+              <div class="flex items-center text-buddy-muted">
+                <span class="w-6 h-5 flex items-center justify-center hover:bg-white/10 hover:text-white cursor-pointer transition-colors" title="Minimize">
+                  <svg class="w-2.5 h-2.5" viewBox="0 0 10 10" stroke="currentColor"><line x1="0" y1="5" x2="10" y2="5" stroke-width="1.2"/></svg>
+                </span>
+                <span class="w-6 h-5 flex items-center justify-center hover:bg-red-600 hover:text-white cursor-pointer transition-colors" title="Close">
+                  <svg class="w-2.5 h-2.5" viewBox="0 0 10 10" stroke="currentColor"><line x1="0" y1="0" x2="10" y2="10" stroke-width="1.2"/><line x1="10" y1="0" x2="0" y2="10" stroke-width="1.2"/></svg>
+                </span>
+              </div>
             </div>
-            <p class="text-[11px] text-white font-medium truncate mb-2">
-              🎵 Robot Rock &bull; Live
-            </p>
-            <!-- Animated EQ bars -->
-            <div class="flex items-end gap-1 h-7 pt-1">
-              <span class="w-1.5 bg-buddy-cyan rounded-full animate-bounce h-5"></span>
-              <span class="w-1.5 bg-buddy-purple rounded-full animate-pulse h-6"></span>
-              <span class="w-1.5 bg-buddy-cyan rounded-full animate-bounce h-4" style="animation-delay: 0.15s;"></span>
-              <span class="w-1.5 bg-pink-500 rounded-full animate-pulse h-5" style="animation-delay: 0.25s;"></span>
-              <span class="w-1.5 bg-emerald-400 rounded-full animate-bounce h-6" style="animation-delay: 0.1s;"></span>
-              <span class="w-1.5 bg-buddy-cyan rounded-full animate-pulse h-3" style="animation-delay: 0.3s;"></span>
+
+            <!-- Widget Body -->
+            <div class="p-3 text-xs space-y-2.5">
+              <!-- Audio Reactor Status -->
+              <div class="p-2 rounded bg-white/5 border border-white/5">
+                <div class="flex items-center justify-between text-[11px] font-medium mb-1">
+                  <span class="text-white flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>WASAPI Loopback</span>
+                  </span>
+                  <span class="font-mono text-[10px] text-buddy-cyan px-1 rounded bg-buddy-cyan/10">128 BPM</span>
+                </div>
+                <p class="text-[10px] text-buddy-muted truncate">Daft Punk &bull; Robot Rock</p>
+                <!-- Animated EQ bars -->
+                <div class="flex items-end gap-1 h-5 pt-1">
+                  <span class="w-1.5 bg-buddy-cyan rounded-full animate-bounce h-4"></span>
+                  <span class="w-1.5 bg-buddy-purple rounded-full animate-pulse h-5"></span>
+                  <span class="w-1.5 bg-buddy-cyan rounded-full animate-bounce h-3" style="animation-delay: 0.15s;"></span>
+                  <span class="w-1.5 bg-pink-500 rounded-full animate-pulse h-5" style="animation-delay: 0.25s;"></span>
+                  <span class="w-1.5 bg-emerald-400 rounded-full animate-bounce h-4" style="animation-delay: 0.1s;"></span>
+                </div>
+              </div>
+
+              <!-- Desktop Settings Indicators -->
+              <div class="grid grid-cols-2 gap-1.5 text-[10px] font-mono">
+                <div class="px-2 py-1.5 rounded bg-white/5 border border-white/5 flex items-center justify-between text-buddy-muted">
+                  <span>Surface</span>
+                  <span class="text-emerald-400 font-bold">SOLID</span>
+                </div>
+                <div class="px-2 py-1.5 rounded bg-white/5 border border-white/5 flex items-center justify-between text-buddy-muted">
+                  <span>Physics</span>
+                  <span class="text-buddy-cyan font-bold">ACTIVE</span>
+                </div>
+              </div>
+              <div class="text-[10px] text-buddy-darkMuted text-center font-mono">
+                Buddy hops on &amp; kicks this window
+              </div>
             </div>
           </div>
 
-          <!-- Right Mock Window: Native Command Terminal -->
+          <!-- Right Mock Window: Windows 11 Command Terminal -->
           <div
             id="mock-window-term"
-            class="mock-desktop-window w-full sm:w-72 lg:w-80 rounded-2xl bg-black/85 border border-buddy-border shadow-2xl backdrop-blur-xl overflow-hidden transition-all duration-200 hover:scale-[1.02] pointer-events-auto select-none"
-            title="Desktop Terminal Window (Buddy climbs and punches this!)"
+            class="mock-desktop-window w-full sm:w-80 lg:w-96 rounded-lg bg-[#0c0c0c]/95 border border-white/15 shadow-2xl backdrop-blur-2xl overflow-hidden transition-all duration-200 hover:scale-[1.01] pointer-events-auto select-none"
+            title="Desktop Terminal Window (Climb and kick target!)"
           >
-            <!-- Window Title Bar -->
-            <div class="flex items-center justify-between px-3.5 py-2 bg-white/5 border-b border-white/10 text-xs">
-              <div class="flex items-center gap-1.5">
-                <span class="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block hover:opacity-80 cursor-pointer"></span>
-                <span class="w-2.5 h-2.5 rounded-full bg-yellow-500/80 inline-block hover:opacity-80 cursor-pointer"></span>
-                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block hover:opacity-80 cursor-pointer"></span>
-                <span class="text-[11px] font-mono text-buddy-muted ml-1">pwsh - agent</span>
+            <!-- Windows 11 Title Bar -->
+            <div class="flex items-center justify-between px-3 py-1.5 bg-[#1f1f1f]/90 border-b border-white/10 text-xs">
+              <!-- Tab Header -->
+              <div class="flex items-center gap-2 px-2.5 py-0.5 bg-[#0c0c0c] rounded-t border-t border-buddy-cyan text-[11px] font-mono text-white">
+                <svg class="w-3 h-3 text-buddy-cyan" fill="currentColor" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zm0 2v12h16V6H4zm2 2h2v2H6V8zm0 4h10v2H6v-2z"/></svg>
+                <span>Windows PowerShell</span>
               </div>
-              <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-buddy-cyan/10 text-buddy-cyan">Interactive</span>
+              <!-- Windows 11 Window Controls (Top Right) -->
+              <div class="flex items-center text-buddy-muted">
+                <span class="w-7 h-5 flex items-center justify-center hover:bg-white/10 hover:text-white cursor-pointer transition-colors" title="Minimize">
+                  <svg class="w-2.5 h-2.5" viewBox="0 0 10 10" stroke="currentColor"><line x1="0" y1="5" x2="10" y2="5" stroke-width="1.2"/></svg>
+                </span>
+                <span class="w-7 h-5 flex items-center justify-center hover:bg-white/10 hover:text-white cursor-pointer transition-colors" title="Maximize">
+                  <svg class="w-2.5 h-2.5" viewBox="0 0 10 10" stroke="currentColor" fill="none"><rect x="0.5" y="0.5" width="9" height="9" stroke-width="1.2"/></svg>
+                </span>
+                <span class="w-7 h-5 flex items-center justify-center hover:bg-red-600 hover:text-white cursor-pointer transition-colors" title="Close">
+                  <svg class="w-2.5 h-2.5" viewBox="0 0 10 10" stroke="currentColor"><line x1="0" y1="0" x2="10" y2="10" stroke-width="1.2"/><line x1="10" y1="0" x2="0" y2="10" stroke-width="1.2"/></svg>
+                </span>
+              </div>
             </div>
             <!-- Terminal Body -->
-            <div class="p-3 font-mono text-[11px] space-y-1 text-buddy-muted">
-              <div class="text-buddy-darkMuted">$ robo-buddy --live</div>
-              <div class="text-emerald-400">✓ Native station: Default</div>
-              <div class="text-buddy-cyan">✓ Audio loopback: Active</div>
-              <div class="text-buddy-purpleLight">✓ Furniture detected: 5</div>
-              <div class="text-[10px] text-white/60 pt-1 flex items-center gap-1">
+            <div class="p-3 font-mono text-[11px] leading-relaxed text-buddy-muted space-y-1">
+              <div class="text-white/80">Windows PowerShell 7.4</div>
+              <div class="text-emerald-400 pt-0.5">PS C:\RoboBuddy&gt; .\robo-buddy.exe --live</div>
+              <div class="text-buddy-cyan">✓ Native station: Direct3D 11 active</div>
+              <div class="text-buddy-purpleLight">✓ Audio loopback: WASAPI synchronized</div>
+              <div class="text-emerald-400">✓ Collision furniture: 4 ledges mapped</div>
+              <div class="text-white/60 text-[10px] pt-1 flex items-center gap-1.5">
                 <span class="w-1.5 h-1.5 rounded-full bg-buddy-cyan animate-ping"></span>
-                <span>Buddy roaming screen...</span>
+                <span>Buddy roaming desktop perimeter...</span>
               </div>
             </div>
           </div>
@@ -129,42 +175,31 @@ import DownloadCTA from '../components/DownloadCTA.astro';
       </div>
     </div>
 
-    <!-- ==================== MOCK WINDOWS TASKBAR ==================== -->
+    <!-- ==================== MOCK WINDOWS 11 TASKBAR (FLOOR) ==================== -->
     <div
       id="hero-taskbar"
-      class="absolute bottom-0 inset-x-0 h-12 bg-black/75 border-t border-white/10 backdrop-blur-xl z-15 flex items-center justify-between px-4 sm:px-6 select-none pointer-events-auto"
+      class="absolute bottom-14 inset-x-0 h-10 bg-[#121212]/90 border-t border-white/15 backdrop-blur-2xl z-20 flex items-center justify-between px-6 select-none pointer-events-auto shadow-2xl"
     >
-      <!-- Centered Windows 11 App Icons -->
-      <div class="flex items-center gap-1 sm:gap-2 mx-auto">
-        <!-- Windows Start -->
-        <div class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 cursor-pointer transition-colors" title="Start Menu">
-          <svg class="w-4 h-4 text-buddy-cyan" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.951-1.77"/></svg>
+      <!-- Center: Windows 11 Start & Running Robo Buddy App -->
+      <div class="flex items-center gap-2 mx-auto">
+        <!-- Windows 11 Start Icon (4 blue squares) -->
+        <div class="w-7 h-7 rounded flex items-center justify-center hover:bg-white/10 cursor-pointer transition-colors" title="Start">
+          <svg class="w-3.5 h-3.5 text-[#00adef]" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M0 0h11v11H0zM13 0h11v11H13zM0 13h11v11H0zM13 13h11v11H13z"/>
+          </svg>
         </div>
-        <!-- Search -->
-        <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] text-buddy-darkMuted cursor-pointer hover:bg-white/10 transition-colors">
-          <svg class="w-3.5 h-3.5 text-buddy-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-          <span>Search</span>
-        </div>
-        <!-- Terminal -->
-        <div class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 text-emerald-400 cursor-pointer transition-colors" title="PowerShell">
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-        </div>
-        <!-- File Explorer -->
-        <div class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 text-amber-400 cursor-pointer transition-colors" title="File Explorer">
-          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
-        </div>
-        <!-- Running Robo Buddy Task Icon with active status dot -->
-        <div class="relative w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 cursor-pointer shadow-inner" title="Robo Buddy (Active)">
-          <img src="/images/logo-icon.png" alt="Robo Buddy" class="w-5 h-5 object-contain" />
-          <span class="absolute bottom-0.5 w-1.5 h-1.5 rounded-full bg-buddy-cyan animate-pulse"></span>
+        <!-- Active Robo Buddy Task Tab -->
+        <div class="relative flex items-center gap-1.5 px-3 py-1 rounded bg-white/10 border border-white/10 cursor-pointer" title="Robo Buddy (Active)">
+          <img src="/images/logo-icon.png" alt="Robo Buddy" class="w-4 h-4 object-contain" />
+          <span class="text-xs text-white font-medium">Robo Buddy</span>
+          <!-- Windows 11 Active App Underline Indicator -->
+          <span class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-4 h-0.5 rounded-full bg-buddy-cyan"></span>
         </div>
       </div>
 
-      <!-- Right: System Tray & Clock -->
-      <div class="hidden sm:flex items-center gap-3 text-xs text-buddy-muted font-mono">
-        <span class="hover:text-white cursor-pointer" title="Sound: 100%">🔊</span>
-        <span class="hover:text-white cursor-pointer" title="Internet: Connected">📶</span>
-        <span class="text-[11px] text-white font-medium">11:42 PM</span>
+      <!-- Right: System Clock -->
+      <div class="hidden sm:flex items-center gap-2 text-xs text-buddy-muted font-mono">
+        <span class="text-[11px] text-white/90">11:42 PM</span>
       </div>
     </div>
   </section>

@@ -79,3 +79,15 @@ export function applyAttack(c: Character, kind: "punch" | "kick" | "throw", prog
   }
 }
 
+/** A procedural crouch/duck pose when headroom is tight or approaching ceiling. */
+export function applyCrouch(c: Character, amount: number) {
+  const a = Math.max(0, Math.min(1, amount));
+  if (a <= 0.001) return;
+  poseLocal(c, c.bone("spine"), 0.35 * a, 0, 0);
+  poseLocal(c, c.bone("head"), -0.25 * a, 0, 0);
+  poseLocal(c, c.bone("leftUpperLeg"), -0.5 * a, 0, 0);
+  poseLocal(c, c.bone("rightUpperLeg"), -0.5 * a, 0, 0);
+  poseLocal(c, c.bone("leftLowerLeg"), 0.7 * a, 0, 0);
+  poseLocal(c, c.bone("rightLowerLeg"), 0.7 * a, 0, 0);
+}
+
