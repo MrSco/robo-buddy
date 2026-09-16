@@ -1,4 +1,9 @@
 ---
+import pkg from "../../../package.json";
+
+const version = pkg.version;
+const exeUrl = `https://github.com/MrSco/robo-buddy-releases/releases/latest/download/RoboBuddy-Setup-${version}.exe`;
+const msiUrl = `https://github.com/MrSco/robo-buddy-releases/releases/latest/download/RoboBuddy-${version}.msi`;
 ---
 
 <section id="download" class="py-24 relative overflow-hidden">
@@ -23,7 +28,7 @@
         <!-- Main Download Action Buttons -->
         <div class="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
-            href="https://github.com/MrSco/robo-buddy-releases/releases/latest/download/RoboBuddy-Setup-0.7.0.exe"
+            href={exeUrl}
             class="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-buddy-cyan to-buddy-purple hover:brightness-110 text-white font-bold text-base shadow-xl shadow-buddy-cyan/25 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3"
           >
             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.951-1.77"/></svg>
@@ -31,7 +36,7 @@
           </a>
 
           <a
-            href="https://github.com/MrSco/robo-buddy-releases/releases/latest/download/RoboBuddy-0.7.0.msi"
+            href={msiUrl}
             class="w-full sm:w-auto px-6 py-4 rounded-xl bg-buddy-bg border border-buddy-border hover:border-buddy-cyan/50 text-buddy-text hover:text-white font-medium text-sm transition-all hover:bg-white/5 flex items-center justify-center gap-2"
           >
             <span>Download .msi Package</span>
