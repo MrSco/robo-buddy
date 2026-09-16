@@ -2,7 +2,7 @@
 import { CHARACTERS } from '../lib/character-loader';
 ---
 
-<div id="buddy-stage-container" class="absolute inset-0 w-full h-full select-none pointer-events-none z-10 overflow-hidden">
+<div id="buddy-stage-container" class="absolute inset-0 w-full h-full select-none pointer-events-none z-20 overflow-hidden">
   <!-- Character Selector Floating Bar (Top Right) -->
   <div class="absolute top-3 right-3 sm:top-4 sm:right-6 z-30 flex items-center gap-1.5 p-1 rounded-2xl bg-buddy-card/90 border border-buddy-border shadow-xl backdrop-blur-md pointer-events-auto">
     {CHARACTERS.map((char, idx) => (
@@ -36,7 +36,7 @@ import { CHARACTERS } from '../lib/character-loader';
   >
     <div class="bg-buddy-bg/95 border border-buddy-cyan/60 rounded-2xl p-3 sm:p-4 shadow-2xl shadow-buddy-cyan/25 backdrop-blur-xl relative">
       <div class="flex items-center gap-2 mb-1">
-        <span id="bubble-avatar" class="text-sm">🤖</span>
+        <img id="bubble-avatar" src="/images/logo-icon.png" alt="Avatar" class="w-4 h-4 rounded-full object-contain inline-block" />
         <span id="bubble-name" class="text-xs font-bold text-white">T-800</span>
         <span id="bubble-tag" class="text-[9px] font-mono px-1 rounded bg-buddy-cyan/20 text-buddy-cyan font-semibold">Active</span>
       </div>
@@ -55,7 +55,7 @@ import { CHARACTERS } from '../lib/character-loader';
   >
     <div class="flex items-center justify-between pb-2 mb-2.5 border-b border-buddy-border text-xs">
       <span class="font-semibold text-white flex items-center gap-1.5">
-        <span>💬</span>
+        <img src="/images/logo-icon.png" alt="Buddy" class="w-4 h-4 rounded-full object-contain" />
         <span>Talk with <span id="talk-box-char-name">T-800</span></span>
       </span>
       <button id="btn-close-talk" type="button" class="text-buddy-muted hover:text-white p-1 text-base">&times;</button>
@@ -106,7 +106,7 @@ import { CHARACTERS } from '../lib/character-loader';
   <!-- 3D Three.js WebGL Stage Canvas (Spans full hero width & height) -->
   <canvas
     id="hero-stage-canvas"
-    class="w-full h-full block cursor-grab active:cursor-grabbing touch-none select-none pointer-events-auto"
+    class="w-full h-full block cursor-grab active:cursor-grabbing touch-none select-none pointer-events-none"
   ></canvas>
 
   <!-- 2D Pixel Pal Canvas (hidden by default) -->
@@ -149,6 +149,7 @@ import { CHARACTERS } from '../lib/character-loader';
   import { CHARACTERS, fetchCharacter, type CharacterDef } from '../lib/character-loader';
   import type { Character } from '../lib/character';
   import { refreshSkins } from '../lib/character';
+  import { applyLookAt } from '../lib/pose';
 
   function initHeroStage() {
     const container = document.getElementById('buddy-stage-container');
@@ -215,6 +216,25 @@ import { CHARACTERS } from '../lib/character-loader';
     rimLight.position.set(0, 3, -3);
     scene.add(rimLight);
 
+    // Dynamic per-character studio lighting presets (matching desktop app levels)
+    const LIGHTING_PRESETS: Record<string, { key: number; hemi: number; fill: number; rim: number; env: number }> = {
+      't-800': { key: 2.5, hemi: 1.8, fill: 1.8, rim: 2.2, env: 1.5 },
+      'rocco': { key: 1.1, hemi: 1.0, fill: 0.7, rim: 0.8, env: 0.5 },
+      'mannequin': { key: 1.3, hemi: 1.2, fill: 0.8, rim: 0.9, env: 0.6 },
+    };
+    const DEFAULT_LIGHTING = { key: 1.4, hemi: 1.3, fill: 0.9, rim: 1.0, env: 0.7 };
+
+    function applyLighting(charId: string) {
+      const lgt = LIGHTING_PRESETS[charId] ?? DEFAULT_LIGHTING;
+      keyLight.intensity = lgt.key;
+      hemiLight.intensity = lgt.hemi;
+      fillLight.intensity = lgt.fill;
+      rimLight.intensity = lgt.rim;
+      if ('environmentIntensity' in scene) {
+        (scene as any).environmentIntensity = lgt.env;
+      }
+    }
+
     // Dynamic Contact Floor Shadow Mesh
     const shadowGeo = new THREE.PlaneGeometry(1.6, 1.6);
     const shadowCanvas = document.createElement('canvas');
@@ -264,11 +284,12 @@ import { CHARACTERS } from '../lib/character-loader';
     let nextAutoAction = 3.0; // Seconds until next autonomous decision
     let autoTargetX = 1.4;
 
-    // Look-at tracking
-    let targetLookX = 0;
-    let targetLookY = 0;
-    let currentLookX = 0;
-    let currentLookY = 0;
+    // Look-at cursor tracking
+    let cursorScreenX = width * 0.5;
+    let cursorScreenY = height * 0.5;
+    let cursorValid = false;
+    let currentYaw = 0;
+    let currentPitch = 0;
 
     // Drag / Throw tracking
     let pointerDownTime = 0;
@@ -327,7 +348,11 @@ import { CHARACTERS } from '../lib/character-loader';
     // Show Speech Bubble Function
     function showBubble(text: string, durationMs = 4200) {
       if (!bubble || !bubbleText || !bubbleName || !bubbleAvatar || !bubbleTag) return;
-      bubbleAvatar.textContent = activeDef.emoji;
+      if (bubbleAvatar instanceof HTMLImageElement) {
+        bubbleAvatar.src = '/images/logo-icon.png';
+      } else {
+        bubbleAvatar.textContent = activeDef.emoji;
+      }
       bubbleName.textContent = activeDef.name;
       bubbleTag.textContent = isDancing ? 'Dancing' : isFalling ? 'Airborne' : isHeld ? 'Grabbed' : currentLedge ? 'Perched' : 'Active';
       bubbleText.textContent = text;
@@ -417,6 +442,7 @@ import { CHARACTERS } from '../lib/character-loader';
     async function switchCharacter(def: CharacterDef) {
       activeDef = def;
       if (talkBoxCharName) talkBoxCharName.textContent = def.name;
+      applyLighting(def.id);
 
       if (loadingEl) {
         loadingEl.style.opacity = '1';
@@ -536,6 +562,11 @@ import { CHARACTERS } from '../lib/character-loader';
       const onBuddy = getPointerIntersection(e);
       if (!onBuddy) return;
 
+      if (canvas) {
+        canvas.style.pointerEvents = 'auto';
+        canvas.style.cursor = 'grabbing';
+      }
+
       pointerDownTime = performance.now();
       pointerStartX = e.clientX;
       pointerStartY = e.clientY;
@@ -556,14 +587,21 @@ import { CHARACTERS } from '../lib/character-loader';
     });
 
     window.addEventListener('pointermove', (e) => {
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const normX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      const normY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      cursorScreenX = e.clientX;
+      cursorScreenY = e.clientY;
+      cursorValid = true;
 
-      // Cursor tracking for smooth head turn
-      targetLookX = Math.max(-1.5, Math.min(1.5, normX));
-      targetLookY = Math.max(-1.0, Math.min(1.0, normY));
+      // Dynamic click-through: canvas receives pointer events only when hovering/dragging Buddy
+      const onBuddy = isHeld || getPointerIntersection(e);
+      if (canvas) {
+        if (onBuddy) {
+          canvas.style.pointerEvents = 'auto';
+          canvas.style.cursor = isHeld ? 'grabbing' : 'grab';
+        } else {
+          canvas.style.pointerEvents = 'none';
+          canvas.style.cursor = 'default';
+        }
+      }
 
       const now = performance.now();
       const dt = Math.max(0.001, (now - lastPointerTime) / 1000);
@@ -574,7 +612,10 @@ import { CHARACTERS } from '../lib/character-loader';
       lastPointerTime = now;
 
       // Dragging held Buddy
-      if (isHeld && activeCharacter) {
+      if (isHeld && activeCharacter && canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const normX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        const normY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         const vector = new THREE.Vector3(normX, normY, 0.5).unproject(camera);
         const dir = vector.sub(camera.position).normalize();
         const distance = (0 - camera.position.z) / dir.z;
@@ -595,16 +636,21 @@ import { CHARACTERS } from '../lib/character-loader';
       // Poke: brief click
       if (duration < 250 && dist < 12) {
         pokeBuddy();
+        const stillOver = getPointerIntersection(e);
+        if (canvas) {
+          canvas.style.pointerEvents = stillOver ? 'auto' : 'none';
+          canvas.style.cursor = stillOver ? 'grab' : 'default';
+        }
         return;
       }
 
-      // Throw: flung with velocity
+      // Throw: flung with velocity (gentle tumble velocity, no propeller circling)
       const speed = Math.hypot(pointerVelX, pointerVelY);
       if (speed > 350) {
         isFalling = true;
-        velX = pointerVelX * 0.004;
-        velY = -pointerVelY * 0.004;
-        tumbleVel = (Math.random() - 0.5) * 14;
+        velX = Math.max(-5, Math.min(5, pointerVelX * 0.0035));
+        velY = Math.max(-4, Math.min(6, -pointerVelY * 0.0035));
+        tumbleVel = THREE.MathUtils.clamp((Math.random() - 0.5) * 4.0, -3.0, 3.0);
 
         playClip('fall', { loop: true, fade: 0.1 });
         const quote = activeDef.thrownQuotes[Math.floor(Math.random() * activeDef.thrownQuotes.length)];
@@ -613,6 +659,12 @@ import { CHARACTERS } from '../lib/character-loader';
         isFalling = true;
         velX = 0;
         velY = 0;
+      }
+
+      const stillOver = getPointerIntersection(e);
+      if (canvas) {
+        canvas.style.pointerEvents = stillOver ? 'auto' : 'none';
+        canvas.style.cursor = stillOver ? 'grab' : 'default';
       }
     });
 
@@ -686,9 +738,9 @@ import { CHARACTERS } from '../lib/character-loader';
       isWalking = false;
       currentLedge = null;
       posY = Math.max(posY, 1.2);
-      velX = (Math.random() - 0.5) * 5.0;
-      velY = 4.5;
-      tumbleVel = (Math.random() - 0.5) * 12;
+      velX = (Math.random() - 0.5) * 3.5;
+      velY = 4.2;
+      tumbleVel = (Math.random() - 0.5) * 3.0;
 
       playClip('jump', { loop: false, fade: 0.1 });
       const quote = activeDef.thrownQuotes[Math.floor(Math.random() * activeDef.thrownQuotes.length)];
@@ -887,8 +939,6 @@ import { CHARACTERS } from '../lib/character-loader';
             isFalling = false;
             velX = 0;
             velY = 0;
-            tumbleAngle = 0;
-            tumbleVel = 0;
             currentLedge = plat;
 
             playClip('land', { loop: false, fade: 0.1 });
@@ -914,8 +964,6 @@ import { CHARACTERS } from '../lib/character-loader';
             isFalling = false;
             velX = 0;
             velY = 0;
-            tumbleAngle = 0;
-            tumbleVel = 0;
 
             playClip('land', { loop: false, fade: 0.1 });
             window.setTimeout(() => {
@@ -927,20 +975,55 @@ import { CHARACTERS } from '../lib/character-loader';
         }
       }
 
-      // 4. SMOOTH LOOK-AT TRACKING (Head turns naturally towards cursor)
-      if (!isFalling && !isHeld) {
-        currentLookX += (targetLookX - currentLookX) * 0.08;
-        currentLookY += (targetLookY - currentLookY) * 0.08;
-
-        if (headBone) {
-          headBone.rotation.y = currentLookX * 0.5;
-          headBone.rotation.x = -currentLookY * 0.35;
+      // Upright spring recovery (smoothly pull Buddy upright whenever not tumbling in free fall)
+      if (!isFalling && !isHeld && (Math.abs(tumbleAngle) > 0.001 || Math.abs(tumbleVel) > 0.001)) {
+        tumbleVel += (-35 * tumbleAngle - 8 * tumbleVel) * dt;
+        tumbleAngle += tumbleVel * dt;
+        if (Math.abs(tumbleAngle) < 0.005 && Math.abs(tumbleVel) < 0.01) {
+          tumbleAngle = 0;
+          tumbleVel = 0;
         }
+      }
+
+      // 4. SMOOTH LOOK-AT TRACKING (World-space distributed across chest, neck, head - no cocked neck!)
+      if (!isFalling && !isHeld && activeCharacter && canvas) {
+        let targetYaw = 0;
+        let targetPitch = 0;
+        if (cursorValid) {
+          const cRect = canvas.getBoundingClientRect();
+          const headPos = new THREE.Vector3();
+          const hBone = activeCharacter.bone('head');
+          if (hBone) {
+            hBone.getWorldPosition(headPos);
+          } else {
+            headPos.set(posX, posY + 1.8, posZ);
+          }
+          headPos.project(camera);
+          const screenHeadX = ((headPos.x + 1) / 2) * cRect.width + cRect.left;
+          const screenHeadY = ((-headPos.y + 1) / 2) * cRect.height + cRect.top;
+          const dx = cursorScreenX - screenHeadX;
+          const dy = cursorScreenY - screenHeadY;
+          targetYaw = THREE.MathUtils.clamp(dx / (cRect.width * 0.35), -1, 1) * 0.75;
+          targetPitch = THREE.MathUtils.clamp(-dy / (cRect.height * 0.35), -1, 1) * 0.45;
+        }
+
+        const k = 1 - Math.exp(-dt * 9);
+        currentYaw += (targetYaw - currentYaw) * k;
+        currentPitch += (targetPitch - currentPitch) * k;
+
+        // Dampen head look-at when character is walking or turned sideways
+        const lookScale = 1 - Math.min(1, Math.abs(rotY) / 1.2);
+        applyLookAt(activeCharacter, currentYaw * lookScale, currentPitch * lookScale, 0);
       }
 
       // 5. UPDATE CHARACTER TRANSFORMS IN SCENE
       if (activeCharacter) {
-        activeCharacter.root.position.set(posX, posY + footOffset, posZ);
+        // Pivot about hips/center of mass (~0.92m) during tumble so rotation doesn't swing in a massive circle around feet
+        const half = 0.92;
+        const offsetX = Math.abs(tumbleAngle) > 0.001 ? half * Math.sin(tumbleAngle) : 0;
+        const offsetY = Math.abs(tumbleAngle) > 0.001 ? half * (1 - Math.cos(tumbleAngle)) : 0;
+
+        activeCharacter.root.position.set(posX + offsetX, posY + footOffset + offsetY, posZ);
         activeCharacter.root.rotation.set(0, rotY, tumbleAngle);
 
         // Shadow follows on floor or platform

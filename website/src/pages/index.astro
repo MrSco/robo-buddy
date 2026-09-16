@@ -13,8 +13,8 @@ import DownloadCTA from '../components/DownloadCTA.astro';
     <!-- Full-Width Interactive 3D Hero Stage -->
     <BuddyHeroStage />
 
-    <!-- Hero Content Overlay (In front of 3D stage; buttons act as climbable platforms) -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20 pointer-events-none">
+    <!-- Hero Content (Behind 3D stage so Buddy renders in front of text and elements) -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
         <!-- Left Hero Copy -->
         <div class="lg:col-span-7 space-y-6 text-center lg:text-left">

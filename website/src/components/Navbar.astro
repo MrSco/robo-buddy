@@ -4,20 +4,16 @@ const { currentPath = '/' } = Astro.props;
 
 <header class="sticky top-0 z-50 backdrop-blur-md bg-buddy-bg/80 border-b border-buddy-border">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-    <!-- Brand -->
-    <a href="/" class="flex items-center gap-3 group">
-      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-buddy-cyan to-buddy-purple p-0.5 shadow-lg group-hover:scale-105 transition-transform duration-200">
-        <div class="w-full h-full bg-buddy-bg rounded-[7px] flex items-center justify-center text-lg">
-          🤖
-        </div>
-      </div>
-      <div class="flex flex-col">
-        <span class="font-bold tracking-tight text-white flex items-center gap-2">
-          Robo Buddy
-          <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-buddy-cyan/10 border border-buddy-cyan/30 text-buddy-cyan font-semibold">v0.6.0</span>
-        </span>
-        <span class="text-[10px] text-buddy-darkMuted -mt-0.5">Desktop Companion</span>
-      </div>
+    <!-- Brand Logo -->
+    <a href="/" class="flex items-center gap-2.5 group">
+      <img
+        src="/images/logo.png"
+        alt="Robo Buddy"
+        class="h-9 sm:h-10 w-auto object-contain transition-transform duration-200 group-hover:scale-105"
+      />
+      <span class="hidden sm:inline-block text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-buddy-cyan/10 border border-buddy-cyan/30 text-buddy-cyan font-semibold">
+        v0.6.0
+      </span>
     </a>
 
     <!-- Nav links -->
