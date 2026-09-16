@@ -9,15 +9,15 @@ import DownloadCTA from '../components/DownloadCTA.astro';
 
 <BaseLayout currentPath="/">
   <!-- ==================== HERO SECTION (UNBOXED FULL HERO BUDDY) ==================== -->
-  <section id="hero-section" class="relative min-h-[720px] lg:min-h-[800px] pt-10 pb-20 sm:pt-16 sm:pb-24 overflow-hidden">
+  <section id="hero-section" class="relative min-h-[640px] sm:min-h-[720px] lg:min-h-[800px] pt-6 pb-14 sm:pt-14 sm:pb-24 overflow-hidden">
     <!-- Full-Width Interactive 3D Hero Stage -->
     <BuddyHeroStage />
 
     <!-- Hero Content (Behind 3D stage so Buddy renders in front of text and elements) -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8 items-center">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
         <!-- Left Hero Copy -->
-        <div class="lg:col-span-6 space-y-6 text-center lg:text-left">
+        <div class="lg:col-span-6 space-y-4 sm:space-y-6 text-center lg:text-left pt-6 sm:pt-0">
           <!-- Release Badge (Climbable Platform) -->
           <div id="hero-badge-platform" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-buddy-border bg-buddy-card/85 text-xs text-buddy-muted shadow-sm backdrop-blur-md pointer-events-auto">
             <span class="w-2 h-2 rounded-full bg-buddy-cyan animate-pulse"></span>
@@ -27,13 +27,13 @@ import DownloadCTA from '../components/DownloadCTA.astro';
           </div>
 
           <!-- Main Title -->
-          <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-[1.1] pointer-events-none">
+          <h1 class="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-[1.15] sm:leading-[1.1] pointer-events-none">
             The Desktop Pet, <br />
             <span class="text-gradient">Reimagined</span> for the AI Era.
           </h1>
 
           <!-- Subtitle -->
-          <p class="text-base sm:text-lg text-buddy-muted max-w-xl mx-auto lg:mx-0 leading-relaxed pointer-events-none">
+          <p class="text-sm sm:text-base lg:text-lg text-buddy-muted max-w-xl mx-auto lg:mx-0 leading-relaxed pointer-events-none">
             He lives on your taskbar, watches your cursor, and dances to whatever plays through your speakers. Throw him across your screen, watch him climb your windows, or chat with offline neural voices.
           </p>
 
@@ -69,18 +69,31 @@ import DownloadCTA from '../components/DownloadCTA.astro';
         </div>
 
         <!-- Center & Right Mock Desktop Windows (Windows 11 Skin, Climbable & Punchable) -->
-        <div class="lg:col-span-6 flex flex-col sm:flex-row items-end justify-center lg:justify-end gap-4 min-h-[360px] pointer-events-none pt-12 pb-2 mt-auto">
-          <!-- Center Mock Widget: Windows 11 Robo Buddy Companion Card -->
+        <div class="lg:col-span-6 flex flex-col sm:flex-row items-end justify-center lg:justify-end gap-3 sm:gap-4 min-h-[200px] sm:min-h-[360px] pointer-events-none pt-4 sm:pt-12 pb-2 mt-auto">
+          <!-- Center Mock Widget: Windows 11 Robo Buddy Companion Card / Mobile Tabbed Window -->
           <div
             id="mock-window-widget"
-            class="mock-desktop-window w-full sm:w-60 lg:w-64 rounded-lg bg-[#161616]/90 border border-white/15 shadow-2xl backdrop-blur-2xl overflow-hidden transition-all duration-200 hover:scale-[1.01] pointer-events-auto select-none"
+            class="mock-desktop-window w-full sm:w-60 lg:w-64 rounded-lg bg-[#161616]/95 border border-white/15 shadow-2xl backdrop-blur-2xl overflow-hidden transition-all duration-200 hover:scale-[1.01] pointer-events-auto select-none"
             title="Robo Buddy Companion Status (Climb or kick this window!)"
           >
-            <!-- Windows 11 Title Bar -->
-            <div class="flex items-center justify-between px-3 py-1.5 bg-[#202020]/90 border-b border-white/10 text-xs">
-              <div class="flex items-center gap-1.5 text-[11px] font-medium text-white">
-                <img src="/images/logo-icon.png" alt="Robo Buddy" class="w-3.5 h-3.5 object-contain" />
-                <span>Robo Buddy</span>
+            <!-- Windows 11 Title Bar with Mobile Tabs -->
+            <div class="flex items-center justify-between px-2.5 py-1.5 bg-[#202020]/90 border-b border-white/10 text-xs">
+              <div class="flex items-center gap-1 sm:gap-1.5 text-[11px] font-medium text-white">
+                <!-- Desktop title (hidden on mobile) -->
+                <div class="hidden sm:flex items-center gap-1.5">
+                  <img src="/images/logo-icon.png" alt="Robo Buddy" class="w-3.5 h-3.5 object-contain" />
+                  <span>Robo Buddy</span>
+                </div>
+                <!-- Mobile Tabs (shown on mobile to switch between Companion and Terminal without stacking two huge windows) -->
+                <div class="flex sm:hidden items-center gap-1 font-mono text-[10px]">
+                  <button id="tab-btn-companion" type="button" class="px-2 py-0.5 rounded bg-[#161616] text-white border-t border-buddy-cyan font-sans font-medium flex items-center gap-1">
+                    <img src="/images/logo-icon.png" alt="" class="w-3 h-3 object-contain" />
+                    <span>Companion</span>
+                  </button>
+                  <button id="tab-btn-terminal" type="button" class="px-2 py-0.5 rounded text-buddy-muted hover:text-white flex items-center gap-1 font-sans">
+                    <span>PowerShell</span>
+                  </button>
+                </div>
               </div>
               <!-- Windows 11 Title Controls -->
               <div class="flex items-center text-buddy-muted">
@@ -93,8 +106,8 @@ import DownloadCTA from '../components/DownloadCTA.astro';
               </div>
             </div>
 
-            <!-- Widget Body -->
-            <div class="p-3 text-xs space-y-2.5">
+            <!-- Companion Body (WASAPI) -->
+            <div id="companion-tab-content" class="p-3 text-xs space-y-2">
               <!-- Audio Reactor Status -->
               <div class="p-2 rounded bg-white/5 border border-white/5">
                 <div class="flex items-center justify-between text-[11px] font-medium mb-1">
@@ -106,22 +119,22 @@ import DownloadCTA from '../components/DownloadCTA.astro';
                 </div>
                 <p class="text-[10px] text-buddy-muted truncate">Daft Punk &bull; Robot Rock</p>
                 <!-- Animated EQ bars -->
-                <div class="flex items-end gap-1 h-5 pt-1">
-                  <span class="w-1.5 bg-buddy-cyan rounded-full animate-bounce h-4"></span>
-                  <span class="w-1.5 bg-buddy-purple rounded-full animate-pulse h-5"></span>
-                  <span class="w-1.5 bg-buddy-cyan rounded-full animate-bounce h-3" style="animation-delay: 0.15s;"></span>
-                  <span class="w-1.5 bg-pink-500 rounded-full animate-pulse h-5" style="animation-delay: 0.25s;"></span>
-                  <span class="w-1.5 bg-emerald-400 rounded-full animate-bounce h-4" style="animation-delay: 0.1s;"></span>
+                <div class="flex items-end gap-1 h-4 pt-1">
+                  <span class="w-1.5 bg-buddy-cyan rounded-full animate-bounce h-3.5"></span>
+                  <span class="w-1.5 bg-buddy-purple rounded-full animate-pulse h-4"></span>
+                  <span class="w-1.5 bg-buddy-cyan rounded-full animate-bounce h-2.5" style="animation-delay: 0.15s;"></span>
+                  <span class="w-1.5 bg-pink-500 rounded-full animate-pulse h-4" style="animation-delay: 0.25s;"></span>
+                  <span class="w-1.5 bg-emerald-400 rounded-full animate-bounce h-3.5" style="animation-delay: 0.1s;"></span>
                 </div>
               </div>
 
               <!-- Desktop Settings Indicators -->
               <div class="grid grid-cols-2 gap-1.5 text-[10px] font-mono">
-                <div class="px-2 py-1.5 rounded bg-white/5 border border-white/5 flex items-center justify-between text-buddy-muted">
+                <div class="px-2 py-1 rounded bg-white/5 border border-white/5 flex items-center justify-between text-buddy-muted">
                   <span>Surface</span>
                   <span class="text-emerald-400 font-bold">SOLID</span>
                 </div>
-                <div class="px-2 py-1.5 rounded bg-white/5 border border-white/5 flex items-center justify-between text-buddy-muted">
+                <div class="px-2 py-1 rounded bg-white/5 border border-white/5 flex items-center justify-between text-buddy-muted">
                   <span>Physics</span>
                   <span class="text-buddy-cyan font-bold">ACTIVE</span>
                 </div>
@@ -130,12 +143,24 @@ import DownloadCTA from '../components/DownloadCTA.astro';
                 Buddy hops on &amp; kicks this window
               </div>
             </div>
+
+            <!-- Mobile Terminal Content (shown when PowerShell tab selected on mobile) -->
+            <div id="mobile-terminal-tab-content" class="hidden p-2.5 font-mono text-[10px] leading-relaxed text-buddy-muted space-y-1 bg-[#0c0c0c]">
+              <div class="text-white/80">Windows PowerShell 7.4</div>
+              <div class="text-emerald-400">PS C:\RoboBuddy&gt; .\robo-buddy.exe --live</div>
+              <div class="text-buddy-cyan">✓ Direct3D 11 active &bull; WASAPI syncd</div>
+              <div class="text-emerald-400">✓ Collision furniture mapped</div>
+              <div class="text-white/60 text-[9px] pt-0.5 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-buddy-cyan animate-ping"></span>
+                <span>Buddy roaming perimeter...</span>
+              </div>
+            </div>
           </div>
 
-          <!-- Right Mock Window: Windows 11 Command Terminal -->
+          <!-- Right Mock Window: Windows 11 Command Terminal (Shown on tablet and desktop >= 640px) -->
           <div
             id="mock-window-term"
-            class="mock-desktop-window w-full sm:w-80 lg:w-96 rounded-lg bg-[#0c0c0c]/95 border border-white/15 shadow-2xl backdrop-blur-2xl overflow-hidden transition-all duration-200 hover:scale-[1.01] pointer-events-auto select-none"
+            class="mock-desktop-window hidden sm:block w-full sm:w-80 lg:w-96 rounded-lg bg-[#0c0c0c]/95 border border-white/15 shadow-2xl backdrop-blur-2xl overflow-hidden transition-all duration-200 hover:scale-[1.01] pointer-events-auto select-none"
             title="Desktop Terminal Window (Climb and kick target!)"
           >
             <!-- Windows 11 Title Bar -->
@@ -228,4 +253,25 @@ import DownloadCTA from '../components/DownloadCTA.astro';
 
   <!-- ==================== DOWNLOAD CTA ==================== -->
   <DownloadCTA />
+
+  <script>
+    const tabComp = document.getElementById('tab-btn-companion');
+    const tabTerm = document.getElementById('tab-btn-terminal');
+    const compContent = document.getElementById('companion-tab-content');
+    const termContent = document.getElementById('mobile-terminal-tab-content');
+
+    tabComp?.addEventListener('click', () => {
+      compContent?.classList.remove('hidden');
+      termContent?.classList.add('hidden');
+      tabComp.className = 'px-2 py-0.5 rounded bg-[#161616] text-white border-t border-buddy-cyan font-sans font-medium flex items-center gap-1';
+      if (tabTerm) tabTerm.className = 'px-2 py-0.5 rounded text-buddy-muted hover:text-white flex items-center gap-1 font-sans';
+    });
+
+    tabTerm?.addEventListener('click', () => {
+      compContent?.classList.add('hidden');
+      termContent?.classList.remove('hidden');
+      tabTerm.className = 'px-2 py-0.5 rounded bg-[#0c0c0c] text-white border-t border-buddy-cyan font-sans font-medium flex items-center gap-1';
+      if (tabComp) tabComp.className = 'px-2 py-0.5 rounded text-buddy-muted hover:text-white flex items-center gap-1 font-sans';
+    });
+  </script>
 </BaseLayout>
