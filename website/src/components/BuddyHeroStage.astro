@@ -114,8 +114,8 @@ import { CHARACTERS } from '../lib/character-loader';
     <img id="pixel-pal-img" src="/characters/pixel-pal/idle.webp" alt="Pixel Pal" class="w-48 h-48 object-contain pixelated pointer-events-auto cursor-grab active:cursor-grabbing" />
   </div>
 
-  <!-- Stage Control Action Bar (Centered at bottom) -->
-  <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex flex-wrap items-center justify-center gap-2 p-1.5 rounded-2xl bg-buddy-bg/90 border border-buddy-border/90 shadow-2xl backdrop-blur-xl pointer-events-auto">
+  <!-- Stage Control Action Bar (Centered above mock taskbar) -->
+  <div class="absolute bottom-14 left-1/2 -translate-x-1/2 z-30 flex flex-wrap items-center justify-center gap-2 p-1.5 rounded-2xl bg-buddy-bg/90 border border-buddy-border/90 shadow-2xl backdrop-blur-xl pointer-events-auto">
     <button id="btn-action-talk" type="button" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs text-white font-medium transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
       <span>💬</span>
       <span>Talk</span>
@@ -126,11 +126,15 @@ import { CHARACTERS } from '../lib/character-loader';
     </button>
     <button id="btn-action-run" type="button" class="px-3 py-1.5 rounded-xl bg-buddy-purple/20 hover:bg-buddy-purple/30 text-buddy-purpleLight text-xs font-semibold border border-buddy-purple/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
       <span>🏃</span>
-      <span>Roam Hero</span>
+      <span>Roam Taskbar</span>
     </button>
     <button id="btn-action-climb" type="button" class="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
       <span>🪜</span>
-      <span>Climb Button</span>
+      <span>Climb Window</span>
+    </button>
+    <button id="btn-action-kick" type="button" class="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
+      <span>🥋</span>
+      <span>Kick Window</span>
     </button>
     <button id="btn-action-throw" type="button" class="px-3 py-1.5 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 text-xs font-semibold border border-pink-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
       <span>🚀</span>
@@ -149,7 +153,7 @@ import { CHARACTERS } from '../lib/character-loader';
   import { CHARACTERS, fetchCharacter, type CharacterDef } from '../lib/character-loader';
   import type { Character } from '../lib/character';
   import { refreshSkins } from '../lib/character';
-  import { applyLookAt } from '../lib/pose';
+  import { applyLookAt, applyAttack } from '../lib/pose';
 
   function initHeroStage() {
     const container = document.getElementById('buddy-stage-container');
@@ -194,10 +198,10 @@ import { CHARACTERS } from '../lib/character-loader';
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
 
-    // Camera: positioned to frame the entire hero section with ample roaming width
+    // Camera: positioned to frame the entire hero section with desktop windows and taskbar
     const camera = new THREE.PerspectiveCamera(34, width / height, 0.1, 50);
-    camera.position.set(0, 1.2, 4.5);
-    camera.lookAt(0, 0.9, 0);
+    camera.position.set(0, 0.75, 3.4);
+    camera.lookAt(0, 0.55, 0);
 
     // Studio Lighting
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x556677, 1.8);
@@ -235,8 +239,8 @@ import { CHARACTERS } from '../lib/character-loader';
       }
     }
 
-    // Dynamic Contact Floor Shadow Mesh
-    const shadowGeo = new THREE.PlaneGeometry(1.6, 1.6);
+    // Dynamic Contact Floor Shadow Mesh (Proportioned to 0.92m character)
+    const shadowGeo = new THREE.PlaneGeometry(0.9, 0.9);
     const shadowCanvas = document.createElement('canvas');
     shadowCanvas.width = 128;
     shadowCanvas.height = 128;
@@ -261,7 +265,22 @@ import { CHARACTERS } from '../lib/character-loader';
     let footOffset = 0;
 
     // Physics & Positioning
-    const FLOOR_Y = 0;
+    let FLOOR_Y = 0;
+    function updateFloorY() {
+      const tb = document.getElementById('hero-taskbar');
+      if (!tb || !canvas) return;
+      const cRect = canvas.getBoundingClientRect();
+      const tbRect = tb.getBoundingClientRect();
+      if (cRect.height === 0) return;
+      const ndcTop = -((tbRect.top - cRect.top) / cRect.height) * 2 + 1;
+      const v = new THREE.Vector3(0, ndcTop, 0.5).unproject(camera);
+      const dir = v.sub(camera.position).normalize();
+      const dist = -camera.position.z / dir.z;
+      const w = camera.position.clone().add(dir.multiplyScalar(dist));
+      FLOOR_Y = w.y;
+    }
+    updateFloorY();
+
     let posX = 1.4; // Start naturally on the right side of the hero
     let posY = FLOOR_Y;
     let posZ = 0;
@@ -278,10 +297,59 @@ import { CHARACTERS } from '../lib/character-loader';
     let isDancing = false;
     let isWalking = false;
     let isPoked = false;
-    let currentLedge: { name: string; yTop: number } | null = null;
+    let currentLedge: { name: string; id: string; yTop: number } | null = null;
+    let lastPlatformName = '';
+
+    // Procedural Attack / Kick / Punch states
+    let isAttacking = false;
+    let attackKind: 'punch' | 'kick' = 'kick';
+    let attackTime = 0;
+    let attackDuration = 0.65;
+    let attackTargetEl: HTMLElement | null = null;
+    let manualTimeout: number | undefined;
+
+    function setManualActionTimeout(durationMs = 3800) {
+      window.clearTimeout(manualTimeout);
+      manualTimeout = window.setTimeout(() => {
+        isDancing = false;
+        isWalking = false;
+        isAttacking = false;
+        nextAutoAction = 1.5; // resume autonomous showcase
+        if (!isFalling && !isHeld && activeCharacter) {
+          playClip('idle', { loop: true, fade: 0.3 });
+        }
+      }, durationMs);
+    }
+
+    function triggerAttack(targetEl: HTMLElement | null, kind: 'punch' | 'kick') {
+      if (isFalling || isHeld || isAttacking) return;
+      isAttacking = true;
+      attackKind = kind;
+      attackTime = 0;
+      attackDuration = kind === 'kick' ? 0.7 : 0.55;
+      attackTargetEl = targetEl;
+
+      const attackQuotes = [
+        kind === 'kick' ? 'Cyber kick impact test!' : 'Power punch calibrated!',
+        'Testing desktop window durability...',
+        'Physical window interaction verified!',
+        'System shock impact delivered!'
+      ];
+      showBubble(attackQuotes[Math.floor(Math.random() * attackQuotes.length)], 2500);
+
+      // Halfway through attack, shake the target window/widget!
+      window.setTimeout(() => {
+        if (attackTargetEl) {
+          attackTargetEl.classList.remove('shake-impact');
+          void attackTargetEl.offsetWidth; // trigger reflow
+          attackTargetEl.classList.add('shake-impact');
+          window.setTimeout(() => attackTargetEl?.classList.remove('shake-impact'), 450);
+        }
+      }, Math.round(attackDuration * 450));
+    }
 
     // Autonomous behavior cycle
-    let nextAutoAction = 3.0; // Seconds until next autonomous decision
+    let nextAutoAction = 2.5; // Seconds until next autonomous decision
     let autoTargetX = 1.4;
 
     // Look-at cursor tracking
@@ -371,12 +439,12 @@ import { CHARACTERS } from '../lib/character-loader';
       const headPos = new THREE.Vector3();
       if (headBone) {
         headBone.getWorldPosition(headPos);
-        headPos.y += 0.3;
+        headPos.y += 0.2;
       } else if (activeCharacter) {
         headPos.copy(activeCharacter.root.position);
-        headPos.y += 2.0;
+        headPos.y += 1.0;
       } else {
-        headPos.set(posX, posY + 2.0, posZ);
+        headPos.set(posX, posY + 1.0, posZ);
       }
 
       headPos.project(camera);
@@ -390,6 +458,7 @@ import { CHARACTERS } from '../lib/character-loader';
     // Measure World Platforms (Furniture from DOM elements)
     interface Platform {
       name: string;
+      id: string;
       xMin: number;
       xMax: number;
       yTop: number;
@@ -424,13 +493,16 @@ import { CHARACTERS } from '../lib/character-loader';
 
         platforms.push({
           name,
-          xMin: Math.min(wLeft.x, wRight.x) - 0.15,
-          xMax: Math.max(wLeft.x, wRight.x) + 0.15,
+          id,
+          xMin: Math.min(wLeft.x, wRight.x) - 0.1,
+          xMax: Math.max(wLeft.x, wRight.x) + 0.1,
           yTop: Math.max(0.1, wLeft.y),
           speech,
         });
       };
 
+      measure('mock-window-term', 'Terminal Window', 'Hacking the mainframe from the window frame!');
+      measure('mock-window-widget', 'Audio Widget', 'Balancing on the audio beat visualizer!');
       measure('hero-download-btn', 'Download Button', 'Standing on the download button! Click to install me.');
       measure('hero-guide-btn', 'User Guide Button', 'This button opens the full docs & guide!');
       measure('hero-badge-platform', 'Version Badge', 'Climbed all the way up to the version badge!');
@@ -438,7 +510,7 @@ import { CHARACTERS } from '../lib/character-loader';
       return platforms;
     }
 
-    // Switch Character with Standard 1.85m Scaling Normalization
+    // Switch Character with Standard 0.92m Scaling Normalization (Half size desktop companion)
     async function switchCharacter(def: CharacterDef) {
       activeDef = def;
       if (talkBoxCharName) talkBoxCharName.textContent = def.name;
@@ -481,13 +553,13 @@ import { CHARACTERS } from '../lib/character-loader';
 
         activeCharacter = character;
         if (character) {
-          // Standardize visual height across all characters (1.85m standard humanoid)
+          // Standardize visual height across all characters (0.92m compact humanoid companion)
           refreshSkins(character.root);
           const rawBox = new THREE.Box3().setFromObject(character.root);
           const rawSize = new THREE.Vector3();
           rawBox.getSize(rawSize);
           const rawHeight = Math.max(0.1, rawSize.y);
-          const TARGET_HEIGHT = 1.85;
+          const TARGET_HEIGHT = 0.92;
           const scale = TARGET_HEIGHT / rawHeight;
           character.root.scale.set(scale, scale, scale);
           character.root.updateMatrixWorld(true);
@@ -495,6 +567,9 @@ import { CHARACTERS } from '../lib/character-loader';
           // Compute foot offset so feet align flush with y = 0
           const postBox = new THREE.Box3().setFromObject(character.root);
           footOffset = -postBox.min.y;
+
+          updateFloorY();
+          posY = Math.max(posY, FLOOR_Y);
 
           scene.add(character.root);
           character.root.position.set(posX, posY + footOffset, posZ);
@@ -685,57 +760,85 @@ import { CHARACTERS } from '../lib/character-loader';
       }, 1200);
     }
 
-    // Climb onto nearest furniture / button
-    function climbOntoButton() {
+    // Climb onto furniture / window / button with varied selection & cooldown
+    function climbOntoPlatform(preferredName?: string) {
       const platforms = getHeroPlatforms();
       if (!platforms.length) return;
-      // Pick download button first
-      const plat = platforms.find((p) => p.name === 'Download Button') || platforms[0];
+
+      let plat: Platform | undefined;
+      if (preferredName) {
+        plat = platforms.find((p) => p.name.toLowerCase().includes(preferredName.toLowerCase()));
+      }
+      if (!plat) {
+        // Avoid repeatedly targeting the same platform
+        const pool = platforms.filter((p) => p.name !== lastPlatformName);
+        plat = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : platforms[Math.floor(Math.random() * platforms.length)];
+      }
+      if (!plat) return;
+      lastPlatformName = plat.name;
 
       isWalking = false;
       isDancing = false;
       isFalling = true;
+      isAttacking = false;
       currentLedge = null;
 
-      // Leap towards platform top
+      // Leap towards platform top with physics arc
       const targetCenter = (plat.xMin + plat.xMax) / 2;
       velX = (targetCenter - posX) * 1.5;
-      velY = Math.max(3.8, (plat.yTop - posY) * 2.0 + 3.0);
-      tumbleVel = 0;
+      velY = Math.max(3.8, (plat.yTop - posY) * 1.8 + 2.8);
+      tumbleVel = (Math.random() - 0.5) * 1.2;
 
       playClip('jump', { loop: false, fade: 0.1 });
-      showBubble('Scaling the furniture...', 2500);
+      showBubble(`Climbing to the ${plat.name}!`, 2500);
     }
 
     // Action Buttons
-    document.getElementById('btn-action-poke')?.addEventListener('click', pokeBuddy);
+    document.getElementById('btn-action-poke')?.addEventListener('click', () => {
+      pokeBuddy();
+      setManualActionTimeout(1800);
+    });
 
     document.getElementById('btn-action-dance')?.addEventListener('click', () => {
       isDancing = true;
       isWalking = false;
+      isAttacking = false;
       playClip('dance', { loop: true, fade: 0.3 });
       const quote = activeDef.danceQuotes[Math.floor(Math.random() * activeDef.danceQuotes.length)];
       showBubble(quote, 4500);
+      setManualActionTimeout(3800);
     });
 
     document.getElementById('btn-action-run')?.addEventListener('click', () => {
       isWalking = true;
       isDancing = false;
+      isAttacking = false;
       currentLedge = null;
       // Walk across to the opposite side of hero
       autoTargetX = posX > 0 ? -2.2 : 2.2;
       targetRotY = autoTargetX > posX ? Math.PI / 2 : -Math.PI / 2;
       playClip('run', { loop: true, fade: 0.2 });
-      showBubble('Patrolling the entire hero perimeter...', 3000);
+      showBubble('Patrolling the desktop perimeter...', 3000);
+      setManualActionTimeout(3800);
     });
 
-    document.getElementById('btn-action-climb')?.addEventListener('click', climbOntoButton);
+    document.getElementById('btn-action-climb')?.addEventListener('click', () => {
+      climbOntoPlatform();
+      setManualActionTimeout(3800);
+    });
+
+    document.getElementById('btn-action-kick')?.addEventListener('click', () => {
+      const target = document.getElementById('mock-window-widget') || document.getElementById('mock-window-term');
+      triggerAttack(target, 'kick');
+      setManualActionTimeout(3500);
+    });
 
     document.getElementById('btn-action-throw')?.addEventListener('click', () => {
       isHeld = false;
       isFalling = true;
       isDancing = false;
       isWalking = false;
+      isAttacking = false;
       currentLedge = null;
       posY = Math.max(posY, 1.2);
       velX = (Math.random() - 0.5) * 3.5;
@@ -745,6 +848,7 @@ import { CHARACTERS } from '../lib/character-loader';
       playClip('jump', { loop: false, fade: 0.1 });
       const quote = activeDef.thrownQuotes[Math.floor(Math.random() * activeDef.thrownQuotes.length)];
       showBubble(quote, 3500);
+      setManualActionTimeout(3800);
     });
 
     // Talk Box Controls
@@ -789,11 +893,18 @@ import { CHARACTERS } from '../lib/character-loader';
         isDancing = true;
         playClip('dance', { loop: true, fade: 0.25 });
         showBubble('Affirmative. Executing robot hip-hop routine.', 4000);
-      } else if (p.includes('terminate') || p.includes('kill') || p.includes('attack')) {
+        setManualActionTimeout(3800);
+      } else if (p.includes('terminate') || p.includes('kill')) {
         pokeBuddy();
         showBubble('Target acquired. Hasta la vista, baby.', 4000);
+        setManualActionTimeout(2000);
+      } else if (p.includes('kick') || p.includes('punch') || p.includes('attack')) {
+        const target = document.getElementById('mock-window-widget') || document.getElementById('mock-window-term');
+        triggerAttack(target, p.includes('punch') ? 'punch' : 'kick');
+        setManualActionTimeout(3500);
       } else if (p.includes('jump') || p.includes('climb')) {
-        climbOntoButton();
+        climbOntoPlatform();
+        setManualActionTimeout(3800);
       } else if (p.includes('joke')) {
         if (activeDef.id === 't-800') {
           showBubble('A terminator walks into a bar. There were no survivors.', 5000);
@@ -821,6 +932,10 @@ import { CHARACTERS } from '../lib/character-loader';
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height, false);
+      updateFloorY();
+      if (!isFalling && !currentLedge && !isHeld) {
+        posY = FLOOR_Y;
+      }
     }
     window.addEventListener('resize', handleResize);
 
@@ -837,47 +952,81 @@ import { CHARACTERS } from '../lib/character-loader';
         activeCharacter.update(dt);
       }
 
-      // 2. AUTONOMOUS DESKTOP-LIKE ROAMING
-      if (!isHeld && !isFalling && !isDancing && !isPoked) {
+      // Procedural attack progress (punch / kick)
+      if (isAttacking && activeCharacter) {
+        attackTime += dt;
+        const progress = Math.min(1, attackTime / attackDuration);
+        applyAttack(activeCharacter, attackKind, progress);
+        if (progress >= 1) {
+          isAttacking = false;
+          if (!isFalling && !isHeld) {
+            playClip('idle', { loop: true, fade: 0.25 });
+          }
+        }
+      }
+
+      // 2. AUTONOMOUS DESKTOP-LIKE ROAMING SHOWCASE
+      if (!isHeld && !isFalling && !isDancing && !isPoked && !isAttacking) {
         nextAutoAction -= dt;
         if (nextAutoAction <= 0) {
-          nextAutoAction = 5.0 + Math.random() * 4.0;
+          nextAutoAction = 4.0 + Math.random() * 3.5;
           const choice = Math.random();
 
           if (currentLedge) {
-            // If on a button ledge, either jump down or do a quick dance
-            if (choice < 0.6) {
-              // Hop down to floor
+            // If on a window or button ledge:
+            // 50% hop down to taskbar
+            // 25% balance dance
+            // 25% deliver kick/punch attack to current window
+            if (choice < 0.50) {
               currentLedge = null;
               isFalling = true;
-              velX = posX > 0 ? 1.0 : -1.0;
-              velY = 1.5;
+              velX = posX > 0 ? -(Math.random() * 1.2 + 0.4) : (Math.random() * 1.2 + 0.4);
+              velY = 1.4;
               playClip('jump', { loop: false, fade: 0.1 });
-              showBubble('Hopping down.', 2500);
-            } else {
+              showBubble('Hopping down to the taskbar.', 2200);
+            } else if (choice < 0.75) {
               isDancing = true;
               playClip('dance', { loop: true, fade: 0.3 });
-              showBubble('Balancing on the button!', 3500);
+              showBubble('Balancing on the ledge!', 3500);
               window.setTimeout(() => {
                 if (isDancing) {
                   isDancing = false;
                   playClip('idle', { loop: true, fade: 0.3 });
                 }
-              }, 4000);
+              }, 3500);
+            } else {
+              const ledgeEl = currentLedge.id ? document.getElementById(currentLedge.id) : null;
+              triggerAttack(ledgeEl, Math.random() < 0.5 ? 'kick' : 'punch');
             }
           } else {
-            // On floor: roam across hero or climb a button
-            if (choice < 0.35) {
-              // Climb onto Download button!
-              climbOntoButton();
-            } else if (choice < 0.75) {
-              // Walk to a new position across the hero
+            // On taskbar floor:
+            // 30% climb onto a varied window/button platform
+            // 35% walk across taskbar
+            // 15% dance routine
+            // 12% kick / punch test a desktop window
+            // 8% idle fidget
+            if (choice < 0.30) {
+              climbOntoPlatform();
+            } else if (choice < 0.65) {
               isWalking = true;
-              autoTargetX = (Math.random() - 0.5) * 5.0; // Between -2.5 and +2.5
+              autoTargetX = (Math.random() - 0.5) * 5.0; // Roam taskbar floor (-2.5 to +2.5)
               targetRotY = autoTargetX > posX ? Math.PI / 2 : -Math.PI / 2;
               playClip('walk', { loop: true, fade: 0.25 });
+            } else if (choice < 0.80) {
+              isDancing = true;
+              playClip('dance', { loop: true, fade: 0.3 });
+              const quote = activeDef.danceQuotes[Math.floor(Math.random() * activeDef.danceQuotes.length)];
+              showBubble(quote, 4000);
+              window.setTimeout(() => {
+                if (isDancing) {
+                  isDancing = false;
+                  playClip('idle', { loop: true, fade: 0.3 });
+                }
+              }, 3800);
+            } else if (choice < 0.92) {
+              const widgetEl = document.getElementById('mock-window-widget') || document.getElementById('mock-window-term');
+              triggerAttack(widgetEl, Math.random() < 0.5 ? 'kick' : 'punch');
             } else {
-              // Idle fidget
               isWalking = false;
               playClip('idle', { loop: true, fade: 0.3 });
             }
@@ -996,7 +1145,7 @@ import { CHARACTERS } from '../lib/character-loader';
           if (hBone) {
             hBone.getWorldPosition(headPos);
           } else {
-            headPos.set(posX, posY + 1.8, posZ);
+            headPos.set(posX, posY + 0.85, posZ);
           }
           headPos.project(camera);
           const screenHeadX = ((headPos.x + 1) / 2) * cRect.width + cRect.left;
@@ -1018,8 +1167,8 @@ import { CHARACTERS } from '../lib/character-loader';
 
       // 5. UPDATE CHARACTER TRANSFORMS IN SCENE
       if (activeCharacter) {
-        // Pivot about hips/center of mass (~0.92m) during tumble so rotation doesn't swing in a massive circle around feet
-        const half = 0.92;
+        // Pivot about hips/center of mass (~0.46m) during tumble so rotation doesn't swing in a massive circle around feet
+        const half = 0.46;
         const offsetX = Math.abs(tumbleAngle) > 0.001 ? half * Math.sin(tumbleAngle) : 0;
         const offsetY = Math.abs(tumbleAngle) > 0.001 ? half * (1 - Math.cos(tumbleAngle)) : 0;
 

@@ -9,15 +9,15 @@ import DownloadCTA from '../components/DownloadCTA.astro';
 
 <BaseLayout currentPath="/">
   <!-- ==================== HERO SECTION (UNBOXED FULL HERO BUDDY) ==================== -->
-  <section id="hero-section" class="relative min-h-[680px] lg:min-h-[760px] pt-10 pb-16 sm:pt-16 sm:pb-24 overflow-hidden">
+  <section id="hero-section" class="relative min-h-[720px] lg:min-h-[800px] pt-10 pb-20 sm:pt-16 sm:pb-24 overflow-hidden">
     <!-- Full-Width Interactive 3D Hero Stage -->
     <BuddyHeroStage />
 
     <!-- Hero Content (Behind 3D stage so Buddy renders in front of text and elements) -->
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-8 items-center">
         <!-- Left Hero Copy -->
-        <div class="lg:col-span-7 space-y-6 text-center lg:text-left">
+        <div class="lg:col-span-6 space-y-6 text-center lg:text-left">
           <!-- Release Badge (Climbable Platform) -->
           <div id="hero-badge-platform" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-buddy-border bg-buddy-card/85 text-xs text-buddy-muted shadow-sm backdrop-blur-md pointer-events-auto">
             <span class="w-2 h-2 rounded-full bg-buddy-cyan animate-pulse"></span>
@@ -68,11 +68,119 @@ import DownloadCTA from '../components/DownloadCTA.astro';
           </div>
         </div>
 
-        <!-- Right Side Open Roaming Space -->
-        <div class="hidden lg:block lg:col-span-5 min-h-[440px] pointer-events-none"></div>
+        <!-- Center & Right Mock Desktop Windows (Climbable & Punchable) -->
+        <div class="lg:col-span-6 flex flex-col sm:flex-row lg:flex-row items-center justify-end gap-4 min-h-[380px] pointer-events-none pt-4 lg:pt-0">
+          <!-- Center Mock Widget: Audio / Beat Visualizer Card -->
+          <div
+            id="mock-window-widget"
+            class="mock-desktop-window w-44 sm:w-48 p-3 rounded-2xl bg-buddy-card/80 border border-buddy-border shadow-xl backdrop-blur-md transition-all duration-200 hover:scale-105 pointer-events-auto cursor-pointer select-none"
+            title="Music Beat Visualizer (Buddy can climb or kick this!)"
+          >
+            <div class="flex items-center justify-between pb-1.5 border-b border-white/10 mb-2 text-[10px] font-mono text-buddy-muted">
+              <span class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span class="text-white font-semibold">Beat Detect</span>
+              </span>
+              <span class="text-buddy-cyan font-mono text-[9px] px-1 rounded bg-buddy-cyan/10">128 BPM</span>
+            </div>
+            <p class="text-[11px] text-white font-medium truncate mb-2">
+              🎵 Robot Rock &bull; Live
+            </p>
+            <!-- Animated EQ bars -->
+            <div class="flex items-end gap-1 h-7 pt-1">
+              <span class="w-1.5 bg-buddy-cyan rounded-full animate-bounce h-5"></span>
+              <span class="w-1.5 bg-buddy-purple rounded-full animate-pulse h-6"></span>
+              <span class="w-1.5 bg-buddy-cyan rounded-full animate-bounce h-4" style="animation-delay: 0.15s;"></span>
+              <span class="w-1.5 bg-pink-500 rounded-full animate-pulse h-5" style="animation-delay: 0.25s;"></span>
+              <span class="w-1.5 bg-emerald-400 rounded-full animate-bounce h-6" style="animation-delay: 0.1s;"></span>
+              <span class="w-1.5 bg-buddy-cyan rounded-full animate-pulse h-3" style="animation-delay: 0.3s;"></span>
+            </div>
+          </div>
+
+          <!-- Right Mock Window: Native Command Terminal -->
+          <div
+            id="mock-window-term"
+            class="mock-desktop-window w-full sm:w-72 lg:w-80 rounded-2xl bg-black/85 border border-buddy-border shadow-2xl backdrop-blur-xl overflow-hidden transition-all duration-200 hover:scale-[1.02] pointer-events-auto select-none"
+            title="Desktop Terminal Window (Buddy climbs and punches this!)"
+          >
+            <!-- Window Title Bar -->
+            <div class="flex items-center justify-between px-3.5 py-2 bg-white/5 border-b border-white/10 text-xs">
+              <div class="flex items-center gap-1.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-red-500/80 inline-block hover:opacity-80 cursor-pointer"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-yellow-500/80 inline-block hover:opacity-80 cursor-pointer"></span>
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block hover:opacity-80 cursor-pointer"></span>
+                <span class="text-[11px] font-mono text-buddy-muted ml-1">pwsh - agent</span>
+              </div>
+              <span class="text-[9px] font-mono px-1.5 py-0.5 rounded bg-buddy-cyan/10 text-buddy-cyan">Interactive</span>
+            </div>
+            <!-- Terminal Body -->
+            <div class="p-3 font-mono text-[11px] space-y-1 text-buddy-muted">
+              <div class="text-buddy-darkMuted">$ robo-buddy --live</div>
+              <div class="text-emerald-400">✓ Native station: Default</div>
+              <div class="text-buddy-cyan">✓ Audio loopback: Active</div>
+              <div class="text-buddy-purpleLight">✓ Furniture detected: 5</div>
+              <div class="text-[10px] text-white/60 pt-1 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-buddy-cyan animate-ping"></span>
+                <span>Buddy roaming screen...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== MOCK WINDOWS TASKBAR ==================== -->
+    <div
+      id="hero-taskbar"
+      class="absolute bottom-0 inset-x-0 h-12 bg-black/75 border-t border-white/10 backdrop-blur-xl z-15 flex items-center justify-between px-4 sm:px-6 select-none pointer-events-auto"
+    >
+      <!-- Centered Windows 11 App Icons -->
+      <div class="flex items-center gap-1 sm:gap-2 mx-auto">
+        <!-- Windows Start -->
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 cursor-pointer transition-colors" title="Start Menu">
+          <svg class="w-4 h-4 text-buddy-cyan" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.951-1.77"/></svg>
+        </div>
+        <!-- Search -->
+        <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] text-buddy-darkMuted cursor-pointer hover:bg-white/10 transition-colors">
+          <svg class="w-3.5 h-3.5 text-buddy-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <span>Search</span>
+        </div>
+        <!-- Terminal -->
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 text-emerald-400 cursor-pointer transition-colors" title="PowerShell">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        </div>
+        <!-- File Explorer -->
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 text-amber-400 cursor-pointer transition-colors" title="File Explorer">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
+        </div>
+        <!-- Running Robo Buddy Task Icon with active status dot -->
+        <div class="relative w-8 h-8 rounded-lg flex items-center justify-center bg-white/10 cursor-pointer shadow-inner" title="Robo Buddy (Active)">
+          <img src="/images/logo-icon.png" alt="Robo Buddy" class="w-5 h-5 object-contain" />
+          <span class="absolute bottom-0.5 w-1.5 h-1.5 rounded-full bg-buddy-cyan animate-pulse"></span>
+        </div>
+      </div>
+
+      <!-- Right: System Tray & Clock -->
+      <div class="hidden sm:flex items-center gap-3 text-xs text-buddy-muted font-mono">
+        <span class="hover:text-white cursor-pointer" title="Sound: 100%">🔊</span>
+        <span class="hover:text-white cursor-pointer" title="Internet: Connected">📶</span>
+        <span class="text-[11px] text-white font-medium">11:42 PM</span>
       </div>
     </div>
   </section>
+
+  <style>
+    @keyframes window-shake {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      20% { transform: translate(-4px, 2px) rotate(-3deg); }
+      40% { transform: translate(4px, -2px) rotate(3deg); }
+      60% { transform: translate(-3px, 1px) rotate(-2deg); }
+      80% { transform: translate(2px, -1px) rotate(1deg); }
+    }
+    .shake-impact {
+      animation: window-shake 0.4s ease-in-out;
+    }
+  </style>
 
   <!-- ==================== FEATURE REEL (VIDEO DEMOS) ==================== -->
   <FeatureReel />

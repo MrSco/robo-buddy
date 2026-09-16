@@ -56,3 +56,26 @@ export function applyLookAt(c: Character, yaw: number, pitch: number, roll = 0) 
   rotateWorld(head, WORLD_X, -pitch * 0.6);
   rotateWorld(head, WORLD_Z, roll);
 }
+
+/** A bounded procedural action overlay for kicks, punches, and throws. */
+export function applyAttack(c: Character, kind: "punch" | "kick" | "throw", progress: number) {
+  const p = Math.max(0, Math.min(1, progress));
+  const pulse = Math.sin(Math.PI * (p <= 0.8 ? p / 1.6 : 0.5 + (p - 0.8) * 2.5));
+  if (kind === "kick") {
+    poseLocal(c, c.bone("rightUpperLeg"), -1.15 * pulse, 0, 0);
+    poseLocal(c, c.bone("rightLowerLeg"), 0.35 * pulse, 0, 0);
+    poseLocal(c, c.bone("chest") ?? c.bone("spine"), 0.12 * pulse, 0, 0);
+  } else if (kind === "throw") {
+    poseLocal(c, c.bone("leftUpperArm"), -1.3 * pulse, 0, -0.8);
+    poseLocal(c, c.bone("rightUpperArm"), -1.3 * pulse, 0, 0.8);
+    poseLocal(c, c.bone("leftLowerArm"), -0.6 * pulse, 0, 0);
+    poseLocal(c, c.bone("rightLowerArm"), -0.6 * pulse, 0, 0);
+  } else {
+    const arm = c.bone("rightUpperArm");
+    if (arm) {
+      poseLocal(c, arm, -1.1 * pulse, 0, 0.65);
+      poseLocal(c, c.bone("rightLowerArm"), -0.3 * pulse, 0, 0);
+    }
+  }
+}
+
