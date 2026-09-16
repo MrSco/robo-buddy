@@ -8,34 +8,39 @@ import DownloadCTA from '../components/DownloadCTA.astro';
 ---
 
 <BaseLayout currentPath="/">
-  <!-- ==================== HERO SECTION ==================== -->
-  <section class="relative pt-10 pb-16 sm:pt-16 sm:pb-24 overflow-hidden">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+  <!-- ==================== HERO SECTION (UNBOXED FULL HERO BUDDY) ==================== -->
+  <section id="hero-section" class="relative min-h-[680px] lg:min-h-[760px] pt-10 pb-16 sm:pt-16 sm:pb-24 overflow-hidden">
+    <!-- Full-Width Interactive 3D Hero Stage -->
+    <BuddyHeroStage />
+
+    <!-- Hero Content Overlay (In front of 3D stage; buttons act as climbable platforms) -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-20 pointer-events-none">
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
         <!-- Left Hero Copy -->
-        <div class="lg:col-span-6 space-y-6 text-center lg:text-left z-20">
-          <!-- Release Badge -->
-          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-buddy-border bg-buddy-card/80 text-xs text-buddy-muted shadow-sm backdrop-blur-md">
+        <div class="lg:col-span-7 space-y-6 text-center lg:text-left">
+          <!-- Release Badge (Climbable Platform) -->
+          <div id="hero-badge-platform" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-buddy-border bg-buddy-card/85 text-xs text-buddy-muted shadow-sm backdrop-blur-md pointer-events-auto">
             <span class="w-2 h-2 rounded-full bg-buddy-cyan animate-pulse"></span>
             <span class="text-white font-medium">Robo Buddy 0.6.0 is here</span>
             <span class="text-buddy-darkMuted">•</span>
-            <span class="text-buddy-cyan hover:underline cursor-pointer">What's new &rarr;</span>
+            <a href="/guide" class="text-buddy-cyan hover:underline cursor-pointer">What's new &rarr;</a>
           </div>
 
           <!-- Main Title -->
-          <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-[1.1]">
+          <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-[1.1] pointer-events-none">
             The Desktop Pet, <br />
             <span class="text-gradient">Reimagined</span> for the AI Era.
           </h1>
 
           <!-- Subtitle -->
-          <p class="text-base sm:text-lg text-buddy-muted max-w-xl mx-auto lg:mx-0 leading-relaxed">
+          <p class="text-base sm:text-lg text-buddy-muted max-w-xl mx-auto lg:mx-0 leading-relaxed pointer-events-none">
             He lives on your taskbar, watches your cursor, and dances to whatever plays through your speakers. Throw him across your screen, watch him climb your windows, or chat with offline neural voices.
           </p>
 
-          <!-- CTAs -->
-          <div class="pt-2 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+          <!-- CTAs (Climbable Furniture Platforms for Buddy) -->
+          <div class="pt-2 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pointer-events-auto">
             <a
+              id="hero-download-btn"
               href="#download"
               class="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-gradient-to-r from-buddy-cyan to-buddy-purple hover:brightness-110 text-white font-bold text-sm shadow-xl shadow-buddy-cyan/20 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2.5"
             >
@@ -44,8 +49,9 @@ import DownloadCTA from '../components/DownloadCTA.astro';
             </a>
 
             <a
+              id="hero-guide-btn"
               href="/guide"
-              class="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-buddy-card/80 border border-buddy-border hover:border-buddy-cyan/50 text-buddy-text hover:text-white font-medium text-sm transition-all hover:bg-white/5 flex items-center justify-center gap-2"
+              class="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-buddy-card/85 border border-buddy-border hover:border-buddy-cyan/50 text-buddy-text hover:text-white font-medium text-sm transition-all hover:bg-white/5 flex items-center justify-center gap-2 shadow-lg"
             >
               <span>Explore User Guide</span>
               <span>&rarr;</span>
@@ -53,7 +59,7 @@ import DownloadCTA from '../components/DownloadCTA.astro';
           </div>
 
           <!-- Trust Badges -->
-          <div class="pt-4 flex flex-wrap items-center justify-center lg:justify-start gap-y-2 gap-x-6 text-xs text-buddy-darkMuted font-mono">
+          <div class="pt-4 flex flex-wrap items-center justify-center lg:justify-start gap-y-2 gap-x-6 text-xs text-buddy-darkMuted font-mono pointer-events-none">
             <span>Windows 10/11</span>
             <span>•</span>
             <span>100% Free & Open Source</span>
@@ -62,10 +68,8 @@ import DownloadCTA from '../components/DownloadCTA.astro';
           </div>
         </div>
 
-        <!-- Right Hero Interactive Stage (Unboxed, Physics & Retargeted Animations) -->
-        <div class="lg:col-span-6 flex justify-center relative min-h-[500px]">
-          <BuddyHeroStage />
-        </div>
+        <!-- Right Side Open Roaming Space -->
+        <div class="hidden lg:block lg:col-span-5 min-h-[440px] pointer-events-none"></div>
       </div>
     </div>
   </section>

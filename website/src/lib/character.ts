@@ -515,7 +515,11 @@ export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<
   await Promise.all(
     Object.entries(manifest.clips ?? {}).map(async ([name, file]) => {
       try {
-        const url = file.startsWith("/") ? file : pack.base + file;
+        let url = file;
+        if (!url.startsWith("/")) {
+          if (url.startsWith("clips/")) url = "/" + url;
+          else url = pack.base + url;
+        }
         const extra = await loadModel(url);
         const first = extra.animations[0];
         if (!first) return;
@@ -600,7 +604,10 @@ export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<
         animatedBones.clear();
       }
     },
-    update: (dt) => vrm?.update(dt),
+    update(dt) {
+      character.beginFrame(dt);
+      vrm?.update(dt);
+    },
     dispose() {
       mixer.stopAllAction();
       root.traverse((o) => {
