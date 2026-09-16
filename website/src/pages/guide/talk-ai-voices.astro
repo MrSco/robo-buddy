@@ -52,6 +52,150 @@ import GuideLayout from '../../layouts/GuideLayout.astro';
           <li>When Buddy speaks, his head and jaw nod along in rhythm with the synthesized speech.</li>
         </ol>
       </div>
+
+      <!-- Voice Models for Included Characters -->
+      <div id="custom-voices" class="mt-6 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <h3 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+            <span>🎙️</span>
+            <span>Voice Models for Included Characters</span>
+          </h3>
+          <a
+            href="https://github.com/MrSco/JarvisChatBot/tree/masa/piper_models"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-xs text-buddy-cyan hover:underline flex items-center gap-1 font-medium"
+          >
+            <span>Browse GitHub repo</span>
+            <svg class="w-3.5 h-3.5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+          </a>
+        </div>
+        <p class="text-xs text-buddy-muted leading-relaxed">
+          Pre-trained neural Piper voice models crafted specifically for Robo Buddy's included characters are available in the <a href="https://github.com/MrSco/JarvisChatBot/tree/masa/piper_models" target="_blank" rel="noopener noreferrer" class="text-buddy-cyan underline">JarvisChatBot Piper Models repository</a>. Each voice requires both the <code>.onnx</code> weights and <code>.onnx.json</code> configuration file:
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          <!-- Arnold / Terminator Voice Card -->
+          <div class="p-4 rounded-xl bg-buddy-card border border-buddy-border hover:border-buddy-cyan/50 transition-all flex flex-col justify-between space-y-3">
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🤖</span>
+                  <b class="text-white text-sm">Arnold Terminator Voice</b>
+                </div>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-buddy-cyan/15 text-buddy-cyan font-semibold">T-800 Character</span>
+              </div>
+              <p class="text-xs text-buddy-muted leading-relaxed">
+                Deep, mechanical Austrian cybernetic cadence. Matches the included <b>T-800</b> endoskeleton character for authentic Terminator one-liners, deadpan conversational AI, and audio responses.
+              </p>
+            </div>
+            <div class="space-y-2 pt-2 border-t border-buddy-border/60">
+              <div class="flex flex-wrap items-center gap-2">
+                <a
+                  href="https://raw.githubusercontent.com/MrSco/JarvisChatBot/masa/piper_models/arnold-terminator.onnx"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download="arnold-terminator.onnx"
+                  class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-buddy-cyan/20 border border-white/10 hover:border-buddy-cyan/40 text-[11px] font-mono text-buddy-cyan transition-colors flex items-center gap-1.5"
+                >
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                  <span>arnold-terminator.onnx</span>
+                </a>
+                <a
+                  href="https://raw.githubusercontent.com/MrSco/JarvisChatBot/masa/piper_models/arnold-terminator.onnx.json"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download="arnold-terminator.onnx.json"
+                  class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-buddy-cyan/20 border border-white/10 hover:border-buddy-cyan/40 text-[11px] font-mono text-buddy-cyan transition-colors flex items-center gap-1.5"
+                >
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                  <span>.onnx.json</span>
+                </a>
+              </div>
+              <div class="text-[10px] text-buddy-darkMuted font-mono flex items-center justify-between">
+                <span>Model size: ~63 MB</span>
+                <a href="https://github.com/MrSco/JarvisChatBot/blob/masa/piper_models/arnold-terminator.onnx" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">View on GitHub &rarr;</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rocco Voice Card -->
+          <div class="p-4 rounded-xl bg-buddy-card border border-buddy-border hover:border-buddy-purple/50 transition-all flex flex-col justify-between space-y-3">
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🧔</span>
+                  <b class="text-white text-sm">Rocco Voice</b>
+                </div>
+                <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-buddy-purple/15 text-buddy-purpleLight font-semibold">Rocco 3D Scan</span>
+              </div>
+              <p class="text-xs text-buddy-muted leading-relaxed">
+                Custom voice model trained to match the included <b>Rocco</b> 3D photogrammetry scan, delivering an expressive, natural personal desktop companion conversation.
+              </p>
+            </div>
+            <div class="space-y-2 pt-2 border-t border-buddy-border/60">
+              <div class="flex flex-wrap items-center gap-2">
+                <a
+                  href="https://raw.githubusercontent.com/MrSco/JarvisChatBot/masa/piper_models/rocco.onnx"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download="rocco.onnx"
+                  class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-buddy-purple/20 border border-white/10 hover:border-buddy-purple/40 text-[11px] font-mono text-buddy-purpleLight transition-colors flex items-center gap-1.5"
+                >
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                  <span>rocco.onnx</span>
+                </a>
+                <a
+                  href="https://raw.githubusercontent.com/MrSco/JarvisChatBot/masa/piper_models/rocco.onnx.json"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download="rocco.onnx.json"
+                  class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-buddy-purple/20 border border-white/10 hover:border-buddy-purple/40 text-[11px] font-mono text-buddy-purpleLight transition-colors flex items-center gap-1.5"
+                >
+                  <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                  <span>.onnx.json</span>
+                </a>
+              </div>
+              <div class="text-[10px] text-buddy-darkMuted font-mono flex items-center justify-between">
+                <span>Model size: ~63 MB</span>
+                <a href="https://github.com/MrSco/JarvisChatBot/blob/masa/piper_models/rocco.onnx" target="_blank" rel="noopener noreferrer" class="hover:text-white transition-colors">View on GitHub &rarr;</a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- More AI Voices Banner -->
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div class="space-y-0.5">
+            <span class="text-white font-medium flex items-center gap-1.5">
+              <span>🌟</span>
+              <span>More Sci-Fi & Companion Voices</span>
+            </span>
+            <p class="text-[11px] text-buddy-muted">
+              The repository also features <b>JARVIS</b>, <b>FRIDAY</b>, <b>GLaDOS</b> (Portal), <b>HAL 9000</b> (2001: A Space Odyssey), <b>TARS</b> (Interstellar), and <b>Bluey</b>.
+            </p>
+          </div>
+          <a
+            href="https://github.com/MrSco/JarvisChatBot/tree/masa/piper_models"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="shrink-0 px-3 py-1.5 rounded-lg bg-gradient-to-r from-buddy-cyan to-buddy-purple hover:brightness-110 text-white font-semibold text-xs transition-transform active:scale-95 shadow-sm"
+          >
+            Explore All Voices &rarr;
+          </a>
+        </div>
+
+        <!-- How to Hook Up Downloaded Voices -->
+        <div class="p-4 rounded-xl bg-buddy-bg border border-buddy-border space-y-2 text-xs">
+          <b class="text-white text-sm">How to Hook Up Downloaded Voices:</b>
+          <ol class="list-decimal pl-5 space-y-1.5 text-buddy-muted">
+            <li>In Robo Buddy, open <b>Settings &rarr; Talk</b> and make sure the TTS Engine is set to <b>Piper</b>.</li>
+            <li>Click the <b>Folder...</b> button next to the voice dropdown. Windows Explorer will open your local voice directory (<code class="text-buddy-cyan">%APPDATA%\com.rocco.robobuddy\piper\voices\</code>).</li>
+            <li>Drop both the <code>.onnx</code> and <code>.onnx.json</code> files into that folder (e.g. <code>arnold-terminator.onnx</code> + <code>arnold-terminator.onnx.json</code>).</li>
+            <li>Robo Buddy automatically detects the new models in the Piper Voice dropdown! Select the voice and click <b>Test voice</b>.</li>
+          </ol>
+        </div>
+      </div>
     </div>
 
     <!-- Live Voice Duplex -->
