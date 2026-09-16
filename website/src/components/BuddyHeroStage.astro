@@ -1,0 +1,801 @@
+---
+import { CHARACTERS } from '../lib/character-loader';
+---
+
+<div id="buddy-stage-container" class="relative w-full h-[520px] lg:h-[620px] select-none flex items-center justify-center overflow-visible">
+  <!-- Character Selector Floating Bar -->
+  <div class="absolute top-2 right-2 sm:right-4 z-30 flex items-center gap-1.5 p-1 rounded-2xl bg-buddy-card/90 border border-buddy-border shadow-xl backdrop-blur-md">
+    {CHARACTERS.map((char, idx) => (
+      <button
+        type="button"
+        class={`char-select-btn px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all ${
+          idx === 0 
+            ? 'bg-gradient-to-r from-buddy-cyan to-buddy-purple text-white shadow-md active-char font-semibold' 
+            : 'text-buddy-muted hover:text-white hover:bg-white/5'
+        }`}
+        data-char-id={char.id}
+        title={`Switch to ${char.name}`}
+      >
+        <span class="text-sm">{char.emoji}</span>
+        <span class="hidden sm:inline">{char.name}</span>
+      </button>
+    ))}
+  </div>
+
+  <!-- Speech Bubble Overlay (dynamically positioned over Buddy's head) -->
+  <div
+    id="buddy-speech-bubble"
+    class="absolute z-30 pointer-events-none opacity-0 transition-opacity duration-300 transform -translate-x-1/2 -translate-y-full max-w-[280px] sm:max-w-xs"
+    style="left: 50%; top: 20%;"
+  >
+    <div class="bg-buddy-bg/95 border border-buddy-cyan/60 rounded-2xl p-3 sm:p-4 shadow-2xl shadow-buddy-cyan/20 backdrop-blur-md relative">
+      <div class="flex items-center gap-2 mb-1">
+        <span id="bubble-avatar" class="text-sm">🤖</span>
+        <span id="bubble-name" class="text-xs font-bold text-white">T-800</span>
+        <span id="bubble-tag" class="text-[9px] font-mono px-1 rounded bg-buddy-cyan/20 text-buddy-cyan font-semibold">Ready</span>
+      </div>
+      <p id="bubble-text" class="text-xs sm:text-sm text-buddy-text leading-snug">
+        "I'll be back."
+      </p>
+      <!-- Speech bubble tail pointing down -->
+      <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-buddy-bg/95 border-r border-b border-buddy-cyan/60 transform rotate-45"></div>
+    </div>
+  </div>
+
+  <!-- Interactive Talk Strip (Talk Mode Demo) -->
+  <div
+    id="buddy-talk-box"
+    class="absolute bottom-16 inset-x-2 sm:inset-x-auto sm:w-[420px] z-30 bg-buddy-bg/95 border border-buddy-border rounded-2xl p-3 shadow-2xl backdrop-blur-xl hidden transform transition-all"
+  >
+    <div class="flex items-center justify-between pb-2 mb-2 border-b border-buddy-border text-xs">
+      <span class="font-semibold text-white flex items-center gap-1.5">
+        <span>💬</span>
+        <span>Talk with <span id="talk-box-char-name">T-800</span></span>
+      </span>
+      <button id="btn-close-talk" type="button" class="text-buddy-muted hover:text-white p-0.5">&times;</button>
+    </div>
+
+    <!-- Quick prompt chips -->
+    <div class="flex flex-wrap gap-1.5 mb-2.5">
+      <button type="button" class="talk-chip px-2 py-0.5 rounded-md bg-white/5 hover:bg-buddy-cyan/20 text-[10px] text-buddy-muted hover:text-buddy-cyan border border-white/10 transition-colors" data-prompt="dance">
+        🕺 Dance
+      </button>
+      <button type="button" class="talk-chip px-2 py-0.5 rounded-md bg-white/5 hover:bg-buddy-cyan/20 text-[10px] text-buddy-muted hover:text-buddy-cyan border border-white/10 transition-colors" data-prompt="who are you?">
+        ❓ Who are you?
+      </button>
+      <button type="button" class="talk-chip px-2 py-0.5 rounded-md bg-white/5 hover:bg-buddy-cyan/20 text-[10px] text-buddy-muted hover:text-buddy-cyan border border-white/10 transition-colors" data-prompt="terminate">
+        🎯 Terminate
+      </button>
+      <button type="button" class="talk-chip px-2 py-0.5 rounded-md bg-white/5 hover:bg-buddy-cyan/20 text-[10px] text-buddy-muted hover:text-buddy-cyan border border-white/10 transition-colors" data-prompt="jump">
+        🦘 Jump
+      </button>
+      <button type="button" class="talk-chip px-2 py-0.5 rounded-md bg-white/5 hover:bg-buddy-cyan/20 text-[10px] text-buddy-muted hover:text-buddy-cyan border border-white/10 transition-colors" data-prompt="tell a joke">
+        😄 Joke
+      </button>
+    </div>
+
+    <form id="talk-form" class="flex gap-2">
+      <input
+        id="talk-input"
+        type="text"
+        placeholder="Type a message or command..."
+        class="flex-1 px-3 py-1.5 rounded-xl bg-buddy-card border border-buddy-border text-xs text-white placeholder-buddy-darkMuted focus:outline-none focus:border-buddy-cyan"
+        autocomplete="off"
+      />
+      <button
+        type="submit"
+        class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-buddy-cyan to-buddy-purple hover:brightness-110 text-white text-xs font-semibold shadow-md transition-transform active:scale-95"
+      >
+        Send
+      </button>
+    </form>
+  </div>
+
+  <!-- Loading State Indicator -->
+  <div id="stage-loading" class="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-buddy-bg/40 backdrop-blur-sm pointer-events-none transition-opacity duration-300">
+    <div class="w-10 h-10 rounded-full border-2 border-buddy-cyan/30 border-t-buddy-cyan animate-spin"></div>
+    <p id="stage-loading-text" class="text-xs font-mono text-buddy-muted animate-pulse">Loading T-800 & animations...</p>
+  </div>
+
+  <!-- 3D Three.js WebGL Stage Canvas -->
+  <canvas
+    id="hero-stage-canvas"
+    class="w-full h-full block cursor-grab active:cursor-grabbing touch-none select-none z-10"
+  ></canvas>
+
+  <!-- 2D Pixel Pal Canvas (hidden by default) -->
+  <div id="pixel-pal-container" class="absolute inset-0 z-10 hidden flex items-center justify-center pointer-events-none">
+    <img id="pixel-pal-img" src="/characters/pixel-pal/idle.webp" alt="Pixel Pal" class="w-48 h-48 object-contain pixelated pointer-events-auto cursor-grab active:cursor-grabbing" />
+  </div>
+
+  <!-- Stage Control Action Bar -->
+  <div class="absolute bottom-2 inset-x-2 sm:inset-x-auto z-20 flex flex-wrap items-center justify-center gap-2 p-1.5 rounded-2xl bg-buddy-bg/85 border border-buddy-border/80 shadow-2xl backdrop-blur-md">
+    <button id="btn-action-talk" type="button" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs text-white font-medium transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
+      <span>💬</span>
+      <span>Talk</span>
+    </button>
+    <button id="btn-action-dance" type="button" class="px-3 py-1.5 rounded-xl bg-buddy-cyan/20 hover:bg-buddy-cyan/30 text-buddy-cyanLight text-xs font-semibold border border-buddy-cyan/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
+      <span>🕺</span>
+      <span>Dance</span>
+    </button>
+    <button id="btn-action-run" type="button" class="px-3 py-1.5 rounded-xl bg-buddy-purple/20 hover:bg-buddy-purple/30 text-buddy-purpleLight text-xs font-semibold border border-buddy-purple/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
+      <span>🏃</span>
+      <span>Run Around</span>
+    </button>
+    <button id="btn-action-throw" type="button" class="px-3 py-1.5 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 text-xs font-semibold border border-pink-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
+      <span>🚀</span>
+      <span>Throw Me!</span>
+    </button>
+    <button id="btn-action-poke" type="button" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs text-buddy-muted hover:text-white transition-all hover:scale-105 active:scale-95 flex items-center gap-1">
+      <span>👋</span>
+      <span>Poke</span>
+    </button>
+  </div>
+
+  <!-- Interactive Hint Callout -->
+  <div class="absolute top-2 left-2 sm:left-4 z-20 pointer-events-none hidden sm:flex items-center gap-2 px-3 py-1 rounded-xl bg-black/50 border border-white/10 backdrop-blur-sm text-[11px] font-mono text-buddy-muted">
+    <span class="w-2 h-2 rounded-full bg-buddy-cyan animate-pulse"></span>
+    <span>Click to poke • Drag to carry • Fling to throw!</span>
+  </div>
+</div>
+
+<script>
+  import * as THREE from 'three';
+  import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+  import { CHARACTERS, fetchCharacter, type CharacterDef } from '../lib/character-loader';
+  import type { Character } from '../lib/character';
+
+  function initHeroStage() {
+    const container = document.getElementById('buddy-stage-container');
+    const canvas = document.getElementById('hero-stage-canvas') as HTMLCanvasElement | null;
+    const loadingEl = document.getElementById('stage-loading');
+    const loadingText = document.getElementById('stage-loading-text');
+    const bubble = document.getElementById('buddy-speech-bubble');
+    const bubbleAvatar = document.getElementById('bubble-avatar');
+    const bubbleName = document.getElementById('bubble-name');
+    const bubbleTag = document.getElementById('bubble-tag');
+    const bubbleText = document.getElementById('bubble-text');
+    const talkBox = document.getElementById('buddy-talk-box');
+    const talkBoxCharName = document.getElementById('talk-box-char-name');
+    const talkInput = document.getElementById('talk-input') as HTMLInputElement | null;
+    const pixelPalContainer = document.getElementById('pixel-pal-container');
+    const pixelPalImg = document.getElementById('pixel-pal-img') as HTMLImageElement | null;
+
+    if (!canvas || !container) return;
+
+    // Dimensions
+    let width = container.clientWidth || 600;
+    let height = container.clientHeight || 550;
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setSize(width, height, false);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    // Scene
+    const scene = new THREE.Scene();
+
+    // Environment map for chrome/metallic reflection (crucial for T-800!)
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+
+    // Camera
+    const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 50);
+    camera.position.set(0, 1.3, 3.8);
+    camera.lookAt(0, 1.0, 0);
+
+    // Studio Lighting
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.8);
+    scene.add(hemiLight);
+
+    const keyLight = new THREE.DirectionalLight(0xffffff, 2.4);
+    keyLight.position.set(2, 4, 3);
+    keyLight.castShadow = true;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x8b5cf6, 1.6);
+    fillLight.position.set(-3, 2, 2);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0x06b6d4, 2.2);
+    rimLight.position.set(0, 3, -3);
+    scene.add(rimLight);
+
+    // Soft Contact Floor Shadow
+    const shadowGeo = new THREE.PlaneGeometry(1.6, 1.6);
+    const shadowCanvas = document.createElement('canvas');
+    shadowCanvas.width = 128;
+    shadowCanvas.height = 128;
+    const sCtx = shadowCanvas.getContext('2d')!;
+    const grad = sCtx.createRadialGradient(64, 64, 10, 64, 64, 60);
+    grad.addColorStop(0, 'rgba(0, 0, 0, 0.55)');
+    grad.addColorStop(0.5, 'rgba(0, 0, 0, 0.25)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    sCtx.fillStyle = grad;
+    sCtx.fillRect(0, 0, 128, 128);
+    const shadowTexture = new THREE.CanvasTexture(shadowCanvas);
+    const shadowMat = new THREE.MeshBasicMaterial({ map: shadowTexture, transparent: true, depthWrite: false });
+    const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+    shadowMesh.rotation.x = -Math.PI / 2;
+    shadowMesh.position.y = 0.01;
+    scene.add(shadowMesh);
+
+    // State Variables
+    let activeDef: CharacterDef = CHARACTERS[0]; // T-800 default!
+    let activeCharacter: Character | null = null;
+    let headBone: THREE.Object3D | null = null;
+
+    // Physics & Interaction State
+    const FLOOR_Y = 0;
+    let posX = 0;
+    let posY = FLOOR_Y;
+    let posZ = 0;
+    let velX = 0;
+    let velY = 0;
+    let velZ = 0;
+    let rotY = 0;
+    let tumbleAngle = 0;
+    let tumbleVel = 0;
+
+    let isHeld = false;
+    let isFalling = false;
+    let isDancing = false;
+    let isRunning = false;
+    let isPoked = false;
+
+    let runDirection = 1;
+    let runTimer = 0;
+
+    let targetLookX = 0;
+    let targetLookY = 0;
+    let currentLookX = 0;
+    let currentLookY = 0;
+
+    let pointerDownTime = 0;
+    let pointerStartX = 0;
+    let pointerStartY = 0;
+    let lastPointerX = 0;
+    let lastPointerY = 0;
+    let lastPointerTime = 0;
+    let pointerVelX = 0;
+    let pointerVelY = 0;
+
+    let bubbleTimeout: number | undefined;
+
+    // Show Speech Bubble Function
+    function showBubble(text: string, durationMs = 4500) {
+      if (!bubble || !bubbleText || !bubbleName || !bubbleAvatar || !bubbleTag) return;
+      bubbleAvatar.textContent = activeDef.emoji;
+      bubbleName.textContent = activeDef.name;
+      bubbleTag.textContent = isDancing ? 'Dancing' : isFalling ? 'Airborne' : isHeld ? 'Grabbed' : 'Thinking';
+      bubbleText.textContent = text;
+      bubble.style.opacity = '1';
+
+      window.clearTimeout(bubbleTimeout);
+      bubbleTimeout = window.setTimeout(() => {
+        bubble.style.opacity = '0';
+      }, durationMs);
+    }
+
+    // Load Character
+    async function switchCharacter(def: CharacterDef) {
+      activeDef = def;
+      if (talkBoxCharName) talkBoxCharName.textContent = def.name;
+
+      if (loadingEl) {
+        loadingEl.style.opacity = '1';
+        loadingEl.style.pointerEvents = 'auto';
+        if (loadingText) loadingText.textContent = `Summoning ${def.name}...`;
+      }
+
+      // Hide 2D if was shown
+      if (pixelPalContainer) pixelPalContainer.classList.add('hidden');
+      canvas!.style.display = 'block';
+
+      if (def.id === 'pixel-pal') {
+        // 2D Character mode
+        if (activeCharacter) {
+          scene.remove(activeCharacter.root);
+          activeCharacter = null;
+        }
+        canvas!.style.display = 'none';
+        if (pixelPalContainer) {
+          pixelPalContainer.classList.remove('hidden');
+          if (pixelPalImg) pixelPalImg.src = '/characters/pixel-pal/idle.webp';
+        }
+        if (loadingEl) {
+          loadingEl.style.opacity = '0';
+          loadingEl.style.pointerEvents = 'none';
+        }
+        showBubble("16-bit retro power engaged!", 3500);
+        return;
+      }
+
+      try {
+        const { character, manifest } = await fetchCharacter(def);
+        if (activeCharacter) {
+          scene.remove(activeCharacter.root);
+          activeCharacter.dispose();
+        }
+
+        activeCharacter = character;
+        if (character) {
+          scene.add(character.root);
+          character.root.position.set(0, FLOOR_Y, 0);
+          posX = 0;
+          posY = FLOOR_Y;
+          posZ = 0;
+          velX = 0;
+          velY = 0;
+
+          // Find head bone
+          headBone = character.bone("head") ?? null;
+          if (!headBone && manifest.lookAtBone) {
+            character.root.traverse((o) => {
+              if (o.name.toLowerCase().includes(manifest.lookAtBone!.toLowerCase())) headBone = o;
+            });
+          }
+
+          // Start default idle animation
+          character.play("idle", { loop: true, fade: 0.3 });
+        }
+
+        if (loadingEl) {
+          loadingEl.style.opacity = '0';
+          loadingEl.style.pointerEvents = 'none';
+        }
+
+        // Greet quote
+        const greet = def.defaultQuotes[Math.floor(Math.random() * def.defaultQuotes.length)];
+        showBubble(greet, 4000);
+      } catch (err) {
+        console.error(`Failed to load ${def.name}:`, err);
+        if (loadingText) loadingText.textContent = `Could not load ${def.name}. Retrying...`;
+      }
+    }
+
+    // Initial load: Start with T-800!
+    switchCharacter(CHARACTERS[0]);
+
+    // Character Switcher Buttons
+    document.querySelectorAll<HTMLButtonElement>('.char-select-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.charId;
+        const target = CHARACTERS.find((c) => c.id === id);
+        if (!target) return;
+
+        document.querySelectorAll('.char-select-btn').forEach((b) => {
+          b.classList.remove('bg-gradient-to-r', 'from-buddy-cyan', 'to-buddy-purple', 'text-white', 'shadow-md', 'active-char', 'font-semibold');
+          b.classList.add('text-buddy-muted');
+        });
+        btn.classList.add('bg-gradient-to-r', 'from-buddy-cyan', 'to-buddy-purple', 'text-white', 'shadow-md', 'active-char', 'font-semibold');
+        btn.classList.remove('text-buddy-muted');
+
+        switchCharacter(target);
+      });
+    });
+
+    // Raycasting to detect click on Buddy
+    const raycaster = new THREE.Raycaster();
+    const mouseCoord = new THREE.Vector2();
+
+    function getPointerIntersection(e: PointerEvent): boolean {
+      if (!activeCharacter) return false;
+      const rect = canvas!.getBoundingClientRect();
+      mouseCoord.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouseCoord.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouseCoord, camera);
+      const hits = raycaster.intersectObject(activeCharacter.root, true);
+      return hits.length > 0;
+    }
+
+    // Pointer Events for Grabbing & Throwing
+    window.addEventListener('pointerdown', (e) => {
+      const onBuddy = getPointerIntersection(e);
+      if (!onBuddy) return;
+
+      pointerDownTime = performance.now();
+      pointerStartX = e.clientX;
+      pointerStartY = e.clientY;
+      lastPointerX = e.clientX;
+      lastPointerY = e.clientY;
+      lastPointerTime = performance.now();
+      pointerVelX = 0;
+      pointerVelY = 0;
+
+      isHeld = true;
+      isFalling = false;
+      isDancing = false;
+      isRunning = false;
+
+      if (activeCharacter && activeCharacter.hasClip("held")) {
+        activeCharacter.play("held", { loop: true, fade: 0.15 });
+      } else if (activeCharacter && activeCharacter.hasClip("holdingDangle")) {
+        activeCharacter.play("holdingDangle", { loop: true, fade: 0.15 });
+      } else if (activeCharacter && activeCharacter.hasClip("fall")) {
+        activeCharacter.play("fall", { loop: true, fade: 0.15 });
+      }
+
+      showBubble("*grabbed!*", 2000);
+    });
+
+    window.addEventListener('pointermove', (e) => {
+      const rect = canvas!.getBoundingClientRect();
+      const clientX = e.clientX - rect.left;
+      const clientY = e.clientY - rect.top;
+
+      // Track cursor for head look
+      const normX = (clientX / rect.width) * 2 - 1;
+      const normY = -(clientY / rect.height) * 2 + 1;
+      targetLookX = Math.max(-1.4, Math.min(1.4, normX));
+      targetLookY = Math.max(-0.9, Math.min(0.9, normY));
+
+      // Measure pointer velocity for throwing
+      const now = performance.now();
+      const dt = Math.max(0.001, (now - lastPointerTime) / 1000);
+      pointerVelX = (e.clientX - lastPointerX) / dt;
+      pointerVelY = (e.clientY - lastPointerY) / dt;
+      lastPointerX = e.clientX;
+      lastPointerY = e.clientY;
+      lastPointerTime = now;
+
+      // Move held buddy
+      if (isHeld && activeCharacter) {
+        // Unproject mouse into 3D world space at z = posZ
+        const vector = new THREE.Vector3(normX, normY, 0.5);
+        vector.unproject(camera);
+        const dir = vector.sub(camera.position).normalize();
+        const distance = (0 - camera.position.z) / dir.z;
+        const pos = camera.position.clone().add(dir.multiplyScalar(distance));
+
+        posX = Math.max(-2.5, Math.min(2.5, pos.x));
+        posY = Math.max(FLOOR_Y, Math.min(3.0, pos.y - 0.7));
+      }
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      if (!isHeld) return;
+      isHeld = false;
+
+      const duration = performance.now() - pointerDownTime;
+      const dist = Math.hypot(e.clientX - pointerStartX, e.clientY - pointerStartY);
+
+      // Poke detection: brief click without drag
+      if (duration < 250 && dist < 10) {
+        pokeBuddy();
+        return;
+      }
+
+      // Throw detection
+      const speed = Math.hypot(pointerVelX, pointerVelY);
+      if (speed > 350) {
+        // FLING / THROW!
+        isFalling = true;
+        velX = pointerVelX * 0.0035;
+        velY = -pointerVelY * 0.0035;
+        tumbleVel = (Math.random() - 0.5) * 15;
+
+        if (activeCharacter) {
+          if (activeCharacter.hasClip("fall")) {
+            activeCharacter.play("fall", { loop: true, fade: 0.1 });
+          } else if (activeCharacter.hasClip("Falling_Idle")) {
+            activeCharacter.play("Falling_Idle", { loop: true, fade: 0.1 });
+          }
+        }
+
+        const quote = activeDef.thrownQuotes[Math.floor(Math.random() * activeDef.thrownQuotes.length)];
+        showBubble(quote, 3000);
+      } else {
+        // Gentle drop
+        isFalling = true;
+        velX = 0;
+        velY = 0;
+      }
+    });
+
+    function pokeBuddy() {
+      isPoked = true;
+      isDancing = false;
+      isRunning = false;
+
+      if (activeCharacter) {
+        if (activeCharacter.hasClip("poked")) {
+          activeCharacter.play("poked", { loop: false, fade: 0.1 });
+        } else if (activeCharacter.hasClip("hit")) {
+          activeCharacter.play("hit", { loop: false, fade: 0.1 });
+        }
+      }
+
+      const quote = activeDef.pokedQuotes[Math.floor(Math.random() * activeDef.pokedQuotes.length)];
+      showBubble(quote, 3500);
+
+      window.setTimeout(() => {
+        isPoked = false;
+        if (!isHeld && !isFalling && activeCharacter) {
+          activeCharacter.play("idle", { loop: true, fade: 0.25 });
+        }
+      }, 1200);
+    }
+
+    // Action Buttons Handlers
+    document.getElementById('btn-action-poke')?.addEventListener('click', pokeBuddy);
+
+    document.getElementById('btn-action-dance')?.addEventListener('click', () => {
+      isDancing = true;
+      isRunning = false;
+      if (activeCharacter) {
+        activeCharacter.play("dance", { loop: true, fade: 0.3 });
+      }
+      const quote = activeDef.danceQuotes[Math.floor(Math.random() * activeDef.danceQuotes.length)];
+      showBubble(quote, 4500);
+    });
+
+    document.getElementById('btn-action-run')?.addEventListener('click', () => {
+      isRunning = true;
+      isDancing = false;
+      runDirection = posX > 0 ? -1 : 1;
+      runTimer = 3.5;
+      if (activeCharacter) {
+        if (activeCharacter.hasClip("run")) activeCharacter.play("run", { loop: true, fade: 0.2 });
+        else if (activeCharacter.hasClip("walk")) activeCharacter.play("walk", { loop: true, fade: 0.2 });
+      }
+      showBubble("Patrolling the desktop perimeter...", 3000);
+    });
+
+    document.getElementById('btn-action-throw')?.addEventListener('click', () => {
+      isHeld = false;
+      isFalling = true;
+      isDancing = false;
+      isRunning = false;
+      posY = 1.8;
+      velX = (Math.random() - 0.5) * 4.5;
+      velY = 4.0;
+      tumbleVel = (Math.random() - 0.5) * 12;
+
+      if (activeCharacter) {
+        if (activeCharacter.hasClip("jump")) activeCharacter.play("jump", { loop: false, fade: 0.1 });
+        else if (activeCharacter.hasClip("fall")) activeCharacter.play("fall", { loop: true, fade: 0.1 });
+      }
+
+      const quote = activeDef.thrownQuotes[Math.floor(Math.random() * activeDef.thrownQuotes.length)];
+      showBubble(quote, 3500);
+    });
+
+    // Talk Box Controls
+    const btnTalk = document.getElementById('btn-action-talk');
+    const btnCloseTalk = document.getElementById('btn-close-talk');
+    const talkForm = document.getElementById('talk-form');
+
+    btnTalk?.addEventListener('click', () => {
+      talkBox?.classList.toggle('hidden');
+      if (!talkBox?.classList.contains('hidden')) {
+        talkInput?.focus();
+      }
+    });
+
+    btnCloseTalk?.addEventListener('click', () => {
+      talkBox?.classList.add('hidden');
+    });
+
+    // Double click canvas to talk
+    canvas.addEventListener('dblclick', () => {
+      talkBox?.classList.remove('hidden');
+      talkInput?.focus();
+    });
+
+    // Talk Chips
+    document.querySelectorAll<HTMLButtonElement>('.talk-chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        const prompt = chip.dataset.prompt ?? '';
+        handleTalkPrompt(prompt);
+      });
+    });
+
+    talkForm?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const val = talkInput?.value.trim() ?? '';
+      if (!val) return;
+      handleTalkPrompt(val);
+      if (talkInput) talkInput.value = '';
+    });
+
+    function handleTalkPrompt(prompt: string) {
+      const p = prompt.toLowerCase();
+      talkBox?.classList.add('hidden');
+
+      if (p.includes('dance')) {
+        isDancing = true;
+        if (activeCharacter) activeCharacter.play("dance", { loop: true, fade: 0.25 });
+        showBubble("Affirmative. Executing dance routine.", 4000);
+      } else if (p.includes('terminate') || p.includes('kill') || p.includes('attack')) {
+        pokeBuddy();
+        showBubble("Target acquired. Hasta la vista, baby.", 4000);
+      } else if (p.includes('jump')) {
+        isFalling = true;
+        velY = 4.2;
+        if (activeCharacter) {
+          if (activeCharacter.hasClip("jump")) activeCharacter.play("jump", { loop: false, fade: 0.1 });
+        }
+        showBubble("Executing vertical kinetic leap.", 3000);
+      } else if (p.includes('joke')) {
+        if (activeDef.id === 't-800') {
+          showBubble("A terminator walks into a bar. There were no survivors.", 5000);
+        } else {
+          showBubble("Why did the desktop pet cross the road? To climb the other window!", 5000);
+        }
+      } else if (p.includes('who are you') || p.includes('what are you')) {
+        if (activeDef.id === 't-800') {
+          showBubble("Cyberdyne Systems Model 101. Living tissue over metal endoskeleton.", 5000);
+        } else {
+          showBubble(`I am ${activeDef.name}, your modern desktop buddy!`, 4500);
+        }
+      } else {
+        // General in-character reply
+        const replies = activeDef.defaultQuotes;
+        const reply = replies[Math.floor(Math.random() * replies.length)];
+        showBubble(reply, 4500);
+      }
+    }
+
+    // Resize Handler
+    function handleResize() {
+      if (!container || !canvas) return;
+      width = container.clientWidth;
+      height = container.clientHeight;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height, false);
+    }
+    window.addEventListener('resize', handleResize);
+
+    // Main Animation / Physics Loop
+    const clock = new THREE.Clock();
+    const GRAVITY = 9.8; // m/s^2
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.1);
+      const elapsed = clock.getElapsedTime();
+
+      // Update Character Animations Mixer
+      if (activeCharacter) {
+        activeCharacter.update(dt);
+      }
+
+      // Physics Simulation
+      if (isFalling) {
+        velY -= GRAVITY * dt;
+        posX += velX * dt;
+        posY += velY * dt;
+        tumbleAngle += tumbleVel * dt;
+
+        // Wall collisions
+        const WALL_LIMIT = 2.4;
+        if (posX > WALL_LIMIT) {
+          posX = WALL_LIMIT;
+          velX = -velX * 0.45;
+          tumbleVel = -tumbleVel * 0.5;
+        } else if (posX < -WALL_LIMIT) {
+          posX = -WALL_LIMIT;
+          velX = -velX * 0.45;
+          tumbleVel = -tumbleVel * 0.5;
+        }
+
+        // Floor collision
+        if (posY <= FLOOR_Y) {
+          posY = FLOOR_Y;
+          if (Math.abs(velY) > 1.5) {
+            // Bounce
+            velY = -velY * 0.35;
+            velX *= 0.6;
+          } else {
+            // Settled on floor!
+            isFalling = false;
+            velX = 0;
+            velY = 0;
+            tumbleAngle = 0;
+            tumbleVel = 0;
+
+            if (activeCharacter) {
+              if (activeCharacter.hasClip("land")) {
+                activeCharacter.play("land", { loop: false, fade: 0.1 });
+                window.setTimeout(() => {
+                  if (!isFalling && !isHeld && !isDancing && !isRunning && activeCharacter) {
+                    activeCharacter.play("idle", { loop: true, fade: 0.25 });
+                  }
+                }, 800);
+              } else {
+                activeCharacter.play("idle", { loop: true, fade: 0.25 });
+              }
+            }
+          }
+        }
+      }
+
+      // Running Around Logic
+      if (isRunning) {
+        runTimer -= dt;
+        const RUN_SPEED = 1.6;
+        posX += runDirection * RUN_SPEED * dt;
+        rotY = runDirection > 0 ? Math.PI / 2 : -Math.PI / 2;
+
+        if (posX > 2.0) {
+          runDirection = -1;
+        } else if (posX < -2.0) {
+          runDirection = 1;
+        }
+
+        if (runTimer <= 0) {
+          isRunning = false;
+          rotY = 0;
+          if (activeCharacter) activeCharacter.play("idle", { loop: true, fade: 0.3 });
+          showBubble("Perimeter secure.", 3000);
+        }
+      }
+
+      // Smooth look-at tracking
+      if (!isFalling && !isHeld) {
+        currentLookX += (targetLookX - currentLookX) * 0.08;
+        currentLookY += (targetLookY - currentLookY) * 0.08;
+
+        if (headBone) {
+          headBone.rotation.y = currentLookX * 0.6;
+          headBone.rotation.x = -currentLookY * 0.35;
+        }
+      }
+
+      // Apply root transforms
+      if (activeCharacter) {
+        activeCharacter.root.position.set(posX, posY, posZ);
+        if (isFalling) {
+          activeCharacter.root.rotation.z = tumbleAngle;
+          activeCharacter.root.rotation.x = tumbleAngle * 0.5;
+        } else if (isRunning) {
+          activeCharacter.root.rotation.set(0, rotY, 0);
+        } else {
+          activeCharacter.root.rotation.set(0, 0, 0);
+        }
+
+        // Contact shadow position & scale
+        shadowMesh.position.x = posX;
+        shadowMesh.position.z = posZ;
+        const heightScale = Math.max(0.2, 1 - (posY - FLOOR_Y) * 0.4);
+        shadowMesh.scale.set(heightScale, heightScale, 1);
+        (shadowMesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0.1, 0.5 - (posY - FLOOR_Y) * 0.25);
+
+        // Project head position to 2D screen coordinates for speech bubble!
+        if (bubble && headBone) {
+          const headWorld = new THREE.Vector3();
+          headBone.getWorldPosition(headWorld);
+          headWorld.y += 0.35; // Position above crown
+          headWorld.project(camera);
+
+          const screenX = ((headWorld.x + 1) / 2) * width;
+          const screenY = ((-headWorld.y + 1) / 2) * height;
+
+          bubble.style.left = `${screenX}px`;
+          bubble.style.top = `${screenY}px`;
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initHeroStage);
+  } else {
+    initHeroStage();
+  }
+</script>

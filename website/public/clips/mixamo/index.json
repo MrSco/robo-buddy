@@ -1,0 +1,236 @@
+[
+  {
+    "name": "Arms_Hip_Hop",
+    "file": "Arms_Hip_Hop.glb",
+    "duration": 22.0,
+    "loop": true
+  },
+  {
+    "name": "Bboy",
+    "file": "Bboy.glb",
+    "duration": 13.667,
+    "loop": true
+  },
+  {
+    "name": "Bored",
+    "file": "Bored.glb",
+    "duration": 10.7,
+    "loop": true
+  },
+  {
+    "name": "Breathing_Idle",
+    "file": "Breathing_Idle.glb",
+    "duration": 9.967,
+    "loop": true
+  },
+  {
+    "name": "Chicken_Dance",
+    "file": "Chicken_Dance.glb",
+    "duration": 4.8,
+    "loop": true
+  },
+  {
+    "name": "Crouch_Look_Around",
+    "file": "Crouch_Look_Around.glb",
+    "duration": 5.867,
+    "loop": true
+  },
+  {
+    "name": "Falling_Idle",
+    "file": "Falling_Idle.glb",
+    "duration": 0.733,
+    "loop": true
+  },
+  {
+    "name": "Falling_To_Landing",
+    "file": "Falling_To_Landing.glb",
+    "duration": 1.1,
+    "loop": true
+  },
+  {
+    "name": "Fast_Run",
+    "file": "Fast_Run.glb",
+    "duration": 0.567,
+    "loop": false
+  },
+  {
+    "name": "Gangnam_Style",
+    "file": "Gangnam_Style.glb",
+    "duration": 12.4,
+    "loop": true
+  },
+  {
+    "name": "Getting_Up",
+    "file": "Getting_Up.glb",
+    "duration": 2.733,
+    "loop": false
+  },
+  {
+    "name": "Getting_Up_2",
+    "file": "Getting_Up_2.glb",
+    "duration": 8.367,
+    "loop": false
+  },
+  {
+    "name": "Hanging_Idle",
+    "file": "Hanging_Idle.glb",
+    "duration": 2.367,
+    "loop": false
+  },
+  {
+    "name": "Happy_Idle",
+    "file": "Happy_Idle.glb",
+    "duration": 2.967,
+    "loop": true
+  },
+  {
+    "name": "Jump",
+    "file": "Jump.glb",
+    "duration": 2.2,
+    "loop": false
+  },
+  {
+    "name": "Jumping",
+    "file": "Jumping.glb",
+    "duration": 1.933,
+    "loop": false
+  },
+  {
+    "name": "Jumping_Down",
+    "file": "Jumping_Down.glb",
+    "duration": 2.333,
+    "loop": false
+  },
+  {
+    "name": "Jumping_Up",
+    "file": "Jumping_Up.glb",
+    "duration": 0.867,
+    "loop": false
+  },
+  {
+    "name": "Neutral_Idle",
+    "file": "Neutral_Idle.glb",
+    "duration": 8.8,
+    "loop": true
+  },
+  {
+    "name": "Robot_Hip_Hop",
+    "file": "Robot_Hip_Hop.glb",
+    "duration": 15.467,
+    "loop": true
+  },
+  {
+    "name": "Rumba",
+    "file": "Rumba.glb",
+    "duration": 2.4,
+    "loop": true
+  },
+  {
+    "name": "Running",
+    "file": "Running.glb",
+    "duration": 0.733,
+    "loop": false
+  },
+  {
+    "name": "Running_Man",
+    "file": "Running_Man.glb",
+    "duration": 13.8,
+    "loop": true
+  },
+  {
+    "name": "Sad_Idle",
+    "file": "Sad_Idle.glb",
+    "duration": 2.833,
+    "loop": true
+  },
+  {
+    "name": "Salsa",
+    "file": "Salsa.glb",
+    "duration": 12.0,
+    "loop": true
+  },
+  {
+    "name": "Samba",
+    "file": "Samba.glb",
+    "duration": 18.233,
+    "loop": true
+  },
+  {
+    "name": "Shuffling",
+    "file": "Shuffling.glb",
+    "duration": 7.533,
+    "loop": true
+  },
+  {
+    "name": "Side_To_Side",
+    "file": "Side_To_Side.glb",
+    "duration": 15.8,
+    "loop": true
+  },
+  {
+    "name": "Silly_Twist",
+    "file": "Silly_Twist.glb",
+    "duration": 5.467,
+    "loop": true
+  },
+  {
+    "name": "Sitting_Laughing",
+    "file": "Sitting_Laughing.glb",
+    "duration": 8.367,
+    "loop": true
+  },
+  {
+    "name": "Snake_Hip_Hop",
+    "file": "Snake_Hip_Hop.glb",
+    "duration": 15.3,
+    "loop": true
+  },
+  {
+    "name": "Standing_Up",
+    "file": "Standing_Up.glb",
+    "duration": 11.433,
+    "loop": false
+  },
+  {
+    "name": "Step_Hip_Hop",
+    "file": "Step_Hip_Hop.glb",
+    "duration": 7.833,
+    "loop": true
+  },
+  {
+    "name": "Swing_Charleston",
+    "file": "Swing_Charleston.glb",
+    "duration": 20.933,
+    "loop": true
+  },
+  {
+    "name": "Texting",
+    "file": "Texting.glb",
+    "duration": 23.6,
+    "loop": true
+  },
+  {
+    "name": "Twist",
+    "file": "Twist.glb",
+    "duration": 9.467,
+    "loop": true
+  },
+  {
+    "name": "Wave_Hip_Hop",
+    "file": "Wave_Hip_Hop.glb",
+    "duration": 16.0,
+    "loop": true
+  },
+  {
+    "name": "Weight_Shift_Idle",
+    "file": "Weight_Shift_Idle.glb",
+    "duration": 16.667,
+    "loop": true
+  },
+  {
+    "name": "YMCA",
+    "file": "YMCA.glb",
+    "duration": 4.533,
+    "loop": true
+  }
+]

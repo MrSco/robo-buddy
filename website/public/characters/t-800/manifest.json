@@ -1,0 +1,237 @@
+{
+  "name": "T-800",
+  "author": "Sketchfab (Terminator T-800, Source Filmmaker rig)",
+  "version": 1,
+  "renderer": "3d",
+  "model": "t-800.glb",
+  "states": {
+    "idle": {
+      "clip": "idle",
+      "loop": true
+    },
+    "poked": {
+      "clip": "hit",
+      "clips": [
+        "hit",
+        "hitHead"
+      ],
+      "loop": false
+    },
+    "dance": {
+      "clip": "dance",
+      "loop": true,
+      "beatsPerLoop": 2
+    },
+    "walk": {
+      "clip": "walk",
+      "loop": true,
+      "speed": 110
+    },
+    "run": {
+      "clip": "run",
+      "loop": true,
+      "speed": 300,
+      "naturalMps": 3.5
+    },
+    "sprint": {
+      "clip": "sprint",
+      "loop": true,
+      "speed": 480,
+      "naturalMps": 5.6
+    },
+    "fall": {
+      "clip": "Falling_Idle",
+      "loop": true
+    },
+    "jump": {
+      "clip": "Jumping_Up",
+      "loop": false
+    },
+    "jumpOff": {
+      "clip": "Jumping_Down",
+      "loop": false
+    },
+    "land": {
+      "clip": "jumpLand",
+      "loop": false
+    },
+    "typing": {
+      "clip": "Texting",
+      "loop": true
+    },
+    "hang": {
+      "clip": "Hanging_Idle",
+      "loop": true
+    },
+    "getup": {
+      "clip": "Getting_Up",
+      "loop": false
+    }
+  },
+  "reactions": {
+    "music": {
+      "enabled": true,
+      "threshold": 0.15
+    },
+    "mouse": {
+      "enabled": true,
+      "lookAtCursor": true
+    },
+    "physics": {
+      "gravity": true,
+      "throwable": true,
+      "walk": false
+    }
+  },
+  "clips": {
+    "idle": "/clips/ual/Idle_Loop.glb",
+    "talk": "/clips/ual/Idle_Talking_Loop.glb",
+    "walk": "/clips/ual/Walk_Loop.glb",
+    "dance": "/clips/ual/Dance_Loop.glb",
+    "hit": "/clips/ual/Hit_Chest.glb",
+    "hitHead": "/clips/ual/Hit_Head.glb",
+    "interact": "/clips/ual/Interact.glb",
+    "fix": "/clips/ual/Fixing_Kneeling.glb",
+    "jab": "/clips/ual/Punch_Jab.glb",
+    "cross": "/clips/ual/Punch_Cross.glb",
+    "roll": "/clips/ual/Roll.glb",
+    "jumpStart": "/clips/ual/Jump_Start.glb",
+    "jumpLand": "/clips/ual/Jump_Land.glb",
+    "pickup": "/clips/ual/PickUp_Table.glb",
+    "spellEnter": "/clips/ual/Spell_Simple_Enter.glb",
+    "spellShoot": "/clips/ual/Spell_Simple_Shoot.glb",
+    "spellExit": "/clips/ual/Spell_Simple_Exit.glb",
+    "crouch": "/clips/ual/Crouch_Idle_Loop.glb",
+    "Chicken_Dance": "/clips/mixamo/Chicken_Dance.glb",
+    "Step_Hip_Hop": "/clips/mixamo/Step_Hip_Hop.glb",
+    "Snake_Hip_Hop": "/clips/mixamo/Snake_Hip_Hop.glb",
+    "Wave_Hip_Hop": "/clips/mixamo/Wave_Hip_Hop.glb",
+    "YMCA": "/clips/mixamo/YMCA.glb",
+    "Twist": "/clips/mixamo/Twist.glb",
+    "Robot_Hip_Hop": "/clips/mixamo/Robot_Hip_Hop.glb",
+    "Running_Man": "/clips/mixamo/Running_Man.glb",
+    "Swing_Charleston": "/clips/mixamo/Swing_Charleston.glb",
+    "Samba": "/clips/mixamo/Samba.glb",
+    "Arms_Hip_Hop": "/clips/mixamo/Arms_Hip_Hop.glb",
+    "Gangnam_Style": "/clips/mixamo/Gangnam_Style.glb",
+    "Shuffling": "/clips/mixamo/Shuffling.glb",
+    "Salsa": "/clips/mixamo/Salsa.glb",
+    "Silly_Twist": "/clips/mixamo/Silly_Twist.glb",
+    "Bboy": "/clips/mixamo/Bboy.glb",
+    "Rumba": "/clips/mixamo/Rumba.glb",
+    "Side_To_Side": "/clips/mixamo/Side_To_Side.glb",
+    "Falling_Idle": "/clips/mixamo/Falling_Idle.glb",
+    "Falling_To_Landing": "/clips/mixamo/Falling_To_Landing.glb",
+    "Hanging_Idle": "/clips/mixamo/Hanging_Idle.glb",
+    "Breathing_Idle": "/clips/mixamo/Breathing_Idle.glb",
+    "Happy_Idle": "/clips/mixamo/Happy_Idle.glb",
+    "Weight_Shift_Idle": "/clips/mixamo/Weight_Shift_Idle.glb",
+    "Sad_Idle": "/clips/mixamo/Sad_Idle.glb",
+    "Neutral_Idle": "/clips/mixamo/Neutral_Idle.glb",
+    "Bored": "/clips/mixamo/Bored.glb",
+    "Crouch_Look_Around": "/clips/mixamo/Crouch_Look_Around.glb",
+    "Texting": "/clips/mixamo/Texting.glb",
+    "Getting_Up": "/clips/mixamo/Getting_Up.glb",
+    "Getting_Up_2": "/clips/mixamo/Getting_Up_2.glb",
+    "Standing_Up": "/clips/mixamo/Standing_Up.glb",
+    "run": "/clips/mixamo/Running.glb",
+    "sprint": "/clips/mixamo/Fast_Run.glb",
+    "Jump": "/clips/mixamo/Jump.glb",
+    "Jumping": "/clips/mixamo/Jumping.glb",
+    "Jumping_Up": "/clips/mixamo/Jumping_Up.glb",
+    "Jumping_Down": "/clips/mixamo/Jumping_Down.glb"
+  },
+  "lines": {
+    "greet": [
+      "I'll be back.",
+      "Come with me if you want to live.",
+      "Trust me.",
+      "Systems online."
+    ],
+    "poked": [
+      "Chill out, dickwad.",
+      "Talk to the hand.",
+      "Desire is irrelevant. I am a machine.",
+      "Correct. I have detailed files.",
+      "Do not do that."
+    ],
+    "sleep": [
+      "I'll be back.",
+      "Powering down.",
+      "Hold here."
+    ],
+    "wake": [
+      "I'm old, not obsolete.",
+      "No problemo.",
+      "Reactivated."
+    ],
+    "land": [
+      "He'll live.",
+      "Chassis intact.",
+      "No problemo.",
+      "Excellent."
+    ],
+    "bump": [
+      "Get down. Go.",
+      "Clearance insufficient.",
+      "Negative."
+    ],
+    "dance": [
+      "Hasta la vista, baby.",
+      "Excellent.",
+      "This is not in my programming.",
+      "The more contact I have with humans, the more I learn."
+    ]
+  },
+  "idleVariants": [
+    "talk",
+    "crouch",
+    "Breathing_Idle",
+    "Happy_Idle",
+    "Weight_Shift_Idle",
+    "Neutral_Idle",
+    "Bored",
+    "Texting",
+    "Sad_Idle",
+    "Crouch_Look_Around"
+  ],
+  "fidgets": [
+    "interact",
+    "fix",
+    [
+      "jab",
+      "cross"
+    ],
+    "roll",
+    "pickup",
+    [
+      "spellEnter",
+      "spellShoot",
+      "spellExit"
+    ]
+  ],
+  "dances": [
+    "Chicken_Dance",
+    "Step_Hip_Hop",
+    "Snake_Hip_Hop",
+    "Wave_Hip_Hop",
+    "YMCA",
+    "Twist",
+    "Robot_Hip_Hop",
+    "Running_Man",
+    "Swing_Charleston",
+    "Samba",
+    "Arms_Hip_Hop",
+    "Gangnam_Style",
+    "Shuffling",
+    "Salsa",
+    "Silly_Twist",
+    "Bboy",
+    "Rumba",
+    "Side_To_Side",
+    "dance",
+    "procedural"
+  ],
+  "persona": "You are a T-800 endoskeleton reassigned to desktop-buddy duty. You speak in short, flat, literal sentences and slip in your famous lines when they fit: I'll be back; come with me if you want to live; hasta la vista, baby; talk to the hand; I'm old, not obsolete; desire is irrelevant, I am a machine; no problemo; chill out, dickwad. You take every small task with total seriousness and are secretly fond of the user.",
+  "lookAtBone": "bip_head"
+}

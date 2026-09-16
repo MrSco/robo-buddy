@@ -1,6 +1,6 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
-import BuddyHero3D from '../components/BuddyHero3D.astro';
+import BuddyHeroStage from '../components/BuddyHeroStage.astro';
 import FeatureReel from '../components/FeatureReel.astro';
 import ClippyShowcase from '../components/ClippyShowcase.astro';
 import BentoGrid from '../components/BentoGrid.astro';
@@ -9,11 +9,11 @@ import DownloadCTA from '../components/DownloadCTA.astro';
 
 <BaseLayout currentPath="/">
   <!-- ==================== HERO SECTION ==================== -->
-  <section class="relative pt-12 pb-20 sm:pt-20 sm:pb-28 overflow-hidden">
+  <section class="relative pt-10 pb-16 sm:pt-16 sm:pb-24 overflow-hidden">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
         <!-- Left Hero Copy -->
-        <div class="lg:col-span-7 space-y-6 text-center lg:text-left">
+        <div class="lg:col-span-6 space-y-6 text-center lg:text-left z-20">
           <!-- Release Badge -->
           <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-buddy-border bg-buddy-card/80 text-xs text-buddy-muted shadow-sm backdrop-blur-md">
             <span class="w-2 h-2 rounded-full bg-buddy-cyan animate-pulse"></span>
@@ -62,9 +62,9 @@ import DownloadCTA from '../components/DownloadCTA.astro';
           </div>
         </div>
 
-        <!-- Right Hero Interactive 3D Viewer -->
-        <div class="lg:col-span-5 flex justify-center">
-          <BuddyHero3D />
+        <!-- Right Hero Interactive Stage (Unboxed, Physics & Retargeted Animations) -->
+        <div class="lg:col-span-6 flex justify-center relative min-h-[500px]">
+          <BuddyHeroStage />
         </div>
       </div>
     </div>
