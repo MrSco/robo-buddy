@@ -3,29 +3,61 @@ import { CHARACTERS } from '../lib/character-loader';
 ---
 
 <div id="buddy-stage-container" class="absolute inset-0 w-full h-full select-none pointer-events-none z-20 overflow-hidden">
-  <!-- Character Selector Floating Bar (Top Right) -->
-  <div class="absolute top-3 right-3 sm:top-4 sm:right-6 z-30 flex items-center gap-1.5 p-1 rounded-2xl bg-buddy-card/90 border border-buddy-border shadow-xl backdrop-blur-md pointer-events-auto">
-    {CHARACTERS.map((char, idx) => (
-      <button
-        type="button"
-        class={`char-select-btn px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all ${
-          idx === 0 
-            ? 'bg-gradient-to-r from-buddy-cyan to-buddy-purple text-white shadow-md active-char font-semibold' 
-            : 'text-buddy-muted hover:text-white hover:bg-white/5'
-        }`}
-        data-char-id={char.id}
-        title={`Switch to ${char.name}`}
-      >
-        <span class="text-sm">{char.emoji}</span>
-        <span class="hidden sm:inline">{char.name}</span>
+  <!-- Unified Floating Command Center & Character Selector (Top Right) -->
+  <div class="absolute top-3 right-3 sm:top-4 sm:right-6 z-30 flex flex-wrap items-center gap-1.5 p-1.5 rounded-2xl bg-black/85 border border-white/15 shadow-2xl backdrop-blur-xl pointer-events-auto max-w-[calc(100vw-24px)]">
+    <!-- Action Command Buttons -->
+    <div class="flex items-center gap-1">
+      <button id="btn-action-talk" type="button" class="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/15 text-xs text-white font-medium transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Talk with Buddy">
+        <span>💬</span>
+        <span class="hidden md:inline">Talk</span>
       </button>
-    ))}
-  </div>
+      <button id="btn-action-dance" type="button" class="px-2.5 py-1 rounded-xl bg-buddy-cyan/20 hover:bg-buddy-cyan/30 text-buddy-cyanLight text-xs font-semibold border border-buddy-cyan/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Dance Routine">
+        <span>🕺</span>
+        <span class="hidden md:inline">Dance</span>
+      </button>
+      <button id="btn-action-run" type="button" class="px-2.5 py-1 rounded-xl bg-buddy-purple/20 hover:bg-buddy-purple/30 text-buddy-purpleLight text-xs font-semibold border border-buddy-purple/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Roam Taskbar Floor">
+        <span>🏃</span>
+        <span class="hidden md:inline">Roam</span>
+      </button>
+      <button id="btn-action-climb" type="button" class="px-2.5 py-1 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Climb Desktop Window">
+        <span>🪜</span>
+        <span class="hidden md:inline">Climb</span>
+      </button>
+      <button id="btn-action-kick" type="button" class="px-2.5 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Kick / Punch Window">
+        <span>🥋</span>
+        <span class="hidden md:inline">Kick</span>
+      </button>
+      <button id="btn-action-throw" type="button" class="px-2.5 py-1 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 text-xs font-semibold border border-pink-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Throw Buddy">
+        <span>🚀</span>
+        <span class="hidden md:inline">Throw</span>
+      </button>
+      <button id="btn-action-poke" type="button" class="px-2.5 py-1 rounded-xl bg-white/5 hover:bg-white/15 text-xs text-buddy-muted hover:text-white transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Poke Buddy">
+        <span>👋</span>
+        <span class="hidden md:inline">Poke</span>
+      </button>
+    </div>
 
-  <!-- Interactive Hint Callout (Top Left) -->
-  <div class="absolute top-3 left-3 sm:top-4 sm:left-6 z-30 pointer-events-none hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/60 border border-white/10 backdrop-blur-md text-[11px] font-mono text-buddy-muted shadow-lg">
-    <span class="w-2 h-2 rounded-full bg-buddy-cyan animate-pulse"></span>
-    <span>Click to poke • Drag to carry • Fling to throw!</span>
+    <!-- Vertical Separator -->
+    <div class="h-4 w-px bg-white/20 mx-0.5 hidden sm:block"></div>
+
+    <!-- Character Selector Pills -->
+    <div class="flex items-center gap-1">
+      {CHARACTERS.map((char, idx) => (
+        <button
+          type="button"
+          class={`char-select-btn px-2.5 py-1 rounded-xl text-xs font-medium flex items-center gap-1 transition-all ${
+            idx === 0 
+              ? 'bg-gradient-to-r from-buddy-cyan to-buddy-purple text-white shadow-md active-char font-semibold' 
+              : 'text-buddy-muted hover:text-white hover:bg-white/5'
+          }`}
+          data-char-id={char.id}
+          title={`Switch to ${char.name}`}
+        >
+          <span class="text-xs">{char.emoji}</span>
+          <span class="hidden sm:inline">{char.name}</span>
+        </button>
+      ))}
+    </div>
   </div>
 
   <!-- Speech Bubble Overlay (dynamically pinned to Buddy's 3D head bone) -->
@@ -114,37 +146,6 @@ import { CHARACTERS } from '../lib/character-loader';
     <img id="pixel-pal-img" src="/characters/pixel-pal/idle.webp" alt="Pixel Pal" class="w-48 h-48 object-contain pixelated pointer-events-auto cursor-grab active:cursor-grabbing" />
   </div>
 
-  <!-- Stage Control Action Bar (Docked beneath mock taskbar floor) -->
-  <div class="absolute bottom-2 left-1/2 -translate-x-1/2 z-30 flex flex-wrap items-center justify-center gap-1.5 p-1 rounded-2xl bg-black/80 border border-white/10 shadow-2xl backdrop-blur-xl pointer-events-auto">
-    <button id="btn-action-talk" type="button" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs text-white font-medium transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
-      <span>💬</span>
-      <span>Talk</span>
-    </button>
-    <button id="btn-action-dance" type="button" class="px-3 py-1.5 rounded-xl bg-buddy-cyan/20 hover:bg-buddy-cyan/30 text-buddy-cyanLight text-xs font-semibold border border-buddy-cyan/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
-      <span>🕺</span>
-      <span>Dance</span>
-    </button>
-    <button id="btn-action-run" type="button" class="px-3 py-1.5 rounded-xl bg-buddy-purple/20 hover:bg-buddy-purple/30 text-buddy-purpleLight text-xs font-semibold border border-buddy-purple/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
-      <span>🏃</span>
-      <span>Roam Taskbar</span>
-    </button>
-    <button id="btn-action-climb" type="button" class="px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
-      <span>🪜</span>
-      <span>Climb Window</span>
-    </button>
-    <button id="btn-action-kick" type="button" class="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
-      <span>🥋</span>
-      <span>Kick Window</span>
-    </button>
-    <button id="btn-action-throw" type="button" class="px-3 py-1.5 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 text-xs font-semibold border border-pink-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5">
-      <span>🚀</span>
-      <span>Throw Me!</span>
-    </button>
-    <button id="btn-action-poke" type="button" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-xs text-buddy-muted hover:text-white transition-all hover:scale-105 active:scale-95 flex items-center gap-1">
-      <span>👋</span>
-      <span>Poke</span>
-    </button>
-  </div>
 </div>
 
 <script>
@@ -153,7 +154,14 @@ import { CHARACTERS } from '../lib/character-loader';
   import { CHARACTERS, fetchCharacter, type CharacterDef } from '../lib/character-loader';
   import type { Character } from '../lib/character';
   import { refreshSkins } from '../lib/character';
-  import { applyLookAt, applyAttack, applyCrouch } from '../lib/pose';
+  import {
+    applyLookAt,
+    applyAttack,
+    applyCrouch,
+    applyHeldByArm,
+    applyHeldByLeg,
+    applyDangle,
+  } from '../lib/pose';
 
   function initHeroStage() {
     const container = document.getElementById('buddy-stage-container');
@@ -288,7 +296,9 @@ import { CHARACTERS } from '../lib/character-loader';
       const cRect = canvas.getBoundingClientRect();
       const hRect = header.getBoundingClientRect();
       if (cRect.height === 0) return;
-      const ndcBottom = -((hRect.bottom - cRect.top) / cRect.height) * 2 + 1;
+      // Strict physical ceiling: 14px below header bottom
+      const ceilingPixelY = Math.max(cRect.top + 8, hRect.bottom + 14);
+      const ndcBottom = -((ceilingPixelY - cRect.top) / cRect.height) * 2 + 1;
       const v = new THREE.Vector3(0, ndcBottom, 0.5).unproject(camera);
       const dir = v.sub(camera.position).normalize();
       const dist = -camera.position.z / dir.z;
@@ -306,6 +316,12 @@ import { CHARACTERS } from '../lib/character-loader';
     let targetRotY = 0;
     let tumbleAngle = 0;
     let tumbleVel = 0;
+
+    // Limb Grabbing State (Matching desktop app mechanics)
+    type GrabPart = 'head' | 'torso' | 'leftArm' | 'rightArm' | 'leftLeg' | 'rightLeg';
+    let currentGrabPart: GrabPart | null = null;
+    let heldAmount = 0;
+    let flipAmount = 0;
 
     // Behavior states
     let isHeld = false;
@@ -426,6 +442,10 @@ import { CHARACTERS } from '../lib/character-loader';
         for (const alt of ['hit', 'hitHead', 'Hit_Chest', 'Hit_Head']) {
           if (activeCharacter.hasClip(alt)) { activeCharacter.play(alt, opts); return; }
         }
+      } else if (name === 'crouch') {
+        for (const alt of ['crouch', 'Crouch_Idle_Loop', 'Crouch_Look_Around']) {
+          if (activeCharacter.hasClip(alt)) { activeCharacter.play(alt, opts); return; }
+        }
       }
     }
 
@@ -438,7 +458,7 @@ import { CHARACTERS } from '../lib/character-loader';
         bubbleAvatar.textContent = activeDef.emoji;
       }
       bubbleName.textContent = activeDef.name;
-      bubbleTag.textContent = isDancing ? 'Dancing' : isFalling ? 'Airborne' : isHeld ? 'Grabbed' : currentLedge ? 'Perched' : 'Active';
+      bubbleTag.textContent = isDancing ? 'Dancing' : isFalling ? 'Airborne' : isHeld ? (currentGrabPart ? `Held by ${currentGrabPart}` : 'Grabbed') : currentLedge ? 'Perched' : 'Active';
       bubbleText.textContent = text;
       bubble.style.opacity = '1';
 
@@ -448,27 +468,86 @@ import { CHARACTERS } from '../lib/character-loader';
       }, durationMs);
     }
 
-    // Position speech bubble dynamically pinned to Buddy's 3D head bone
+    // Position speech bubble dynamically pinned snug above Buddy's 3D head bone
     function updateSpeechBubblePos() {
       if (!bubble || bubble.style.opacity === '0' || !canvas) return;
       const cRect = canvas.getBoundingClientRect();
       const headPos = new THREE.Vector3();
       if (headBone) {
         headBone.getWorldPosition(headPos);
-        headPos.y += 0.02; // Down-pointing tail meets top of skull cleanly
       } else if (activeCharacter) {
         headPos.copy(activeCharacter.root.position);
-        headPos.y += 0.85;
+        headPos.y += 0.82;
       } else {
-        headPos.set(posX, posY + 0.85, posZ);
+        headPos.set(posX, posY + 0.82, posZ);
       }
 
       headPos.project(camera);
       const screenX = ((headPos.x + 1) / 2) * cRect.width + cRect.left;
       const screenY = ((-headPos.y + 1) / 2) * cRect.height + cRect.top;
 
-      bubble.style.left = `${screenX}px`;
-      bubble.style.top = `${screenY}px`;
+      // Position bubble so down-pointing tail meets skull snugly (screenY - 4px)
+      const bubbleW = bubble.offsetWidth || 220;
+      const bubbleH = bubble.offsetHeight || 80;
+      const clampedX = Math.max(bubbleW / 2 + 12, Math.min(window.innerWidth - bubbleW / 2 - 12, screenX));
+      const clampedY = Math.max(cRect.top + bubbleH + 10, screenY - 4);
+
+      bubble.style.left = `${clampedX}px`;
+      bubble.style.top = `${clampedY}px`;
+    }
+
+    // Helper: Project a bone to screen pixel coordinates
+    function getScreenPos(bone: THREE.Object3D | null | undefined): { x: number; y: number } | null {
+      if (!bone || !canvas) return null;
+      const tmp = new THREE.Vector3();
+      bone.getWorldPosition(tmp);
+      tmp.project(camera);
+      const cRect = canvas.getBoundingClientRect();
+      return {
+        x: ((tmp.x + 1) / 2) * cRect.width + cRect.left,
+        y: ((-tmp.y + 1) / 2) * cRect.height + cRect.top,
+      };
+    }
+
+    // Desktop-style bone proximity hit testing for limbs
+    function getGrabPartAt(clientX: number, clientY: number): GrabPart {
+      if (!activeCharacter) return 'torso';
+      activeCharacter.root.updateMatrixWorld(true);
+
+      const candidates: Array<[GrabPart, THREE.Object3D | undefined]> = [
+        ['head', activeCharacter.bone('head') ?? headBone ?? undefined],
+        ['torso', activeCharacter.bone('chest') ?? activeCharacter.bone('spine')],
+        ['torso', activeCharacter.bone('hips')],
+        ['leftArm', activeCharacter.bone('leftHand')],
+        ['leftArm', activeCharacter.bone('leftLowerArm')],
+        ['leftArm', activeCharacter.bone('leftUpperArm')],
+        ['rightArm', activeCharacter.bone('rightHand')],
+        ['rightArm', activeCharacter.bone('rightLowerArm')],
+        ['rightArm', activeCharacter.bone('rightUpperArm')],
+        ['leftLeg', activeCharacter.bone('leftFoot')],
+        ['leftLeg', activeCharacter.bone('leftLowerLeg')],
+        ['leftLeg', activeCharacter.bone('leftUpperLeg')],
+        ['rightLeg', activeCharacter.bone('rightFoot')],
+        ['rightLeg', activeCharacter.bone('rightLowerLeg')],
+        ['rightLeg', activeCharacter.bone('rightUpperLeg')],
+      ];
+
+      let best: GrabPart = 'torso';
+      let bestD = Infinity;
+
+      for (const [part, bone] of candidates) {
+        if (!bone) continue;
+        const pos = getScreenPos(bone);
+        if (!pos) continue;
+        // Torso is wide; give it a little extra reach so clicks on the torso count
+        const d = Math.hypot(pos.x - clientX, pos.y - clientY) * (part === 'torso' ? 0.75 : 1.0);
+        if (d < bestD) {
+          bestD = d;
+          best = part;
+        }
+      }
+
+      return best;
     }
 
     // Measure World Platforms (Furniture from DOM elements)
@@ -509,8 +588,9 @@ import { CHARACTERS } from '../lib/character-loader';
 
         const yTop = Math.max(0.1, wLeft.y);
 
-        // Require at least 0.88m headroom under ceiling header so Buddy never cuts off!
-        if (CEILING_Y - yTop < 0.88) {
+        // Require that Buddy can fit under ceiling header (ducking allowed)
+        const maxPosY = CEILING_Y - footOffset - 0.92;
+        if (maxPosY - yTop < -0.15) {
           return;
         }
 
@@ -654,7 +734,7 @@ import { CHARACTERS } from '../lib/character-loader';
       return hits.length > 0;
     }
 
-    // Pointer Events for Grabbing & Throwing
+    // Pointer Events for Grabbing & Throwing (With Desktop-Style Limb Detection)
     window.addEventListener('pointerdown', (e) => {
       const onBuddy = getPointerIntersection(e);
       if (!onBuddy) return;
@@ -677,10 +757,48 @@ import { CHARACTERS } from '../lib/character-loader';
       isFalling = false;
       isDancing = false;
       isWalking = false;
+      isAttacking = false;
       currentLedge = null;
 
+      // Detect specific limb clicked
+      currentGrabPart = getGrabPartAt(e.clientX, e.clientY);
+
+      // Contextual quotes based on gripped limb
+      if (currentGrabPart === 'leftLeg' || currentGrabPart === 'rightLeg') {
+        const legQuotes = [
+          'Whoa! Put me down! Not by the leg!',
+          'Hey! Upside down! Watch the joint actuators!',
+          'Negative! Inverted chassis orientation detected!',
+          'Unhand my leg! Hydraulic line strain warning!'
+        ];
+        showBubble(legQuotes[Math.floor(Math.random() * legQuotes.length)], 3000);
+      } else if (currentGrabPart === 'leftArm' || currentGrabPart === 'rightArm') {
+        const armQuotes = [
+          'Careful with my cybernetic arm!',
+          'Hey! Do not pull my arm off!',
+          'Hanging by an arm here!',
+          'Arm actuator load limit approaching!'
+        ];
+        showBubble(armQuotes[Math.floor(Math.random() * armQuotes.length)], 3000);
+      } else if (currentGrabPart === 'head') {
+        const headQuotes = [
+          'Watch the skull unit!',
+          'Hands off the neural processor!',
+          'Hey! Pick me up by the torso, not the head!',
+          'Tactical optical sensor alignment disturbed!'
+        ];
+        showBubble(headQuotes[Math.floor(Math.random() * headQuotes.length)], 3000);
+      } else {
+        const torsoQuotes = [
+          '*grabbed!* Where are we going?',
+          'Tactical relocation in progress.',
+          'Hold on tight!',
+          'Chassis captured. Standing by.'
+        ];
+        showBubble(torsoQuotes[Math.floor(Math.random() * torsoQuotes.length)], 2500);
+      }
+
       playClip('fall', { loop: true, fade: 0.15 });
-      showBubble('*grabbed!*', 2000);
     });
 
     window.addEventListener('pointermove', (e) => {
@@ -708,7 +826,7 @@ import { CHARACTERS } from '../lib/character-loader';
       lastPointerY = e.clientY;
       lastPointerTime = now;
 
-      // Dragging held Buddy
+      // Dragging held Buddy (pinned to the specific gripped limb)
       if (isHeld && activeCharacter && canvas) {
         const rect = canvas.getBoundingClientRect();
         const normX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -718,8 +836,18 @@ import { CHARACTERS } from '../lib/character-loader';
         const distance = (0 - camera.position.z) / dir.z;
         const pos = camera.position.clone().add(dir.multiplyScalar(distance));
 
+        let holdOffsetY = 0.45;
+        if (currentGrabPart === 'leftLeg' || currentGrabPart === 'rightLeg') {
+          holdOffsetY = 0.92;
+        } else if (currentGrabPart === 'leftArm' || currentGrabPart === 'rightArm') {
+          holdOffsetY = 0.95;
+        } else if (currentGrabPart === 'head') {
+          holdOffsetY = 0.82;
+        }
+
+        const maxPosY = CEILING_Y - footOffset - 0.92;
         posX = Math.max(-3.5, Math.min(3.5, pos.x));
-        posY = Math.max(FLOOR_Y, Math.min(CEILING_Y - 0.92, pos.y - 0.45));
+        posY = Math.max(FLOOR_Y, Math.min(maxPosY, pos.y - holdOffsetY));
       }
     });
 
@@ -733,6 +861,7 @@ import { CHARACTERS } from '../lib/character-loader';
       // Poke: brief click
       if (duration < 250 && dist < 12) {
         pokeBuddy();
+        currentGrabPart = null;
         const stillOver = getPointerIntersection(e);
         if (canvas) {
           canvas.style.pointerEvents = stillOver ? 'auto' : 'none';
@@ -741,12 +870,19 @@ import { CHARACTERS } from '../lib/character-loader';
         return;
       }
 
-      // Throw: flung with velocity (gentle tumble velocity, no propeller circling)
+      // If upside down from leg grab, transfer flip into tumbleAngle so spring recovery pulls him upright!
+      if (flipAmount > 0.3) {
+        const flip = flipAmount * Math.PI * (currentGrabPart === 'leftLeg' ? -1 : 1);
+        tumbleAngle += flip;
+        flipAmount = 0;
+      }
+
+      // Throw: flung with velocity (smooth tumble velocity, spring recovers upright)
       const speed = Math.hypot(pointerVelX, pointerVelY);
       if (speed > 350) {
         isFalling = true;
         velX = Math.max(-5, Math.min(5, pointerVelX * 0.0035));
-        velY = Math.max(-4, Math.min(6, -pointerVelY * 0.0035));
+        velY = Math.max(-4, Math.min(5.5, -pointerVelY * 0.0035));
         tumbleVel = THREE.MathUtils.clamp((Math.random() - 0.5) * 4.0, -3.0, 3.0);
 
         playClip('fall', { loop: true, fade: 0.1 });
@@ -757,6 +893,8 @@ import { CHARACTERS } from '../lib/character-loader';
         velX = 0;
         velY = 0;
       }
+
+      currentGrabPart = null;
 
       const stillOver = getPointerIntersection(e);
       if (canvas) {
@@ -782,7 +920,7 @@ import { CHARACTERS } from '../lib/character-loader';
       }, 1200);
     }
 
-    // Climb onto furniture / window / button with varied selection & cooldown
+    // Climb onto furniture / window / button with varied selection & ceiling-safe trajectory
     function climbOntoPlatform(preferredName?: string) {
       const platforms = getHeroPlatforms();
       if (!platforms.length) return;
@@ -805,10 +943,15 @@ import { CHARACTERS } from '../lib/character-loader';
       isAttacking = false;
       currentLedge = null;
 
-      // Leap towards platform top with physics arc
+      const maxPosY = CEILING_Y - footOffset - 0.92;
+      const headroom = Math.max(0.1, maxPosY - posY);
       const targetCenter = (plat.xMin + plat.xMax) / 2;
       velX = (targetCenter - posX) * 1.5;
-      velY = Math.max(3.8, (plat.yTop - posY) * 1.8 + 2.8);
+
+      // Safe ballistic apex: apex never exceeds the ceiling header
+      const neededApex = Math.max(0.15, (plat.yTop - posY) + 0.12);
+      const safeApex = Math.min(neededApex, headroom * 0.9);
+      velY = Math.sqrt(2 * GRAVITY * safeApex);
       tumbleVel = (Math.random() - 0.5) * 1.2;
 
       playClip('jump', { loop: false, fade: 0.1 });
@@ -862,9 +1005,11 @@ import { CHARACTERS } from '../lib/character-loader';
       isWalking = false;
       isAttacking = false;
       currentLedge = null;
-      posY = Math.max(posY, 1.2);
+
+      const maxPosY = CEILING_Y - footOffset - 0.92;
+      const headroom = Math.max(0.15, maxPosY - posY);
       velX = (Math.random() - 0.5) * 3.5;
-      velY = 4.2;
+      velY = Math.min(4.5, Math.sqrt(2 * GRAVITY * headroom * 0.85));
       tumbleVel = (Math.random() - 0.5) * 3.0;
 
       playClip('jump', { loop: false, fade: 0.1 });
@@ -975,6 +1120,23 @@ import { CHARACTERS } from '../lib/character-loader';
         activeCharacter.update(dt);
       }
 
+      // Update hold and flip transition amounts for limb grabbing
+      const isLimbGrab = currentGrabPart === 'leftLeg' || currentGrabPart === 'rightLeg';
+      flipAmount += ((isHeld && isLimbGrab ? 1 : 0) - flipAmount) * Math.min(1, dt * 7);
+      heldAmount += ((isHeld ? 1 : 0) - heldAmount) * Math.min(1, dt * 10);
+
+      // Apply desktop-style limb grabbing procedural poses
+      if (heldAmount > 0.001 && activeCharacter) {
+        const elapsed = clock.getElapsedTime();
+        if (currentGrabPart === 'leftArm' || currentGrabPart === 'rightArm') {
+          applyHeldByArm(activeCharacter, currentGrabPart === 'leftArm' ? 'left' : 'right', elapsed, heldAmount);
+        } else if (currentGrabPart === 'leftLeg' || currentGrabPart === 'rightLeg') {
+          applyHeldByLeg(activeCharacter, currentGrabPart === 'leftLeg' ? 'left' : 'right', elapsed, heldAmount);
+        } else {
+          applyDangle(activeCharacter, elapsed, heldAmount);
+        }
+      }
+
       // Procedural attack progress (punch / kick)
       if (isAttacking && activeCharacter) {
         attackTime += dt;
@@ -988,12 +1150,34 @@ import { CHARACTERS } from '../lib/character-loader';
         }
       }
 
-      // Procedural crouch / duck when approaching ceiling header
+      const maxPosY = CEILING_Y - footOffset - 0.92;
+
+      // Hard clamp: Buddy NEVER penetrates the ceiling header!
+      if (posY > maxPosY) {
+        const excess = posY - maxPosY;
+        if (currentLedge && excess > 0.22) {
+          // Not enough clearance to stand or crouch on this ledge! Bonk and fall off!
+          currentLedge = null;
+          isFalling = true;
+          velY = -1.8;
+          velX = posX > 0 ? -1.2 : 1.2;
+          tumbleVel = (Math.random() - 0.5) * 3.5;
+          playClip('hit', { loop: false, fade: 0.1 });
+          showBubble('*Bonk!* Clearance insufficient up here!', 2500);
+        } else {
+          posY = maxPosY;
+        }
+      }
+
+      // Procedural crouch / duck when approaching or under ceiling header
       if (!isFalling && !isHeld && activeCharacter) {
-        const headroom = CEILING_Y - (posY + 0.92);
-        if (headroom < 0.2) {
-          const crouchAmount = Math.min(1, Math.max(0, (0.2 - headroom) / 0.2));
-          applyCrouch(activeCharacter, crouchAmount);
+        const headroom = maxPosY - posY;
+        if (headroom < 0.22) {
+          const drop = Math.min(0.25, Math.max(0.04, 0.22 - headroom));
+          applyCrouch(activeCharacter, drop);
+          if (!isWalking && !isDancing && !isAttacking && drop > 0.08) {
+            playClip('crouch', { loop: true, fade: 0.2 });
+          }
         }
       }
 
@@ -1097,14 +1281,19 @@ import { CHARACTERS } from '../lib/character-loader';
         tumbleAngle += tumbleVel * dt;
 
         // Ceiling collision & head bonk (Header navbar is the ceiling!)
-        const headTop = posY + 0.92;
-        if (headTop >= CEILING_Y) {
-          posY = CEILING_Y - 0.92;
+        if (posY >= maxPosY) {
+          posY = maxPosY;
           if (velY > 0) {
             velY = -Math.abs(velY) * 0.55;
             tumbleVel = (Math.random() - 0.5) * 4.0;
             playClip('hit', { loop: false, fade: 0.1 });
-            showBubble('*Bonk!* Ouch, hit the ceiling!', 2200);
+            const bonkQuotes = [
+              '*Bonk!* Ouch, hit the ceiling!',
+              'Clearance insufficient! Head collision detected.',
+              'Watch the ceiling! Negative clearance.',
+              '*Clang!* Cybernetic chassis impact!'
+            ];
+            showBubble(bonkQuotes[Math.floor(Math.random() * bonkQuotes.length)], 2200);
           }
         }
 
@@ -1211,19 +1400,25 @@ import { CHARACTERS } from '../lib/character-loader';
 
       // 5. UPDATE CHARACTER TRANSFORMS IN SCENE
       if (activeCharacter) {
+        // Leg hold: whole body flips upside down about the grab side
+        const flip = flipAmount * Math.PI * (currentGrabPart === 'leftLeg' ? -1 : 1);
+
         // Pivot about hips/center of mass (~0.46m) during tumble so rotation doesn't swing in a massive circle around feet
         const half = 0.46;
-        const offsetX = Math.abs(tumbleAngle) > 0.001 ? half * Math.sin(tumbleAngle) : 0;
-        const offsetY = Math.abs(tumbleAngle) > 0.001 ? half * (1 - Math.cos(tumbleAngle)) : 0;
+        const totalZRot = tumbleAngle + flip;
+        const offsetX = Math.abs(totalZRot) > 0.001 ? half * Math.sin(totalZRot) : 0;
+        const offsetY = Math.abs(totalZRot) > 0.001 ? half * (1 - Math.cos(totalZRot)) : 0;
+        const flipLift = flipAmount * 0.92;
 
-        activeCharacter.root.position.set(posX + offsetX, posY + footOffset + offsetY, posZ);
-        activeCharacter.root.rotation.set(0, rotY, tumbleAngle);
+        activeCharacter.root.position.set(posX + offsetX, posY + footOffset + offsetY + flipLift, posZ);
+        activeCharacter.root.rotation.set(0, rotY, totalZRot);
 
-        // Shadow follows on floor or platform
+        // Shadow follows on floor or platform (fades when upside down or airborne)
         shadowMesh.position.x = posX;
         shadowMesh.position.z = posZ;
         shadowMesh.position.y = (currentLedge ? currentLedge.yTop : FLOOR_Y) + 0.01;
-        const shadowScale = Math.max(0.3, 1.0 - (posY - (currentLedge ? currentLedge.yTop : FLOOR_Y)) * 0.3);
+        const distFromGround = posY - (currentLedge ? currentLedge.yTop : FLOOR_Y);
+        const shadowScale = Math.max(0.15, (1.0 - distFromGround * 0.3) * (1 - flipAmount * 0.5));
         shadowMesh.scale.set(shadowScale, shadowScale, shadowScale);
       }
 
