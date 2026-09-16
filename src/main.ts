@@ -1240,7 +1240,7 @@ function frame() {
     const step = Math.min(Math.abs(act.targetX - physics.x), act.speed * settings.size * dt);
     physics.nudge(dir * step, act.beyond);
     walkDistance += step;
-    const strideLength = 55 * Math.max(0.5, settings.size);
+    const strideLength = 110 * Math.max(0.5, settings.size);
     if (walkDistance >= strideLength) {
       walkDistance = 0;
       sounds.play("footstep", 0.45);
