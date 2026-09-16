@@ -1115,8 +1115,14 @@ function frame() {
 
   const paused = settings.paused;
   if (music) {
-    // His own voice through the speakers must not start (or stop) a dance.
-    music.hold = voice.busy(1500) || live.speaking;
+    // His own voice or sounds through the speakers must not start (or stop) a dance.
+    // Also hold while actively walking/running so stride footsteps never trigger dance lock.
+    const walking = currentState === "walk" || lastAct === "walk";
+    music.hold =
+      voice.busy(1500) ||
+      live.speaking ||
+      sounds.busy(1500) ||
+      (walking && sounds.footstepsEnabled && sounds.enabled);
     music.update(dt, t);
     const musicOn = settings.musicEnabled && !paused && (manifest?.reactions.music?.enabled ?? true);
     const forced = t < forcedDanceUntil && physics?.mode === "rest" && !asleep;

@@ -39,6 +39,16 @@ export class Sounds {
   volume = 0.6;
   footstepsEnabled = true;
 
+  private busyUntil = -Infinity;
+  private lastPlayedAt = -Infinity;
+
+  /** True while a sound effect is playing or within `graceMs` after it ends. */
+  busy(graceMs = 1500): boolean {
+    if (!this.enabled) return false;
+    const now = performance.now();
+    return now <= this.busyUntil + graceMs || now - this.lastPlayedAt <= graceMs;
+  }
+
   /** Dev: the last few events played, newest last, for the status line. */
   last = "-";
   private history: string[] = [];
@@ -111,6 +121,8 @@ export class Sounds {
     this.history.push(event);
     if (this.history.length > 4) this.history.shift();
     this.last = this.history.join(">");
+    this.lastPlayedAt = performance.now();
+    this.busyUntil = Math.max(this.busyUntil, this.lastPlayedAt + 150);
 
     const ctx = this.getContext();
     if (!ctx) return;
@@ -143,7 +155,13 @@ export class Sounds {
       source.buffer = buffer;
 
       // Micro-pitch jitter: ±4%
-      source.playbackRate.value = 1 + (Math.random() * 2 - 1) * 0.04;
+      const playbackRate = 1 + (Math.random() * 2 - 1) * 0.04;
+      source.playbackRate.value = playbackRate;
+
+      if (buffer.duration > 0) {
+        const durationMs = (buffer.duration / Math.max(0.1, playbackRate)) * 1000;
+        this.busyUntil = Math.max(this.busyUntil, performance.now() + durationMs);
+      }
 
       const gainNode = ctx.createGain();
       const clampedIntensity = Math.max(0.1, Math.min(1.5, intensity));

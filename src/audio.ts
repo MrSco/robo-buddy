@@ -37,7 +37,7 @@ export class Music {
    * because the settings meter and the debug line both show it.
    */
   gateLevel = 0;
-  /** While our own voice plays through the speakers, neither start nor stop dancing on it. */
+  /** While our own voice or sound effects play through the speakers, neither start nor stop dancing on it. */
   hold = false;
   /**
    * Seconds a tempo must hold steady before he starts. This, not loudness, is what decides:
@@ -89,8 +89,14 @@ export class Music {
       this.stableSince = -1;
     }
     this.lastBpmSample = r.bpm;
+
+    // While holding, Buddy's own audio must not build up or keep a tempo lock.
+    if (this.hold && !this.dancing) {
+      this.stableSince = -1;
+    }
+
     const hasBeat = !r.silent && r.bpm > 0;
-    const locked = hasBeat && this.stableSince >= 0 && now - this.stableSince > this.lockSeconds;
+    const locked = !this.hold && hasBeat && this.stableSince >= 0 && now - this.stableSince > this.lockSeconds;
 
     // Kept for the meter and the debug line only; how loud it is no longer decides anything.
     this.gateLevel += (r.level - this.gateLevel) * (1 - Math.exp(-dt * 1.5));
@@ -101,7 +107,7 @@ export class Music {
     // He stops once the beat has been gone a couple of seconds, or at once on real silence, so a
     // gap between tracks does not drop him instantly.
     if (this.hold) {
-      this.belowSince = -1;
+      if (this.dancing) this.belowSince = -1;
     } else if (this.dancing ? hasBeat : locked) {
       this.belowSince = -1;
       this.dancing = true;

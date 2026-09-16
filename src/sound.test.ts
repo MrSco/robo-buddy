@@ -92,4 +92,16 @@ describe("Sounds engine", () => {
     // Should load without throwing
     expect(() => sounds.load(mockPack, customManifest)).not.toThrow();
   });
+
+  it("reports busy state when playing and respects graceMs", () => {
+    expect(sounds.busy()).toBe(false);
+
+    sounds.play("footstep");
+    expect(sounds.busy(1000)).toBe(true);
+    expect(sounds.busy(0)).toBe(true);
+
+    // When sounds are disabled, busy() returns false
+    sounds.enabled = false;
+    expect(sounds.busy(1000)).toBe(false);
+  });
 });
