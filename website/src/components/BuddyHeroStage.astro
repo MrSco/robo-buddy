@@ -2,81 +2,84 @@
 import { CHARACTERS } from '../lib/character-loader';
 ---
 
-<div id="buddy-stage-container" class="absolute inset-0 w-full h-full select-none pointer-events-none z-20 overflow-hidden">
-  <!-- Unified Floating Command Center & Character Selector (Top Right on desktop, top full-width strip on mobile) -->
-  <div class="absolute top-2 left-2 right-2 sm:left-auto sm:right-6 sm:top-4 z-30 flex items-center justify-between sm:justify-start gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-2xl bg-black/85 border border-white/15 shadow-2xl backdrop-blur-xl pointer-events-auto overflow-x-auto no-scrollbar max-w-[calc(100vw-16px)] sm:max-w-none">
-    <!-- Action Command Buttons -->
-    <div class="flex items-center gap-0.5 sm:gap-1 shrink-0">
-      <button id="btn-action-talk" type="button" class="px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-white/5 hover:bg-white/15 text-xs text-white font-medium transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Talk with Buddy">
-        <span>💬</span>
-        <span class="hidden md:inline">Talk</span>
-      </button>
-      <button id="btn-action-dance" type="button" class="px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-buddy-cyan/20 hover:bg-buddy-cyan/30 text-buddy-cyanLight text-xs font-semibold border border-buddy-cyan/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Dance Routine">
-        <span>🕺</span>
-        <span class="hidden md:inline">Dance</span>
-      </button>
-      <button id="btn-action-run" type="button" class="px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-buddy-purple/20 hover:bg-buddy-purple/30 text-buddy-purpleLight text-xs font-semibold border border-buddy-purple/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Roam Taskbar Floor">
-        <span>🏃</span>
-        <span class="hidden md:inline">Roam</span>
-      </button>
-      <button id="btn-action-climb" type="button" class="px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Climb Desktop Window">
-        <span>🪜</span>
-        <span class="hidden md:inline">Climb</span>
-      </button>
-      <button id="btn-action-kick" type="button" class="px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Kick / Punch Window">
-        <span>🥋</span>
-        <span class="hidden md:inline">Kick</span>
-      </button>
-      <button id="btn-action-throw" type="button" class="px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 text-xs font-semibold border border-pink-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Throw Buddy">
-        <span>🚀</span>
-        <span class="hidden md:inline">Throw</span>
-      </button>
-      <button id="btn-action-poke" type="button" class="px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-white/5 hover:bg-white/15 text-xs text-buddy-muted hover:text-white transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Poke Buddy">
-        <span>👋</span>
-        <span class="hidden md:inline">Poke</span>
-      </button>
-    </div>
-
-    <!-- Vertical Separator -->
-    <div class="h-4 w-px bg-white/20 mx-0.5 shrink-0"></div>
-
-    <!-- Character Selector Pills -->
-    <div class="flex items-center gap-0.5 sm:gap-1 shrink-0">
-      {CHARACTERS.map((char, idx) => (
-        <button
-          type="button"
-          class={`char-select-btn px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl text-xs font-medium flex items-center gap-1 transition-all ${
-            idx === 0 
-              ? 'bg-gradient-to-r from-buddy-cyan to-buddy-purple text-white shadow-md active-char font-semibold' 
-              : 'text-buddy-muted hover:text-white hover:bg-white/5'
-          }`}
-          data-char-id={char.id}
-          title={`Switch to ${char.name}`}
-        >
-          <span class="text-xs">{char.emoji}</span>
-          <span class="hidden sm:inline">{char.name}</span>
-        </button>
-      ))}
-    </div>
+<!-- Floating Command Center & Character Selector (Anchored to Hero section top-right) -->
+<div id="hero-cmd-center" class="absolute top-2 left-2 right-2 sm:left-auto sm:right-6 sm:top-4 z-20 flex items-center justify-between sm:justify-start gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-2xl bg-black/85 border border-white/15 shadow-2xl backdrop-blur-xl pointer-events-auto overflow-x-auto no-scrollbar max-w-[calc(100vw-16px)] sm:max-w-none">
+  <!-- Action Command Buttons -->
+  <div class="flex items-center gap-0.5 sm:gap-1 shrink-0">
+    <button id="btn-action-talk" type="button" class="px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-white/5 hover:bg-white/15 text-xs text-white font-medium transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Talk with Buddy">
+      <span>💬</span>
+      <span class="hidden md:inline">Talk</span>
+    </button>
+    <button id="btn-action-dance" type="button" class="px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-buddy-cyan/20 hover:bg-buddy-cyan/30 text-buddy-cyanLight text-xs font-semibold border border-buddy-cyan/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Dance Routine">
+      <span>🕺</span>
+      <span class="hidden md:inline">Dance</span>
+    </button>
+    <button id="btn-action-run" type="button" class="px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-buddy-purple/20 hover:bg-buddy-purple/30 text-buddy-purpleLight text-xs font-semibold border border-buddy-purple/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Roam Taskbar Floor">
+      <span>🏃</span>
+      <span class="hidden md:inline">Roam</span>
+    </button>
+    <button id="btn-action-climb" type="button" class="px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Climb Desktop Window">
+      <span>🪜</span>
+      <span class="hidden md:inline">Climb</span>
+    </button>
+    <button id="btn-action-kick" type="button" class="px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Kick / Punch Window">
+      <span>🥋</span>
+      <span class="hidden md:inline">Kick</span>
+    </button>
+    <button id="btn-action-throw" type="button" class="px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 text-xs font-semibold border border-pink-500/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Throw Buddy">
+      <span>🚀</span>
+      <span class="hidden md:inline">Throw</span>
+    </button>
+    <button id="btn-action-poke" type="button" class="px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl bg-white/5 hover:bg-white/15 text-xs text-buddy-muted hover:text-white transition-all hover:scale-105 active:scale-95 flex items-center gap-1" title="Poke Buddy">
+      <span>👋</span>
+      <span class="hidden md:inline">Poke</span>
+    </button>
   </div>
 
-  <!-- Speech Bubble Overlay (dynamically pinned to Buddy's 3D head bone) -->
+  <!-- Vertical Separator -->
+  <div class="h-4 w-px bg-white/20 mx-0.5 shrink-0"></div>
+
+  <!-- Character Selector Pills -->
+  <div class="flex items-center gap-0.5 sm:gap-1 shrink-0">
+    {CHARACTERS.map((char, idx) => (
+      <button
+        type="button"
+        class={`char-select-btn px-2 py-1 sm:px-2.5 sm:py-1 rounded-xl text-xs font-medium flex items-center gap-1 transition-all ${
+          idx === 0 
+            ? 'bg-gradient-to-r from-buddy-cyan to-buddy-purple text-white shadow-md active-char font-semibold' 
+            : 'text-buddy-muted hover:text-white hover:bg-white/5'
+        }`}
+        data-char-id={char.id}
+        title={`Switch to ${char.name}`}
+      >
+        <span class="text-xs">{char.emoji}</span>
+        <span class="hidden sm:inline">{char.name}</span>
+      </button>
+    ))}
+  </div>
+</div>
+
+<!-- Viewport-Wide Fixed 3D Stage Container (Follows user throughout whole page) -->
+<div id="buddy-stage-container" class="fixed inset-0 w-screen h-screen select-none pointer-events-none z-25 overflow-hidden">
+  <!-- Speech Bubble Overlay (dynamically pinned to Buddy's 3D skull crown) -->
   <div
     id="buddy-speech-bubble"
-    class="fixed z-40 pointer-events-none opacity-0 transition-opacity duration-300 transform -translate-x-1/2 -translate-y-full max-w-[280px] sm:max-w-xs"
-    style="left: 50%; top: 50%;"
+    class="fixed z-40 pointer-events-none opacity-0 transition-opacity duration-300 max-w-[280px] sm:max-w-xs"
+    style="left: 50%; top: 50%; transform: translate(-50%, -100%);"
   >
     <div class="bg-buddy-bg/95 border border-buddy-cyan/60 rounded-2xl p-3 sm:p-4 shadow-2xl shadow-buddy-cyan/25 backdrop-blur-xl relative">
       <div class="flex items-center gap-2 mb-1">
-        <img id="bubble-avatar" src="/images/logo-icon.png" alt="Avatar" class="w-4 h-4 rounded-full object-contain inline-block" />
+        <img id="bubble-avatar" src="/images/t800-avatar.png" alt="Avatar" class="w-4 h-4 rounded-full object-cover inline-block" />
         <span id="bubble-name" class="text-xs font-bold text-white">T-800</span>
         <span id="bubble-tag" class="text-[9px] font-mono px-1 rounded bg-buddy-cyan/20 text-buddy-cyan font-semibold">Active</span>
       </div>
       <p id="bubble-text" class="text-xs sm:text-sm text-buddy-text leading-snug font-medium">
         "I'll be back."
       </p>
-      <!-- Speech bubble tail pointing down -->
-      <div class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-buddy-bg/95 border-r border-b border-buddy-cyan/60 transform rotate-45"></div>
+      <!-- Tails: bottom, left side, right side -->
+      <div id="bubble-tail-down" class="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-buddy-bg/95 border-r border-b border-buddy-cyan/60 transform rotate-45"></div>
+      <div id="bubble-tail-left" class="hidden absolute top-1/2 -left-2 -translate-y-1/2 w-4 h-4 bg-buddy-bg/95 border-l border-b border-buddy-cyan/60 transform rotate-45"></div>
+      <div id="bubble-tail-right" class="hidden absolute top-1/2 -right-2 -translate-y-1/2 w-4 h-4 bg-buddy-bg/95 border-r border-t border-buddy-cyan/60 transform rotate-45"></div>
     </div>
   </div>
 
@@ -87,7 +90,7 @@ import { CHARACTERS } from '../lib/character-loader';
   >
     <div class="flex items-center justify-between pb-2 mb-2.5 border-b border-buddy-border text-xs">
       <span class="font-semibold text-white flex items-center gap-1.5">
-        <img src="/images/logo-icon.png" alt="Buddy" class="w-4 h-4 rounded-full object-contain" />
+        <img id="talk-box-avatar" src="/images/t800-avatar.png" alt="Buddy" class="w-4 h-4 rounded-full object-cover" />
         <span>Talk with <span id="talk-box-char-name">T-800</span></span>
       </span>
       <button id="btn-close-talk" type="button" class="text-buddy-muted hover:text-white p-1 text-base">&times;</button>
@@ -135,7 +138,7 @@ import { CHARACTERS } from '../lib/character-loader';
     <p id="stage-loading-text" class="text-xs font-mono text-buddy-muted animate-pulse">Loading T-800 & retargeted animations...</p>
   </div>
 
-  <!-- 3D Three.js WebGL Stage Canvas (Spans full hero width & height) -->
+  <!-- 3D Three.js WebGL Stage Canvas (Full viewport) -->
   <canvas
     id="hero-stage-canvas"
     class="w-full h-full block cursor-grab active:cursor-grabbing touch-none select-none pointer-events-none"
@@ -145,7 +148,6 @@ import { CHARACTERS } from '../lib/character-loader';
   <div id="pixel-pal-container" class="absolute inset-0 z-15 hidden flex items-center justify-center pointer-events-none">
     <img id="pixel-pal-img" src="/characters/pixel-pal/idle.webp" alt="Pixel Pal" class="w-48 h-48 object-contain pixelated pointer-events-auto cursor-grab active:cursor-grabbing" />
   </div>
-
 </div>
 
 <script>
@@ -182,9 +184,9 @@ import { CHARACTERS } from '../lib/character-loader';
 
     if (!canvas || !container) return;
 
-    // Dimensions: full hero section
-    let width = container.clientWidth || window.innerWidth || 1200;
-    let height = container.clientHeight || 700;
+    // Dimensions: full viewport
+    let width = window.innerWidth;
+    let height = window.innerHeight;
 
     // Three.js WebGL Renderer
     const renderer = new THREE.WebGLRenderer({
@@ -207,7 +209,7 @@ import { CHARACTERS } from '../lib/character-loader';
     scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
 
-    // Camera: positioned to frame the entire hero section with desktop windows and taskbar
+    // Camera: positioned to frame the desktop companion space
     const camera = new THREE.PerspectiveCamera(34, width / height, 0.1, 50);
     if (width < 768) {
       camera.position.set(0, 0.65, 3.8);
@@ -215,6 +217,17 @@ import { CHARACTERS } from '../lib/character-loader';
       camera.position.set(0, 0.75, 3.4);
     }
     camera.lookAt(0, 0.55, 0);
+
+    // Helper: Map viewport screen pixel coordinates to 3D world coordinates at z=0 plane
+    function screenToWorldZ0(pixelX: number, pixelY: number): { x: number; y: number } {
+      const ndcX = (pixelX / window.innerWidth) * 2 - 1;
+      const ndcY = -(pixelY / window.innerHeight) * 2 + 1;
+      const v = new THREE.Vector3(ndcX, ndcY, 0.5).unproject(camera);
+      const dir = v.sub(camera.position).normalize();
+      const dist = -camera.position.z / dir.z;
+      const w = camera.position.clone().add(dir.multiplyScalar(dist));
+      return { x: w.x, y: w.y };
+    }
 
     // Studio Lighting
     const hemiLight = new THREE.HemisphereLight(0xffffff, 0x556677, 1.8);
@@ -300,12 +313,8 @@ import { CHARACTERS } from '../lib/character-loader';
     }
 
     function getVisibleHeroWall(): number {
-      if (!canvas || !camera) return 1.5;
-      const v = new THREE.Vector3(1, 0, 0.5).unproject(camera);
-      const dir = v.sub(camera.position).normalize();
-      const dist = -camera.position.z / dir.z;
-      const w = camera.position.clone().add(dir.multiplyScalar(dist));
-      return Math.max(0.35, Math.abs(w.x) - (currentTargetHeight * 0.35));
+      const rightEdge = screenToWorldZ0(window.innerWidth, window.innerHeight * 0.5);
+      return Math.max(0.35, Math.abs(rightEdge.x) - (currentTargetHeight * 0.35));
     }
 
     function getInitialPosX(): number {
@@ -319,34 +328,27 @@ import { CHARACTERS } from '../lib/character-loader';
     let FLOOR_Y = 0;
     function updateFloorY() {
       const tb = document.getElementById('hero-taskbar');
-      if (!tb || !canvas) return;
-      const cRect = canvas.getBoundingClientRect();
-      const tbRect = tb.getBoundingClientRect();
-      if (cRect.height === 0) return;
-      const ndcTop = -((tbRect.top - cRect.top) / cRect.height) * 2 + 1;
-      const v = new THREE.Vector3(0, ndcTop, 0.5).unproject(camera);
-      const dir = v.sub(camera.position).normalize();
-      const dist = -camera.position.z / dir.z;
-      const w = camera.position.clone().add(dir.multiplyScalar(dist));
-      FLOOR_Y = w.y;
+      const bottomPixelY = window.innerHeight - 12;
+      if (tb) {
+        const tbRect = tb.getBoundingClientRect();
+        // If hero-taskbar is visible in the lower part of the viewport, Buddy walks on it
+        if (tbRect.top >= window.innerHeight * 0.55 && tbRect.top <= bottomPixelY) {
+          FLOOR_Y = screenToWorldZ0(0, tbRect.top).y;
+          return;
+        }
+      }
+      // Default floor: right at the bottom edge of the viewport
+      FLOOR_Y = screenToWorldZ0(0, bottomPixelY).y;
     }
     updateFloorY();
 
     let CEILING_Y = 1.85;
     function updateCeilingY() {
       const header = document.querySelector('header');
-      if (!header || !canvas) return;
-      const cRect = canvas.getBoundingClientRect();
-      const hRect = header.getBoundingClientRect();
-      if (cRect.height === 0) return;
+      const headerBottom = header ? header.getBoundingClientRect().bottom : 0;
       // Strict physical ceiling: 14px below header bottom
-      const ceilingPixelY = Math.max(cRect.top + 8, hRect.bottom + 14);
-      const ndcBottom = -((ceilingPixelY - cRect.top) / cRect.height) * 2 + 1;
-      const v = new THREE.Vector3(0, ndcBottom, 0.5).unproject(camera);
-      const dir = v.sub(camera.position).normalize();
-      const dist = -camera.position.z / dir.z;
-      const w = camera.position.clone().add(dir.multiplyScalar(dist));
-      CEILING_Y = w.y;
+      const ceilingPixelY = Math.max(14, headerBottom + 14);
+      CEILING_Y = screenToWorldZ0(0, ceilingPixelY).y;
     }
     updateCeilingY();
 
@@ -512,11 +514,15 @@ import { CHARACTERS } from '../lib/character-loader';
       }
     }
 
+    const tailDown = document.getElementById('bubble-tail-down');
+    const tailLeft = document.getElementById('bubble-tail-left');
+    const tailRight = document.getElementById('bubble-tail-right');
+
     // Show Speech Bubble Function
     function showBubble(text: string, durationMs = 4200) {
       if (!bubble || !bubbleText || !bubbleName || !bubbleAvatar || !bubbleTag) return;
       if (bubbleAvatar instanceof HTMLImageElement) {
-        bubbleAvatar.src = '/images/logo-icon.png';
+        bubbleAvatar.src = activeDef.avatar ?? '/images/t800-avatar.png';
       } else {
         bubbleAvatar.textContent = activeDef.emoji;
       }
@@ -531,14 +537,14 @@ import { CHARACTERS } from '../lib/character-loader';
       }, durationMs);
     }
 
-    // Position speech bubble dynamically pinned snug above Buddy's 3D skull crown
+    // Position speech bubble dynamically: snug above head when headroom is ample,
+    // or placed cleanly to the side with angled tail when headroom is tight so it
+    // NEVER covers Buddy's face/chest and NEVER gets cut off by header!
     function updateSpeechBubblePos() {
       if (!bubble || bubble.style.opacity === '0' || !canvas) return;
-      const cRect = canvas.getBoundingClientRect();
       const crownPos = new THREE.Vector3();
       if (headBone) {
         headBone.getWorldPosition(crownPos);
-        // The skull crown sits ~14% of currentTargetHeight above the head bone
         crownPos.y += currentTargetHeight * 0.14;
       } else if (activeCharacter) {
         crownPos.copy(activeCharacter.root.position);
@@ -548,19 +554,58 @@ import { CHARACTERS } from '../lib/character-loader';
       }
 
       crownPos.project(camera);
-      const screenX = ((crownPos.x + 1) / 2) * cRect.width + cRect.left;
-      const screenY = ((-crownPos.y + 1) / 2) * cRect.height + cRect.top;
+      const screenX = ((crownPos.x + 1) / 2) * window.innerWidth;
+      const screenY = ((-crownPos.y + 1) / 2) * window.innerHeight;
 
-      // With CSS -translate-y-full, (screenY - 14px) positions the bottom of the card
-      // 14px above the crown of the head. The 14px tail meets the top of the skull
-      // perfectly with zero head covering and no awkward air gap!
-      const bubbleW = bubble.offsetWidth || 220;
+      const bubbleW = bubble.offsetWidth || 240;
       const bubbleH = bubble.offsetHeight || 80;
-      const clampedX = Math.max(bubbleW / 2 + 8, Math.min(window.innerWidth - bubbleW / 2 - 8, screenX));
-      const clampedY = Math.max(cRect.top + bubbleH + 12, screenY - 14);
 
-      bubble.style.left = `${clampedX}px`;
-      bubble.style.top = `${clampedY}px`;
+      const header = document.querySelector('header');
+      const headerBottom = (header ? header.getBoundingClientRect().bottom : 0) + 8;
+      const availableHeadroom = screenY - headerBottom;
+
+      // If headroom above crown is insufficient for bubble height + margins,
+      // shift bubble to the side so Buddy's face and standing body stay completely clear!
+      if (availableHeadroom < bubbleH + 26) {
+        const spaceOnRight = window.innerWidth - screenX;
+        const spaceOnLeft = screenX;
+
+        if (spaceOnRight >= bubbleW + 50 || spaceOnRight >= spaceOnLeft) {
+          // Place to the RIGHT of Buddy
+          tailDown?.classList.add('hidden');
+          tailRight?.classList.add('hidden');
+          tailLeft?.classList.remove('hidden');
+
+          const left = Math.min(window.innerWidth - bubbleW - 12, screenX + 42);
+          const top = Math.max(headerBottom + 12, Math.min(window.innerHeight - bubbleH - 16, screenY - bubbleH * 0.4));
+          bubble.style.transform = 'none';
+          bubble.style.left = `${left}px`;
+          bubble.style.top = `${top}px`;
+        } else {
+          // Place to the LEFT of Buddy
+          tailDown?.classList.add('hidden');
+          tailLeft?.classList.add('hidden');
+          tailRight?.classList.remove('hidden');
+
+          const left = Math.max(12, screenX - bubbleW - 42);
+          const top = Math.max(headerBottom + 12, Math.min(window.innerHeight - bubbleH - 16, screenY - bubbleH * 0.4));
+          bubble.style.transform = 'none';
+          bubble.style.left = `${left}px`;
+          bubble.style.top = `${top}px`;
+        }
+      } else {
+        // Ample headroom: place snugly above Buddy's crown
+        tailLeft?.classList.add('hidden');
+        tailRight?.classList.add('hidden');
+        tailDown?.classList.remove('hidden');
+
+        const clampedX = Math.max(bubbleW / 2 + 12, Math.min(window.innerWidth - bubbleW / 2 - 12, screenX));
+        const clampedY = Math.max(headerBottom + bubbleH + 10, screenY - 14);
+
+        bubble.style.transform = 'translate(-50%, -100%)';
+        bubble.style.left = `${clampedX}px`;
+        bubble.style.top = `${clampedY}px`;
+      }
     }
 
     // Helper: Project a bone to screen pixel coordinates
@@ -569,10 +614,9 @@ import { CHARACTERS } from '../lib/character-loader';
       const tmp = new THREE.Vector3();
       bone.getWorldPosition(tmp);
       tmp.project(camera);
-      const cRect = canvas.getBoundingClientRect();
       return {
-        x: ((tmp.x + 1) / 2) * cRect.width + cRect.left,
-        y: ((-tmp.y + 1) / 2) * cRect.height + cRect.top,
+        x: ((tmp.x + 1) / 2) * window.innerWidth,
+        y: ((-tmp.y + 1) / 2) * window.innerHeight,
       };
     }
 
@@ -617,7 +661,7 @@ import { CHARACTERS } from '../lib/character-loader';
       return best;
     }
 
-    // Measure World Platforms (Furniture from DOM elements)
+    // Measure World Platforms across the whole page (DOM elements as interactive ledges)
     interface Platform {
       name: string;
       id: string;
@@ -630,8 +674,8 @@ import { CHARACTERS } from '../lib/character-loader';
     function getHeroPlatforms(): Platform[] {
       const platforms: Platform[] = [];
       if (!canvas) return platforms;
-      const cRect = canvas.getBoundingClientRect();
-      if (cRect.width === 0 || cRect.height === 0) return platforms;
+      const header = document.querySelector('header');
+      const headerBottom = (header ? header.getBoundingClientRect().bottom : 0) + 10;
 
       const measure = (id: string, name: string, speech: string) => {
         const el = document.getElementById(id);
@@ -639,42 +683,50 @@ import { CHARACTERS } from '../lib/character-loader';
         const r = el.getBoundingClientRect();
         if (r.width === 0 || r.height === 0) return;
 
-        const ndcLeft = ((r.left - cRect.left) / cRect.width) * 2 - 1;
-        const ndcRight = ((r.right - cRect.left) / cRect.width) * 2 - 1;
-        const ndcTop = -((r.top - cRect.top) / cRect.height) * 2 + 1;
+        // Element must be inside the visible viewport
+        if (r.bottom < headerBottom || r.top > window.innerHeight - 16) {
+          return;
+        }
 
-        const vLeft = new THREE.Vector3(ndcLeft, ndcTop, 0.5).unproject(camera);
-        const dirLeft = vLeft.sub(camera.position).normalize();
-        const distLeft = -camera.position.z / dirLeft.z;
-        const wLeft = camera.position.clone().add(dirLeft.multiplyScalar(distLeft));
-
-        const vRight = new THREE.Vector3(ndcRight, ndcTop, 0.5).unproject(camera);
-        const dirRight = vRight.sub(camera.position).normalize();
-        const distRight = -camera.position.z / dirRight.z;
-        const wRight = camera.position.clone().add(dirRight.multiplyScalar(distRight));
-
-        const yTop = Math.max(0.1, wLeft.y);
+        const leftWorld = screenToWorldZ0(r.left, r.top);
+        const rightWorld = screenToWorldZ0(r.right, r.top);
+        const yTop = leftWorld.y;
 
         // Require that Buddy can fit under ceiling header (ducking allowed)
         const maxPosY = CEILING_Y - footOffset - currentTargetHeight;
         if (maxPosY - yTop < -0.15) {
           return;
         }
+        if (yTop <= FLOOR_Y + 0.05) {
+          return;
+        }
 
         platforms.push({
           name,
           id,
-          xMin: Math.min(wLeft.x, wRight.x) - 0.1,
-          xMax: Math.max(wLeft.x, wRight.x) + 0.1,
+          xMin: Math.min(leftWorld.x, rightWorld.x) - 0.1,
+          xMax: Math.max(leftWorld.x, rightWorld.x) + 0.1,
           yTop,
           speech,
         });
       };
 
+      // Hero platforms
       measure('mock-window-term', 'PowerShell Terminal', 'Hacking the desktop from the terminal window!');
       measure('mock-window-widget', 'Companion Widget', 'Balancing on the live audio reactor widget!');
       measure('hero-download-btn', 'Download Button', 'Standing on the download button! Click to install me.');
       measure('hero-guide-btn', 'User Guide Button', 'This button opens the full docs & guide!');
+
+      // Page-wide platforms
+      const activeReel = document.querySelector('.feature-tab-panel:not(.hidden) .mock-window-reel, .mock-window-reel');
+      if (activeReel && activeReel.id) {
+        measure(activeReel.id, 'Feature Demo Window', 'Checking out the feature demo window!');
+      } else {
+        measure('mock-window-reel', 'Feature Demo Window', 'Checking out the feature demo window!');
+      }
+      measure('mock-window-clippy', 'Clippy AI Window', 'Assisting with context-aware AI tips!');
+      measure('bento-retarget-card', 'Architecture Card', 'Examining the universal rig retargeting system!');
+      measure('cta-download-card', 'Download Card', 'Ready to install Robo Buddy on your desktop!');
 
       return platforms;
     }
@@ -683,6 +735,10 @@ import { CHARACTERS } from '../lib/character-loader';
     async function switchCharacter(def: CharacterDef) {
       activeDef = def;
       if (talkBoxCharName) talkBoxCharName.textContent = def.name;
+      const talkBoxAvatar = document.getElementById('talk-box-avatar') as HTMLImageElement | null;
+      if (talkBoxAvatar) {
+        talkBoxAvatar.src = def.avatar ?? '/images/t800-avatar.png';
+      }
       applyLighting(def.id);
 
       if (loadingEl) {
@@ -790,9 +846,8 @@ import { CHARACTERS } from '../lib/character-loader';
 
     function getPointerIntersection(e: PointerEvent): boolean {
       if (!activeCharacter || !canvas) return false;
-      const rect = canvas.getBoundingClientRect();
-      mouseNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouseNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
       raycaster.setFromCamera(mouseNDC, camera);
       const hits = raycaster.intersectObject(activeCharacter.root, true);
       return hits.length > 0;
@@ -898,13 +953,7 @@ import { CHARACTERS } from '../lib/character-loader';
 
       // Dragging held Buddy (pinned to the specific gripped limb)
       if (isHeld && activeCharacter && canvas) {
-        const rect = canvas.getBoundingClientRect();
-        const normX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-        const normY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-        const vector = new THREE.Vector3(normX, normY, 0.5).unproject(camera);
-        const dir = vector.sub(camera.position).normalize();
-        const distance = (0 - camera.position.z) / dir.z;
-        const pos = camera.position.clone().add(dir.multiplyScalar(distance));
+        const pos = screenToWorldZ0(e.clientX, e.clientY);
 
         let holdOffsetY = currentTargetHeight * 0.5;
         if (currentGrabPart === 'leftLeg' || currentGrabPart === 'rightLeg') {
@@ -1173,9 +1222,9 @@ import { CHARACTERS } from '../lib/character-loader';
 
     // Resize Handler
     function handleResize() {
-      if (!container || !canvas) return;
-      width = container.clientWidth || window.innerWidth || 1200;
-      height = container.clientHeight || 700;
+      if (!canvas) return;
+      width = window.innerWidth;
+      height = window.innerHeight;
       camera.aspect = width / height;
       if (width < 768) {
         camera.position.set(0, 0.65, 3.8);
@@ -1194,6 +1243,13 @@ import { CHARACTERS } from '../lib/character-loader';
       }
     }
     window.addEventListener('resize', handleResize);
+
+    // Scroll Handler: keep floor and ceiling synchronized with page scroll
+    function handleScroll() {
+      updateFloorY();
+      updateCeilingY();
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true });
 
     // Main Animation / Physics Loop
     const clock = new THREE.Clock();
@@ -1473,6 +1529,41 @@ import { CHARACTERS } from '../lib/character-loader';
         }
       }
 
+      // 3b. LEDGE / FLOOR SYNCHRONIZATION (When page is scrolled while Buddy is on a platform or floor)
+      if (currentLedge) {
+        const el = document.getElementById(currentLedge.id);
+        const header = document.querySelector('header');
+        const headerBottom = (header ? header.getBoundingClientRect().bottom : 0) + 10;
+        if (el) {
+          const r = el.getBoundingClientRect();
+          if (r.bottom < headerBottom + 15 || r.top > window.innerHeight) {
+            // Platform scrolled out of view! Buddy drops down!
+            currentLedge = null;
+            isFalling = true;
+            velY = -0.5;
+          } else {
+            const leftWorld = screenToWorldZ0(r.left, r.top);
+            const rightWorld = screenToWorldZ0(r.right, r.top);
+            currentLedge.yTop = leftWorld.y;
+            currentLedge.xMin = Math.min(leftWorld.x, rightWorld.x) - 0.1;
+            currentLedge.xMax = Math.max(leftWorld.x, rightWorld.x) + 0.1;
+            posY = currentLedge.yTop;
+          }
+        } else {
+          currentLedge = null;
+        }
+      } else if (!isFalling && !isHeld) {
+        // Floor tracking: if floor moved beneath Buddy (scrolled past hero), drop down
+        if (posY < FLOOR_Y) {
+          posY = FLOOR_Y;
+        } else if (posY > FLOOR_Y + 0.05) {
+          isFalling = true;
+          velY = -0.5;
+        } else {
+          posY = FLOOR_Y;
+        }
+      }
+
       // Upright spring recovery (smoothly pull Buddy upright whenever not tumbling in free fall)
       if (!isFalling && !isHeld && (Math.abs(tumbleAngle) > 0.001 || Math.abs(tumbleVel) > 0.001)) {
         tumbleVel += (-35 * tumbleAngle - 8 * tumbleVel) * dt;
@@ -1488,7 +1579,6 @@ import { CHARACTERS } from '../lib/character-loader';
         let targetYaw = 0;
         let targetPitch = 0;
         if (cursorValid) {
-          const cRect = canvas.getBoundingClientRect();
           const headPos = new THREE.Vector3();
           const hBone = activeCharacter.bone('head');
           if (hBone) {
@@ -1497,12 +1587,12 @@ import { CHARACTERS } from '../lib/character-loader';
             headPos.set(posX, posY + 0.85, posZ);
           }
           headPos.project(camera);
-          const screenHeadX = ((headPos.x + 1) / 2) * cRect.width + cRect.left;
-          const screenHeadY = ((-headPos.y + 1) / 2) * cRect.height + cRect.top;
+          const screenHeadX = ((headPos.x + 1) / 2) * window.innerWidth;
+          const screenHeadY = ((-headPos.y + 1) / 2) * window.innerHeight;
           const dx = cursorScreenX - screenHeadX;
           const dy = cursorScreenY - screenHeadY;
-          targetYaw = THREE.MathUtils.clamp(dx / (cRect.width * 0.35), -1, 1) * 0.75;
-          targetPitch = THREE.MathUtils.clamp(-dy / (cRect.height * 0.35), -1, 1) * 0.45;
+          targetYaw = THREE.MathUtils.clamp(dx / (window.innerWidth * 0.35), -1, 1) * 0.75;
+          targetPitch = THREE.MathUtils.clamp(-dy / (window.innerHeight * 0.35), -1, 1) * 0.45;
         }
 
         const k = 1 - Math.exp(-dt * 9);

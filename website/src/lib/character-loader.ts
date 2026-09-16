@@ -8,6 +8,7 @@ export interface CharacterDef {
   emoji: string;
   manifestPath: string;
   base: string;
+  avatar?: string;
   defaultQuotes: string[];
   pokedQuotes: string[];
   thrownQuotes: string[];
@@ -20,6 +21,7 @@ export const CHARACTERS: CharacterDef[] = [
     name: "T-800",
     tag: "Terminator",
     emoji: "🤖",
+    avatar: "/images/t800-avatar.png",
     manifestPath: "/characters/t-800/manifest.json",
     base: "/characters/t-800/",
     defaultQuotes: [
