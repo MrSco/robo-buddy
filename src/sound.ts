@@ -24,6 +24,7 @@ export const DEFAULT_SOUNDS: Record<SoundEvent, string[]> = {
  */
 export class Sounds {
   private ctx: AudioContext | null = null;
+  private suspendTimer: ReturnType<typeof setTimeout> | null = null;
   private bufferCache = new Map<string, Promise<AudioBuffer | null>>();
   private pools = new Map<SoundEvent, (AudioBuffer | null)[]>();
   private lastSampleIndex = new Map<SoundEvent, number>();
@@ -34,6 +35,10 @@ export class Sounds {
   }
   set enabled(value: boolean) {
     this.active = value;
+    if (!value && this.ctx && this.ctx.state === "running") {
+      if (this.suspendTimer) clearTimeout(this.suspendTimer);
+      void this.ctx.suspend().catch(() => {});
+    }
   }
 
   volume = 0.6;
@@ -53,24 +58,49 @@ export class Sounds {
   last = "-";
   private history: string[] = [];
 
-  private getContext(): AudioContext | null {
+  private getOfflineContext(): OfflineAudioContext | null {
+    if (typeof window === "undefined") return null;
+    const OfflineCtx =
+      window.OfflineAudioContext ||
+      (window as unknown as { webkitOfflineAudioContext: typeof OfflineAudioContext }).webkitOfflineAudioContext;
+    if (!OfflineCtx) return null;
+    try {
+      return new OfflineCtx(1, 1, 44100);
+    } catch {
+      return null;
+    }
+  }
+
+  private getPlaybackContext(): AudioContext | null {
     if (typeof window === "undefined") return null;
     const AudioCtx =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (!AudioCtx) return null;
     if (!this.ctx) {
-      this.ctx = new AudioCtx();
-    }
-    if (this.ctx.state === "suspended") {
-      void this.ctx.resume().catch(() => {});
+      try {
+        this.ctx = new AudioCtx();
+      } catch {
+        return null;
+      }
     }
     return this.ctx;
   }
 
+  private scheduleSuspend(afterMs = 1000) {
+    if (this.suspendTimer) clearTimeout(this.suspendTimer);
+    this.suspendTimer = setTimeout(() => {
+      if (this.ctx && this.ctx.state === "running") {
+        if (performance.now() >= this.busyUntil) {
+          void this.ctx.suspend().catch(() => {});
+        } else {
+          this.scheduleSuspend(Math.max(100, this.busyUntil - performance.now() + 500));
+        }
+      }
+    }, afterMs);
+  }
+
   private async loadBuffer(url: string): Promise<AudioBuffer | null> {
-    const ctx = this.getContext();
-    if (!ctx) return null;
     const cached = this.bufferCache.get(url);
     if (cached) return cached;
 
@@ -79,7 +109,12 @@ export class Sounds {
         const res = await fetch(url);
         if (!res.ok) return null;
         const arrayBuf = await res.arrayBuffer();
-        return await ctx.decodeAudioData(arrayBuf);
+        const offline = this.getOfflineContext();
+        if (offline) {
+          return await offline.decodeAudioData(arrayBuf);
+        }
+        const ctx = this.getPlaybackContext();
+        return ctx ? await ctx.decodeAudioData(arrayBuf) : null;
       } catch {
         return null;
       }
@@ -124,17 +159,27 @@ export class Sounds {
     this.lastPlayedAt = performance.now();
     this.busyUntil = Math.max(this.busyUntil, this.lastPlayedAt + 150);
 
-    const ctx = this.getContext();
+    const ctx = this.getPlaybackContext();
     if (!ctx) return;
 
+    if (ctx.state === "suspended") {
+      void ctx.resume().catch(() => {});
+    }
+
     const pool = this.pools.get(event);
-    if (!pool || pool.length === 0) return;
+    if (!pool || pool.length === 0) {
+      this.scheduleSuspend(500);
+      return;
+    }
 
     // Pick only loaded buffers
     const readyIndices = pool
       .map((buf, i) => (buf !== null ? i : -1))
       .filter((i) => i >= 0);
-    if (readyIndices.length === 0) return;
+    if (readyIndices.length === 0) {
+      this.scheduleSuspend(500);
+      return;
+    }
 
     // Pick variation avoiding immediate repeat if multiple are available
     let chosenIndex: number;
@@ -148,7 +193,10 @@ export class Sounds {
     this.lastSampleIndex.set(event, chosenIndex);
 
     const buffer = pool[chosenIndex];
-    if (!buffer) return;
+    if (!buffer) {
+      this.scheduleSuspend(500);
+      return;
+    }
 
     try {
       const source = ctx.createBufferSource();
@@ -158,10 +206,9 @@ export class Sounds {
       const playbackRate = 1 + (Math.random() * 2 - 1) * 0.04;
       source.playbackRate.value = playbackRate;
 
-      if (buffer.duration > 0) {
-        const durationMs = (buffer.duration / Math.max(0.1, playbackRate)) * 1000;
-        this.busyUntil = Math.max(this.busyUntil, performance.now() + durationMs);
-      }
+      const durationMs =
+        buffer.duration > 0 ? (buffer.duration / Math.max(0.1, playbackRate)) * 1000 : 300;
+      this.busyUntil = Math.max(this.busyUntil, performance.now() + durationMs);
 
       const gainNode = ctx.createGain();
       const clampedIntensity = Math.max(0.1, Math.min(1.5, intensity));
@@ -180,8 +227,10 @@ export class Sounds {
 
       gainNode.connect(ctx.destination);
       source.start(0);
+      this.scheduleSuspend(durationMs + 1000);
     } catch {
       // Autoplay restriction or audio device error: stay silent
+      this.scheduleSuspend(500);
     }
   }
 }

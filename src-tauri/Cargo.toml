@@ -1,7 +1,7 @@
 [package]
 name = "robo-buddy"
-version = "0.7.0"
-description = "A desktop buddy that dances to your music"
+version = "0.7.1"
+description = "A friendly robot desktop companion that dances to your music"
 authors = ["rocco"]
 edition = "2021"
 
