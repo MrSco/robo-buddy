@@ -179,14 +179,16 @@ const features = [
                   
                   <!-- Video element (loads user video if present, otherwise shows placeholder) -->
                   <video
-                    class="absolute inset-0 w-full h-full object-cover hidden"
-                    controls
-                    preload="metadata"
+                    class="feature-video absolute inset-0 w-full h-full object-cover hidden"
+                    loop
+                    muted
+                    playsinline
+                    preload="auto"
                     src={feat.videoFile}
                   ></video>
 
                   <!-- Placeholder Overlay -->
-                  <div class="relative z-10 flex flex-col items-center max-w-md space-y-3">
+                  <div class="feature-placeholder relative z-10 flex flex-col items-center max-w-md space-y-3">
                     <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-buddy-cyan to-buddy-purple p-0.5 shadow-xl group-hover:scale-110 transition-transform">
                       <div class="w-full h-full bg-buddy-bg/90 rounded-full flex items-center justify-center text-buddy-cyan text-xl pl-1">
                         ▶
@@ -203,8 +205,8 @@ const features = [
                     </div>
                   </div>
 
-                  <!-- Fake Video Player Controls Bar at bottom -->
-                  <div class="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-black/90 to-transparent px-4 flex items-center justify-between z-10">
+                  <!-- Fake Video Player Controls Bar at bottom (visible when showing placeholder) -->
+                  <div class="fake-controls-bar absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-black/90 to-transparent px-4 flex items-center justify-between z-10">
                     <div class="flex items-center gap-3 text-xs text-buddy-muted font-mono">
                       <span class="text-white hover:text-buddy-cyan cursor-pointer">▶</span>
                       <span>0:00 / 0:45</span>
@@ -233,6 +235,29 @@ const features = [
     const tabs = document.querySelectorAll<HTMLButtonElement>('.reel-tab');
     const panels = document.querySelectorAll<HTMLElement>('.reel-panel');
 
+    // Auto-detect and play videos once video files are present in public/videos
+    document.querySelectorAll<HTMLVideoElement>('.feature-video').forEach((vid) => {
+      const parent = vid.parentElement;
+      const placeholder = parent?.querySelector<HTMLElement>('.feature-placeholder');
+      const fakeBar = parent?.querySelector<HTMLElement>('.fake-controls-bar');
+
+      const handleVideoReady = () => {
+        vid.classList.remove('hidden');
+        if (placeholder) placeholder.classList.add('hidden');
+        if (fakeBar) fakeBar.classList.add('hidden');
+        const panel = vid.closest('.reel-panel');
+        if (panel && !panel.classList.contains('hidden')) {
+          vid.play().catch(() => {});
+        }
+      };
+
+      vid.addEventListener('loadeddata', handleVideoReady);
+      vid.addEventListener('canplay', handleVideoReady);
+      if (vid.readyState >= 2) {
+        handleVideoReady();
+      }
+    });
+
     tabs.forEach((tab) => {
       tab.addEventListener('click', () => {
         const target = tab.dataset.target;
@@ -246,14 +271,22 @@ const features = [
         tab.classList.add('bg-gradient-to-r', 'from-buddy-cyan', 'to-buddy-purple', 'text-white', 'shadow-md');
         tab.classList.remove('bg-buddy-bg', 'border', 'border-buddy-border', 'text-buddy-muted');
 
-        // Toggle panels
+        // Toggle panels & synchronize active video playback
         panels.forEach((p) => {
+          const v = p.querySelector<HTMLVideoElement>('.feature-video');
           if (p.id === `panel-${target}`) {
             p.classList.remove('hidden');
             p.classList.add('block');
+            if (v && !v.classList.contains('hidden')) {
+              v.currentTime = 0;
+              v.play().catch(() => {});
+            }
           } else {
             p.classList.add('hidden');
             p.classList.remove('block');
+            if (v) {
+              v.pause();
+            }
           }
         });
       });
