@@ -20,6 +20,7 @@ import { TalkTab } from "./talk";
 import { LibraryTab } from "./library";
 import { CaptureTab } from "./capture";
 import { WindowTab } from "./window";
+import { HelpTab } from "./help";
 
 export class SettingsApp implements SettingsContext {
   private settings: Settings = { ...DEFAULT_SETTINGS };
@@ -40,6 +41,7 @@ export class SettingsApp implements SettingsContext {
   public libraryTab = new LibraryTab();
   public captureTab = new CaptureTab();
   public windowTab = new WindowTab();
+  public helpTab = new HelpTab();
 
   getSettings(): Settings {
     return this.settings;
@@ -218,6 +220,7 @@ export class SettingsApp implements SettingsContext {
     this.libraryTab.init(this);
     this.captureTab.init(this);
     this.windowTab.init(this);
+    this.helpTab.init();
 
     // 4. Populate packs and initial render
     await this.refreshPacks();

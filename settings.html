@@ -404,60 +404,155 @@
 
         <!-- ============================ Help ============================ -->
         <section class="page help" data-page="help" hidden>
-          <div class="cols2">
-            <div class="group">
-              <h2>Getting started</h2>
-              <p>Robo Buddy is a little character who lives on your taskbar. He watches the mouse, dances to your music, and can be picked up, thrown, poked and talked to.</p>
-              <ul>
-                <li><b>Click</b> him to poke. <b>Hold and drag</b> to carry him around; grab an arm or a leg and he hangs from it. <b>Fling</b> him and he flies.</li>
-                <li><b>Windows are furniture.</b> Drop him on a title bar and he stands on it; drop him a bit short and he grabs the edge and pulls himself up. Left alone he climbs nearby windows and hops back down.</li>
-                <li><b>Double-click</b> to talk (once Talk is on). <b>Right-click</b> for the menu; the tray icon has the same one.</li>
-                <li>Every setting applies immediately. Hover any option for a short explanation.</li>
-              </ul>
-              <h2>Characters</h2>
-              <p>Bundled: Rocco (a 3D scan), Rocco as VRM, a mannequin and a 2D Pixel Pal. Add your own with <b>Import model…</b> on the Character tab or by dropping a file onto the buddy.</p>
-              <ul>
-                <li><b>3D:</b> GLB, glTF, VRM or FBX with a humanoid skeleton. Mixamo, Unreal and VRM bone names are recognised, so a free rig from Mixamo or a VRoid character works out of the box.</li>
-                <li><b>Make one of yourself:</b> a phone scan from in3D (or similar) exported as GLB, auto-rigged on mixamo.com, downloaded as FBX or GLB.</li>
-                <li><b>2D:</b> an animated WebP, GIF or PNG becomes a flat buddy.</li>
-                <li>Every animation in the library works on every 3D character; nothing is baked per model.</li>
-                <li><b>Managing your stuff:</b> imported characters get a "Remove" button under the preview, your own clips a 🗑 on the Animations tab, voices a Delete next to the voice list, and personalities an editor with Delete. Built-in characters, clips and profiles cannot be removed; switch clips to "not used" instead. Every tab has a Folder… button to the files.</li>
-              </ul>
-              <h2>Capture: be the animation</h2>
-              <p>The Capture tab (or right-click him and choose <b>Copy me</b>) turns your webcam on and tracks your body on your PC; nothing is uploaded. Tick <b>Mirror on the buddy</b> and he copies you live. Press <b>Record</b>, move, press <b>Stop</b>, give it a name and a role, and it lands in your animations, working on every 3D character. Stand back so your whole body is in frame. The camera turns off when you leave the tab or close this window.</p>
-              <h2>Animations</h2>
-              <p>The Animations tab lists the bundled Mixamo and Quaternius clips plus your own. Give each clip a role (idle, fidget, dance, poke, held, fall, walk) or switch it off. Press ▶ to preview it on the selected character. Drop FBX or GLB animations onto the page or the buddy to add more; Mixamo exports work directly.</p>
+          <div class="help-header">
+            <div class="help-search-row">
+              <input id="help-search" type="search" placeholder="Search guides, hotkeys, features, commands..." autocomplete="off" spellcheck="false" />
+              <div class="help-actions">
+                <button id="help-open-web" type="button" class="btn-help-action" title="Open the full documentation and video guides in your default web browser">🌐 Full Guide Online</button>
+                <button id="help-open-appdata" type="button" class="btn-help-action" title="Open the local folder where characters, clips, voices, and logs live">📁 AppData Folder</button>
+                <button id="help-open-issues" type="button" class="btn-help-action" title="Report an issue or suggest a feature on GitHub">💬 Report Issue</button>
+              </div>
             </div>
-            <div class="group">
-              <h2>Talking: two-minute setup</h2>
-              <ol>
-                <li>Turn on <b>Let him talk</b> on the Talk tab.</li>
-                <li>Pick a provider. <b>Groq</b> is free and fast: create a key at <code>console.groq.com/keys</code>. <b>Gemini</b> is free too: <code>aistudio.google.com/apikey</code>. <b>Ollama</b> needs no key: install it, pull a model, choose Ollama.</li>
-                <li>Paste the key and press <b>Save key</b>. It lands in Windows Credential Manager, never in a file.</li>
-                <li>Press ↻ next to <b>Chat model</b> and pick one, or keep the default. Press <b>Test</b>.</li>
-                <li>Double-click him and say hello. The ☰ button on the strip shows what you both said this session.</li>
-                <li>He takes orders too: "dance", "do the chicken dance for a minute", "stop", "go to sleep", "wake up", "come here", "jump", "climb", "walk left", "be quiet for 20 minutes", or "do the interact" for any clip he has.</li>
-              </ol>
-              <p><b>Personality</b> decides who he is: the persona sent to the model, the lines he says on his own, and how creative he is. Copy a built-in profile to make your own. With <b>Generate fresh speech-bubble lines</b> on, he writes himself new idle remarks once a week.</p>
-              <h2>Microphone</h2>
-              <p>The mic button records until you click it again and sends the clip to the chat endpoint for transcription. Groq's <code>whisper-large-v3-turbo</code> is the default. To keep audio on this PC, focus the chat input and press <b>Windows + H</b> for Windows voice typing instead.</p>
-              <h2>Voices</h2>
-              <p><b>Windows voice</b> works with no setup. <b>Piper</b> is a neural voice that runs on your PC:</p>
-              <ol>
-                <li>Choose Piper as the engine and press <b>Install Piper</b> (a 22 MB download into the app's data folder).</li>
-                <li>Download a voice from the catalogue, or press <b>Folder…</b> and drop in any Piper voice: a pair of <code>name.onnx</code> and <code>name.onnx.json</code>. Cloned voices trained for Piper work the same way.</li>
-                <li>Pick it in the <b>Voice</b> list. Replies are spoken with it and his head nods along.</li>
-              </ol>
-              <h2>If something is off</h2>
-              <ul>
-                <li><b>Can't see him:</b> right-click the tray icon and choose <b>Bring buddy here</b>. He hides while a fullscreen app is focused.</li>
-                <li><b>He dances to game audio:</b> lower the beat lock, so a tempo has to hold steady for longer before he believes it.</li>
-                <li><b>He won't dance to music:</b> raise the beat lock, and check the meter is reading a sensible tempo while a song plays.</li>
-                <li><b>Live voice:</b> on the Talk tab, Engine → Live voice needs an OpenAI key. The talk box then opens a real-time voice session: just speak; the mic button mutes. It ends when the box closes or after 45 quiet seconds, and stops for the day at the minutes cap.</li>
-                <li><b>Talk fails:</b> the Test button shows the provider's exact error. Most often it is a wrong key or a model id the provider no longer offers; press ↻ to see the current list.</li>
-                <li><b>Report a glitch:</b> <code>%APPDATA%\com.rocco.robobuddy\buddy.log</code> records odd animation frames with the state they happened in.</li>
-              </ul>
+            <div class="help-chips" id="help-chips">
+              <button type="button" class="help-chip active" data-filter="all">All Topics</button>
+              <button type="button" class="help-chip" data-filter="basics">Basics & Windows</button>
+              <button type="button" class="help-chip" data-filter="clippy">Clippy Mode</button>
+              <button type="button" class="help-chip" data-filter="physics">Physics</button>
+              <button type="button" class="help-chip" data-filter="music">Music & Beat</button>
+              <button type="button" class="help-chip" data-filter="talk">Talk & AI Voices</button>
+              <button type="button" class="help-chip" data-filter="screensaver">Screensaver Havoc</button>
+              <button type="button" class="help-chip" data-filter="characters">Characters & Mocap</button>
+              <button type="button" class="help-chip" data-filter="troubleshoot">Troubleshooting</button>
             </div>
+          </div>
+
+          <div class="help-grid" id="help-grid">
+            <!-- 1. Basics & Desktop Furniture -->
+            <article class="help-card" data-category="basics">
+              <div class="help-card-header">
+                <span class="help-card-tag tag-basics">Basics</span>
+                <h3>Getting Started & Desktop Furniture</h3>
+              </div>
+              <p>Robo Buddy is an interactive companion who lives on your Windows taskbar. He reacts to your mouse, music, open applications, and physics.</p>
+              <ul>
+                <li><b>Poking & Dragging:</b> Click him to poke. Hold and drag to carry him by an arm or leg. Fling him with the mouse to throw him across your desktop.</li>
+                <li><b>Windows are Furniture:</b> Drop him on another window's title bar and he stands on it. Drop him just short and he grabs the edge and pulls himself up. When left alone, he strolls along title bars and hops between windows.</li>
+                <li><b>Tray & Context Menu:</b> Right-click him or his tray icon to access Settings, bring him to your active screen, pause reactions, or quit.</li>
+                <li><b>Double-Click:</b> Opens the talk box to chat (when Talk is enabled).</li>
+              </ul>
+            </article>
+
+            <!-- 2. Context-Driven Interactions ("Clippy Mode") -->
+            <article class="help-card" data-category="clippy">
+              <div class="help-card-header">
+                <span class="help-card-tag tag-clippy">Context</span>
+                <h3>Clippy Mode (Proactive Companion)</h3>
+              </div>
+              <p>Buddy watches your active workspace and chimes in with clever quips, contextual tips, and interactive action chips.</p>
+              <ul>
+                <li><b>App Awareness:</b> Recognizes when you are coding in VS Code, researching on Chrome/Edge/Firefox, drafting in Office/Notion, 3D modeling in Blender, or pulling a late-nighter (1 AM &ndash; 5 AM).</li>
+                <li><b>Action Chips:</b> Clickable chips in his speech bubble (like <code>[Regex Cheat-sheet]</code>, <code>[Explain Code]</code>, or <code>[Focus Mode]</code>) open pre-filled AI chats or mute apps.</li>
+                <li><b>100% Local Privacy:</b> Process inspection runs entirely on your PC. Password managers (1Password, Bitwarden, KeePass) and private/incognito windows are automatically ignored. Window titles are never sent to external AI without your explicit consent.</li>
+                <li><b>Anti-Annoyance:</b> Requires 18+ seconds of continuous app focus before triggering (no Alt-Tab interruptions) and pauses while you are AFK.</li>
+              </ul>
+            </article>
+
+            <!-- 3. Physics & Window Climbing -->
+            <article class="help-card" data-category="physics">
+              <div class="help-card-header">
+                <span class="help-card-tag tag-physics">Physics</span>
+                <h3>Window Physics & Climbing</h3>
+              </div>
+              <p>Fine-tune how your companion physically interacts with the Windows desktop and open application windows.</p>
+              <ul>
+                <li><b>Gravity & Throwing:</b> Adjust <i>Gravity</i>, <i>Bounciness</i>, and <i>Throw strength</i> in the Reactions tab. Flinging him creates realistic airborne tumbling and ragdoll landings.</li>
+                <li><b>Surface Climbing:</b> Enable <i>Stand on and climb other windows</i> so he roams open title bars, climbs up window stacks, and ducks underneath top screen borders.</li>
+                <li><b>Click-through Precision:</b> On the Window tab, choose <i>Precise</i> so transparent parts of his window pass clicks through to apps underneath, or <i>Locked</i> to make him completely non-clickable.</li>
+                <li><b>Taskbar Overlap:</b> Toggle <i>Stand on the taskbar</i> to let his feet rest directly on the Windows taskbar edge.</li>
+              </ul>
+            </article>
+
+            <!-- 4. Music & Beat Dancing -->
+            <article class="help-card" data-category="music">
+              <div class="help-card-header">
+                <span class="help-card-tag tag-music">Audio</span>
+                <h3>Music Detection & Dancing</h3>
+              </div>
+              <p>Buddy dances to whatever audio plays through your speakers or headphones using low-latency WASAPI loopback.</p>
+              <ul>
+                <li><b>Private & Local:</b> Audio is analyzed purely for frequency peaks and rhythmic tempo. Nothing is recorded, stored, or sent over the network.</li>
+                <li><b>Beat Lock:</b> Controls how quickly he commits to a beat. Higher values react instantly to drums; lower values ensure the beat holds steady for several seconds first, filtering out speech, podcasts, and game gunfire.</li>
+                <li><b>BPM Meter:</b> The live meter in the Reactions tab displays the detected tempo (BPM) in real time.</li>
+                <li><b>Custom Dances:</b> Choose between a specific dance, random shuffle, or the procedural Groove dance that works on every humanoid model.</li>
+              </ul>
+            </article>
+
+            <!-- 5. Talk & AI Setup -->
+            <article class="help-card" data-category="talk">
+              <div class="help-card-header">
+                <span class="help-card-tag tag-talk">AI & Voice</span>
+                <h3>Talk, LLM Providers & Piper Voices</h3>
+              </div>
+              <p>Bring your companion to life with conversational AI, speech recognition, and high-quality local neural voices.</p>
+              <ul>
+                <li><b>Two-Minute Setup:</b> Enable <i>Let him talk</i> on the Talk tab. Choose <b>Groq</b> (free, blazing-fast key at <code>console.groq.com/keys</code>), <b>Gemini</b> (free at <code>aistudio.google.com/apikey</code>), or <b>Ollama</b> (100% offline local model).</li>
+                <li><b>Secure Storage:</b> API keys are stored in Windows Credential Manager, never written to disk.</li>
+                <li><b>Piper Neural Voices:</b> Install Piper (22 MB download) for completely offline, zero-latency neural TTS. Drop any compatible <code>.onnx</code> voice pair into the voices folder.</li>
+                <li><b>GPT-Live Voice:</b> Select Live Voice engine with an OpenAI key for real-time full-duplex spoken conversations where you can naturally interrupt him.</li>
+                <li><b>Voice & Chat Commands:</b> Tell him "dance", "do the chicken dance", "sleep", "wake up", "be quiet for 15 minutes", "climb", or "jump".</li>
+                <li><b>System Hotkey:</b> Set a global shortcut (e.g. <code>Ctrl+Alt+Space</code>) on the Talk tab to instantly toggle the talk box from any application.</li>
+              </ul>
+            </article>
+
+            <!-- 6. Screensaver Havoc -->
+            <article class="help-card" data-category="screensaver">
+              <div class="help-card-header">
+                <span class="help-card-tag tag-screensaver">Screensaver</span>
+                <h3>Screensaver & Desktop Havoc</h3>
+              </div>
+              <p>Turn your idle desktop into an interactive playground of controlled chaos.</p>
+              <ul>
+                <li><b>Desktop Snapshot:</b> Right-click him and choose <i>Screensaver now</i>, or set an idle timer. Buddy takes a screenshot of your screen to play on&mdash;your actual windows and desktop files are never touched.</li>
+                <li><b>Destruction Styles:</b> Choose between <i>Falling grid tiles</i> and <i>Cracked glass cutouts</i>. Buddy leaps around smashing pieces while ambient erosion fractures the screen.</li>
+                <li><b>CRT Power-Off & Void:</b> Simulates a vintage CRT monitor collapsing into a glowing phosphor dot and black void.</li>
+                <li><b>Windows Saver Integration:</b> Seamlessly hands off to your normal Windows screensaver (.scr) or returns instantly to your desktop on mouse movement or keypress.</li>
+              </ul>
+            </article>
+
+            <!-- 7. Characters & Motion Capture -->
+            <article class="help-card" data-category="characters">
+              <div class="help-card-header">
+                <span class="help-card-tag tag-characters">Characters</span>
+                <h3>Custom Characters & Webcam Mocap</h3>
+              </div>
+              <p>Import your own 3D avatars, 2D sprites, and record custom animations with your webcam.</p>
+              <ul>
+                <li><b>3D Rig Imports:</b> Drop any GLB, glTF, VRM, or humanoid FBX file. Mixamo, Unreal, and VRoid skeletons are automatically recognized and retargeted; every animation works on every model.</li>
+                <li><b>Create an Avatar of Yourself:</b> Use a phone 3D scan (e.g., in3D), auto-rig it on mixamo.com, and drop the exported GLB/FBX directly onto Buddy.</li>
+                <li><b>2D Sprites:</b> Drop an animated WebP, GIF, or PNG to turn Buddy into a flat pixel companion.</li>
+                <li><b>Copy Me (Webcam Mocap):</b> On the Capture tab (or right-click &rarr; <i>Copy me</i>), your webcam tracks your posture and 21 hand points via local MediaPipe. Tick <i>Mirror on the buddy</i> to copy you live, and record custom clips directly into your animation library.</li>
+              </ul>
+            </article>
+
+            <!-- 8. Troubleshooting & Diagnostics -->
+            <article class="help-card" data-category="troubleshoot">
+              <div class="help-card-header">
+                <span class="help-card-tag tag-troubleshoot">Diagnostics</span>
+                <h3>Troubleshooting & Tips</h3>
+              </div>
+              <p>Quick solutions to common questions and system behaviors.</p>
+              <ul>
+                <li><b>Buddy wandered off or vanished:</b> Right-click the system tray icon and select <b>Bring buddy here</b> to teleport him directly onto your active monitor. Note: He automatically hides while a fullscreen game or video player is active.</li>
+                <li><b>False dancing:</b> If game audio or podcasts trigger dancing, lower the <i>Beat lock</i> slider so steady rhythm is required before he grooves.</li>
+                <li><b>Talk connection errors:</b> Click the <b>Test</b> button next to the API key in the Talk tab to view the provider's exact error message. Ensure model names are up to date.</li>
+                <li><b>Audio loopback mute:</b> If speaker levels read zero in the meter, ensure your Windows default playback device is active and not exclusively claimed by another application.</li>
+                <li><b>Diagnostic Logs:</b> When reporting a bug or glitch, check <code>%APPDATA%\com.rocco.robobuddy\buddy.log</code> for state traces and animation warnings.</li>
+              </ul>
+            </article>
+          </div>
+
+          <div id="help-empty" class="help-empty" hidden>
+            <p>No matching help topics found. Try searching for "talk", "clippy", "physics", or "keys".</p>
           </div>
         </section>
 

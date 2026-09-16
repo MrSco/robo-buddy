@@ -1,0 +1,90 @@
+---
+import GuideLayout from '../../layouts/GuideLayout.astro';
+---
+
+<GuideLayout title="Talk Setup, AI Providers & Neural Voices" currentSlug="/guide/talk-ai-voices">
+  <div class="space-y-8 text-buddy-text">
+    <div>
+      <span class="text-xs font-mono uppercase tracking-wider text-buddy-cyan font-semibold">AI & Speech</span>
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white mt-1">Conversational AI & Neural Voices</h1>
+      <p class="text-base text-buddy-muted mt-2 leading-relaxed">
+        Equip Robo Buddy with an intelligent LLM brain, whisper speech-to-text, and local neural text-to-speech voices.
+      </p>
+    </div>
+
+    <!-- 2-Minute Quickstart -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Two-Minute Setup Guide</h2>
+      <ol class="list-decimal pl-5 space-y-3 text-sm text-buddy-muted">
+        <li>
+          Open <b>Settings &rarr; Talk</b> and check <b>"Let him talk"</b>.
+        </li>
+        <li>
+          Pick an AI provider from the dropdown:
+          <ul class="list-disc pl-5 mt-1.5 space-y-1 text-xs">
+            <li><b>Groq (Recommended Free):</b> Ultra-fast responses. Grab a free API key at <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" class="text-buddy-cyan underline">console.groq.com/keys</a>.</li>
+            <li><b>Google Gemini (Free Tier):</b> Huge reasoning capabilities. Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" class="text-buddy-cyan underline">aistudio.google.com/apikey</a>.</li>
+            <li><b>Ollama (100% Offline):</b> Needs no API keys. Install Ollama on your PC, pull a model (e.g. <code>ollama pull llama3.2</code>), and choose Ollama.</li>
+          </ul>
+        </li>
+        <li>
+          Paste your key and click <b>Save key</b>. Your key is stored securely in <b>Windows Credential Manager</b> and is never written to disk.
+        </li>
+        <li>
+          Click <b>Test</b> to verify connectivity. Then double-click Buddy on your desktop to start talking!
+        </li>
+      </ol>
+    </div>
+
+    <!-- Piper Neural Voices -->
+    <div id="piper" class="space-y-4 pt-2">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Piper Local Neural Voices</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        Piper is a high-speed, local neural text-to-speech synthesizer. It runs entirely on your CPU with sub-100ms latency, giving Buddy a natural voice with zero cloud subscription fees:
+      </p>
+
+      <div class="p-4 rounded-xl bg-buddy-bg border border-buddy-border space-y-3 text-xs">
+        <b class="text-white text-sm">How to Enable Piper:</b>
+        <ol class="list-decimal pl-5 space-y-1.5 text-buddy-muted">
+          <li>On the Talk tab, switch the TTS Engine to <b>Piper</b>.</li>
+          <li>Click <b>Install Piper</b> (a one-time 22 MB download into your AppData directory).</li>
+          <li>Download any voice from the bundled catalogue (e.g. Bryce, Ryan, Lessac) or click <b>Folder...</b> to drop in any compatible <code>.onnx</code> and <code>.onnx.json</code> voice pair.</li>
+          <li>When Buddy speaks, his head and jaw nod along in rhythm with the synthesized speech.</li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- Live Voice Duplex -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">OpenAI GPT-Live Full-Duplex Voice</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        Under Engine &rarr; <b>Live voice</b>, you can connect an OpenAI API key for real-time bidirectional voice chat. You can speak naturally, and Buddy will listen, think, and speak back with real-time inflection—allowing you to interrupt him mid-sentence.
+      </p>
+    </div>
+
+    <!-- Commands Table -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Voice & Chat Commands</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        Buddy understands natural intent and directly executes action commands when spoken or typed:
+      </p>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs font-mono">
+        <div class="p-2.5 rounded-lg bg-buddy-bg border border-buddy-border text-buddy-cyan">"dance"</div>
+        <div class="p-2.5 rounded-lg bg-buddy-bg border border-buddy-border text-buddy-cyan">"do the chicken dance"</div>
+        <div class="p-2.5 rounded-lg bg-buddy-bg border border-buddy-border text-buddy-cyan">"climb"</div>
+        <div class="p-2.5 rounded-lg bg-buddy-bg border border-buddy-border text-buddy-cyan">"go to sleep"</div>
+        <div class="p-2.5 rounded-lg bg-buddy-bg border border-buddy-border text-buddy-cyan">"wake up"</div>
+        <div class="p-2.5 rounded-lg bg-buddy-bg border border-buddy-border text-buddy-cyan">"be quiet for 15 min"</div>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="pt-6 border-t border-buddy-border flex justify-between">
+      <a href="/guide/screensaver-havoc" class="text-xs text-buddy-darkMuted hover:text-buddy-cyan transition-colors">&larr; Back: Screensaver Havoc</a>
+      <a href="/guide/custom-characters" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-buddy-cyan/15 hover:bg-buddy-cyan/25 border border-buddy-cyan/30 text-buddy-cyan text-xs font-semibold transition-colors">
+        <span>Next: Custom Characters</span>
+        <span>&rarr;</span>
+      </a>
+    </div>
+  </div>
+</GuideLayout>

@@ -1,0 +1,96 @@
+---
+import GuideLayout from '../../layouts/GuideLayout.astro';
+---
+
+<GuideLayout title="Introduction & Installation" currentSlug="/guide">
+  <div class="space-y-8 text-buddy-text">
+    <div>
+      <span class="text-xs font-mono uppercase tracking-wider text-buddy-cyan font-semibold">Getting Started</span>
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white mt-1">Introduction & Installation</h1>
+      <p class="text-base text-buddy-muted mt-2 leading-relaxed">
+        Welcome to Robo Buddy! This guide will help you install, configure, and get the most out of your new desktop companion.
+      </p>
+    </div>
+
+    <!-- Quick Overview Box -->
+    <div class="rounded-xl border border-buddy-cyan/30 bg-buddy-cyan/5 p-4 sm:p-5 flex items-start gap-4">
+      <span class="text-2xl">🤖</span>
+      <div class="space-y-1">
+        <h3 class="text-sm font-bold text-white">What is Robo Buddy?</h3>
+        <p class="text-xs text-buddy-muted leading-relaxed">
+          Robo Buddy is a lightweight native desktop companion for Windows 10 and 11, inspired by classic 90s/2000s desktop pets like Clippy and BonziBuddy—built with modern technologies including Tauri v2 (Rust), WebGL Three.js, local neural voice synthesis, and reactive context awareness.
+        </p>
+      </div>
+    </div>
+
+    <!-- Installation Steps -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Installation</h2>
+      
+      <div class="space-y-3 text-sm">
+        <p>Installing Robo Buddy takes under thirty seconds:</p>
+        
+        <ol class="list-decimal pl-5 space-y-2 text-buddy-muted">
+          <li>
+            Download the latest installer from the <a href="/#download" class="text-buddy-cyan underline hover:text-buddy-cyanLight">Releases Section</a> or <a href="https://github.com/MrSco/robo-buddy-releases/releases" target="_blank" class="text-buddy-cyan underline">GitHub Releases</a>.
+            <ul class="list-disc pl-5 mt-1 space-y-1 text-xs text-buddy-darkMuted">
+              <li><b>Setup Executable (Recommended):</b> <code>RoboBuddy-Setup-0.6.0.exe</code> (per-user install, auto-creates Start Menu entry).</li>
+              <li><b>MSI Package:</b> <code>RoboBuddy-0.6.0.msi</code> for managed enterprise or silent installations.</li>
+            </ul>
+          </li>
+          <li>
+            Run the installer. It installs cleanly into your user application directory and automatically launches Buddy onto your taskbar.
+          </li>
+          <li>
+            Look for Buddy standing on your Windows taskbar and his icon in the system notification tray (bottom-right near your clock).
+          </li>
+        </ol>
+      </div>
+    </div>
+
+    <!-- System Requirements -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">System Requirements</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+        <div class="p-3 rounded-lg bg-buddy-bg border border-buddy-border space-y-1">
+          <span class="font-bold text-white">Operating System</span>
+          <p class="text-buddy-muted">Windows 10 or Windows 11 (64-bit)</p>
+        </div>
+        <div class="p-3 rounded-lg bg-buddy-bg border border-buddy-border space-y-1">
+          <span class="font-bold text-white">Web Runtime</span>
+          <p class="text-buddy-muted">Microsoft Edge WebView2 (pre-installed on all modern Windows builds)</p>
+        </div>
+        <div class="p-3 rounded-lg bg-buddy-bg border border-buddy-border space-y-1">
+          <span class="font-bold text-white">Audio</span>
+          <p class="text-buddy-muted">Standard audio output device (for WASAPI beat tracking)</p>
+        </div>
+        <div class="p-3 rounded-lg bg-buddy-bg border border-buddy-border space-y-1">
+          <span class="font-bold text-white">Webcam (Optional)</span>
+          <p class="text-buddy-muted">Any USB or built-in webcam for real-time motion capture mirroring</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Where files live -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Where Your Data Lives</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        Robo Buddy respects your system. Everything saved—imported characters, custom motion capture clips, Piper neural voices, settings, and logs—lives cleanly inside:
+      </p>
+      <div class="p-3 rounded-lg bg-black/50 border border-buddy-border font-mono text-xs text-buddy-cyan">
+        %APPDATA%\com.rocco.robobuddy\
+      </div>
+      <p class="text-xs text-buddy-darkMuted">
+        You can open this folder anytime from Settings &rarr; Help &rarr; "AppData Folder" button, or delete it whenever you want a completely fresh slate.
+      </p>
+    </div>
+
+    <!-- Next Chapter Button -->
+    <div class="pt-6 border-t border-buddy-border flex justify-end">
+      <a href="/guide/basics" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-buddy-cyan/15 hover:bg-buddy-cyan/25 border border-buddy-cyan/30 text-buddy-cyan text-xs font-semibold transition-colors">
+        <span>Next: Desktop Controls & Furniture</span>
+        <span>&rarr;</span>
+      </a>
+    </div>
+  </div>
+</GuideLayout>

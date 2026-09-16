@@ -1,0 +1,162 @@
+---
+import GuideLayout from '../../layouts/GuideLayout.astro';
+---
+
+<GuideLayout title="Clippy Mode (Context-Driven Interactions)" currentSlug="/guide/clippy-mode">
+  <div class="space-y-8 text-buddy-text">
+    <div>
+      <div class="flex items-center gap-2 mb-1">
+        <span class="text-xs font-mono uppercase tracking-wider text-buddy-cyan font-semibold">Companion Systems</span>
+        <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold">NEW IN v0.6</span>
+      </div>
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white mt-1">Clippy Mode: Context-Aware Companion</h1>
+      <p class="text-base text-buddy-muted mt-2 leading-relaxed">
+        Robo Buddy can proactively observe what you are working on and chime in with witty commentary, actionable tips, matching character gestures, and interactive chips.
+      </p>
+    </div>
+
+    <!-- The Clippy Philosophy -->
+    <div class="rounded-xl border border-buddy-border bg-buddy-bg p-5 space-y-3">
+      <h3 class="text-sm font-bold text-white flex items-center gap-2">
+        <span>📎</span>
+        <span>The Evolution of the Desktop Assistant</span>
+      </h3>
+      <p class="text-xs text-buddy-muted leading-relaxed">
+        Classic desktop companions from the 90s were either beloved or notorious for intrusive pop-ups. Robo Buddy reimagines this concept for modern workflows: unobtrusive, privacy-preserving, contextually smart, and equipped with clickable action chips that actually solve problems.
+      </p>
+    </div>
+
+    <!-- Supported Applications & Workspaces -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Supported Workspaces & Triggers</h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div class="p-4 rounded-xl border border-buddy-border bg-buddy-bg/60 space-y-2">
+          <div class="flex items-center gap-2 text-cyan-400 font-semibold text-sm">
+            <span>💻</span>
+            <span>Coding & Terminals</span>
+          </div>
+          <p class="text-buddy-darkMuted">VS Code, Visual Studio, Windows Terminal, PowerShell, Git</p>
+          <ul class="list-disc pl-4 space-y-1 text-buddy-muted">
+            <li>Quips about regex, git pushes, and "it works on my machine".</li>
+            <li>Typing/texting animations matching your keyboard flow.</li>
+            <li>Action chips: <code>[Regex Cheat-sheet]</code>, <code>[Explain Code]</code>.</li>
+          </ul>
+        </div>
+
+        <div class="p-4 rounded-xl border border-buddy-border bg-buddy-bg/60 space-y-2">
+          <div class="flex items-center gap-2 text-purple-400 font-semibold text-sm">
+            <span>🌐</span>
+            <span>Browsing & Research</span>
+          </div>
+          <p class="text-buddy-darkMuted">Chrome, Edge, Firefox, YouTube, Wikipedia, StackOverflow</p>
+          <ul class="list-disc pl-4 space-y-1 text-buddy-muted">
+            <li>Notices deep rabbit holes on YouTube or Wikipedia.</li>
+            <li>Action chips: <code>[Recommend Vibe]</code>, <code>[Focus Mode]</code>, <code>[Summarize]</code>.</li>
+          </ul>
+        </div>
+
+        <div class="p-4 rounded-xl border border-buddy-border bg-buddy-bg/60 space-y-2">
+          <div class="flex items-center gap-2 text-emerald-400 font-semibold text-sm">
+            <span>📝</span>
+            <span>Productivity & Writing</span>
+          </div>
+          <p class="text-buddy-darkMuted">Word, Excel, PowerPoint, Google Docs, Notion, Obsidian</p>
+          <ul class="list-disc pl-4 space-y-1 text-buddy-muted">
+            <li>Classic Clippy homage: "Looks like you are writing a document..."</li>
+            <li>Action chips: <code>[Check Tone]</code>, <code>[Formula Helper]</code>, <code>[Brainstorm]</code>.</li>
+          </ul>
+        </div>
+
+        <div class="p-4 rounded-xl border border-buddy-border bg-buddy-bg/60 space-y-2">
+          <div class="flex items-center gap-2 text-pink-400 font-semibold text-sm">
+            <span>🎨</span>
+            <span>Creative & 3D Tools</span>
+          </div>
+          <p class="text-buddy-darkMuted">Blender, Photoshop, Figma, Premiere Pro</p>
+          <ul class="list-disc pl-4 space-y-1 text-buddy-muted">
+            <li>Crucial save reminders ("Save now before the crash gods notice!").</li>
+            <li>Action chips: <code>[Save Reminder]</code>, <code>[Shortcut Tip]</code>.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interactive Action Chips -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Interactive Action Chips</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        When Buddy comments on your workspace, clickable pill chips appear in his speech bubble:
+      </p>
+      <ul class="list-disc pl-5 space-y-2 text-xs text-buddy-muted">
+        <li><b>AI Pre-fills:</b> Clicking chips like <code>[Explain Code]</code> or <code>[Check Tone]</code> instantly opens the TalkBox pre-filled with the prompt and relevant context.</li>
+        <li><b>Quick Mute:</b> Clicking <code>[Mute App]</code> permanently excludes that specific executable from future proactive commentary.</li>
+        <li><b>Precise Clickability:</b> Clicks pass straight through the bubble's transparent margins to your work; only the chips themselves catch mouse clicks.</li>
+      </ul>
+    </div>
+
+    <!-- Anti-Annoyance & Privacy Guarantees -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Privacy & Anti-Annoyance Guarantees</h2>
+      <div class="space-y-3 text-xs">
+        <div class="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-buddy-text space-y-1">
+          <b class="text-emerald-400 flex items-center gap-1.5">
+            <span>🔒</span> 100% Local Classification
+          </b>
+          <p class="text-buddy-muted leading-relaxed">
+            Window titles and process names are inspected entirely inside native Rust on your PC. Full window titles are never transmitted to any external LLM or cloud API unless you explicitly opt in under Settings.
+          </p>
+        </div>
+
+        <div class="p-4 rounded-xl bg-buddy-bg border border-buddy-border text-buddy-text space-y-1">
+          <b class="text-white flex items-center gap-1.5">
+            <span>🚫</span> Automatic Sensitive App Blacklist
+          </b>
+          <p class="text-buddy-muted leading-relaxed">
+            Password managers (<code>1Password.exe</code>, <code>Bitwarden.exe</code>, <code>KeePass.exe</code>) and private browsing windows (InPrivate and Incognito) are automatically ignored. Buddy will never inspect or comment on sensitive credential managers.
+          </p>
+        </div>
+
+        <div class="p-4 rounded-xl bg-buddy-bg border border-buddy-border text-buddy-text space-y-1">
+          <b class="text-white flex items-center gap-1.5">
+            <span>⏱️</span> 18-Second Dwell Filter & AFK Suppression
+          </b>
+          <p class="text-buddy-muted leading-relaxed">
+            Rapid Alt-Tabbing or quick window checks will never trigger a comment. Buddy requires at least 18 seconds of continuous dwell time in an application. Additionally, if you step away from your PC for > 15 seconds, context triggers pause completely so Buddy does not talk to an empty chair.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Configuring Chattiness -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Configuring Chattiness</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        Under <b>Settings &rarr; Reactions &rarr; Context (Clippy Mode)</b>, you can adjust frequency:
+      </p>
+      <div class="grid grid-cols-3 gap-3 text-xs text-center font-mono">
+        <div class="p-3 rounded-lg bg-buddy-bg border border-buddy-border">
+          <b class="text-white">Rare</b>
+          <p class="text-buddy-darkMuted mt-1">15–20 min cooldown</p>
+        </div>
+        <div class="p-3 rounded-lg bg-buddy-cyan/10 border border-buddy-cyan/30">
+          <b class="text-buddy-cyan">Normal (Default)</b>
+          <p class="text-buddy-muted mt-1">5–8 min cooldown</p>
+        </div>
+        <div class="p-3 rounded-lg bg-buddy-bg border border-buddy-border">
+          <b class="text-white">Chatty</b>
+          <p class="text-buddy-darkMuted mt-1">2–3 min cooldown</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Next Chapter Button -->
+    <div class="pt-6 border-t border-buddy-border flex justify-between">
+      <a href="/guide/basics" class="text-xs text-buddy-darkMuted hover:text-buddy-cyan transition-colors">&larr; Back: Controls & Furniture</a>
+      <a href="/guide/window-physics" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-buddy-cyan/15 hover:bg-buddy-cyan/25 border border-buddy-cyan/30 text-buddy-cyan text-xs font-semibold transition-colors">
+        <span>Next: Window Physics & Climbing</span>
+        <span>&rarr;</span>
+      </a>
+    </div>
+  </div>
+</GuideLayout>

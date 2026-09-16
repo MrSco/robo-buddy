@@ -13,3 +13,6 @@ output/
 
 # Bytecode from the clip-baking scripts
 __pycache__/
+
+.astro/
+

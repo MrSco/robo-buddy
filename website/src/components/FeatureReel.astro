@@ -1,0 +1,268 @@
+---
+const features = [
+  {
+    id: 'music',
+    tab: '🎵 Beat Dancing',
+    title: 'Dances to Whatever Plays on Your Speakers',
+    badge: 'Audio Reactive',
+    badgeColor: 'border-pink-500/30 text-pink-400 bg-pink-500/10',
+    description: 'Robo Buddy listens to your audio output in real-time using WASAPI loopback without recording or uploading anything. The beat lock algorithm locks onto tempos so he only grooves when it is real music.',
+    bullets: [
+      '100% private: Audio is analyzed strictly for frequency & BPM peaks locally',
+      'Beat lock sensitivity slider prevents false triggers from podcasts & games',
+      'Works with any 3D character using real-time retargeted dance clips'
+    ],
+    videoFile: '/videos/music-dancing.mp4',
+    videoPoster: 'Placeholder: Audio BPM Meter & Dancing Buddy'
+  },
+  {
+    id: 'physics',
+    tab: '🪟 Window Furniture',
+    title: 'Windows Are Physical Furniture',
+    badge: 'Surface Physics',
+    badgeColor: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+    description: 'Your open apps are not just UI—they are ledges and rooftops. Throw Buddy across the screen and watch him tumble, land on an app title bar, grab the edge, and climb himself up.',
+    bullets: [
+      'Fling to throw with realistic momentum, air drag, and bounce physics',
+      'Climbs nearby windows, walks along title bars, and hops between apps',
+      'Precise click-through: only his body clicks, transparent background passes clicks'
+    ],
+    videoFile: '/videos/window-physics.mp4',
+    videoPoster: 'Placeholder: Throwing & Title Bar Climbing'
+  },
+  {
+    id: 'clippy',
+    tab: '📎 Clippy Mode',
+    title: 'Context-Aware Proactive Companion',
+    badge: 'New in v0.6',
+    badgeColor: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10',
+    description: 'The spirit of classic desktop pets reborn for the AI era. Buddy notices what app you are working in—coding in VS Code, researching in Chrome, or drafting in Word—and chimes in with clever tips and interactive action chips.',
+    bullets: [
+      'Clickable Action Chips: [Regex Cheat-sheet], [Explain Code], [Focus Mode]',
+      '100% Local Privacy: Sensitive apps (1Password, Bitwarden, incognito) auto-blacklisted',
+      'Anti-Annoyance dwell filter (18s dwell time) ensures zero spam while Alt-Tabbing'
+    ],
+    videoFile: '/videos/clippy-context.mp4',
+    videoPoster: 'Placeholder: VS Code Quip & Action Chip Interaction'
+  },
+  {
+    id: 'screensaver',
+    tab: '💥 Screensaver Havoc',
+    title: 'Controlled Chaos While You Are Away',
+    badge: 'Desktop Havoc',
+    badgeColor: 'border-amber-500/30 text-amber-400 bg-amber-500/10',
+    description: 'When idle, Buddy takes over the screen and treats a snapshot of your desktop as an arena. He leaps around breaking falling grid tiles or fractured glass cutouts before a CRT collapse into the void.',
+    bullets: [
+      'Zero risk: plays on a freeze-frame snapshot; real files & windows are untouched',
+      'Configurable erosion speed, sound thuds, and classic CRT TV power-off void',
+      'Handoff to your native Windows screensaver or instant wake on any keypress'
+    ],
+    videoFile: '/videos/screensaver-havoc.mp4',
+    videoPoster: 'Placeholder: Desktop Tile Smashing & CRT Void'
+  },
+  {
+    id: 'mocap',
+    tab: '📷 Webcam Mocap',
+    title: 'Copy Me: Real-Time Body & Finger Tracking',
+    badge: 'MediaPipe AI',
+    badgeColor: 'border-purple-500/30 text-purple-400 bg-purple-500/10',
+    description: 'Turn your webcam into a motion capture studio. MediaPipe tracks your body posture and 21 points per hand locally on your machine. Turn on "Mirror" to make Buddy mimic your moves live!',
+    bullets: [
+      'Record custom animations directly from your webcam into your clip library',
+      'Loop blending tool stitches ends together for seamless idle loops & dances',
+      'Camera shuts off the moment you close the capture tab—zero network usage'
+    ],
+    videoFile: '/videos/webcam-mocap.mp4',
+    videoPoster: 'Placeholder: Webcam Pose Mirroring Live'
+  },
+  {
+    id: 'voice',
+    tab: '🗣️ AI Voice & Chat',
+    title: 'Offline Neural Voices & Smart Brains',
+    badge: 'Local TTS + LLM',
+    badgeColor: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
+    description: 'Give Buddy a brain and a voice. Use free high-speed cloud providers (Groq, Google Gemini), 100% offline local LLMs via Ollama, or full-duplex OpenAI GPT-Live voice. Piper neural voices run locally with zero latency.',
+    bullets: [
+      'Fast 2-minute setup with free keys stored in Windows Credential Manager',
+      'Piper Neural TTS: 22 MB offline install, custom cloned voice support',
+      'Takes voice & chat commands: "dance", "sleep", "climb", "be quiet for 20m"'
+    ],
+    videoFile: '/videos/voice-chat.mp4',
+    videoPoster: 'Placeholder: Spoken AI Voice Chat & Command Execution'
+  }
+];
+---
+
+<section id="demos" class="py-20 border-t border-buddy-border/80 bg-buddy-bg/50 relative">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="text-center max-w-3xl mx-auto mb-12">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-buddy-purple/30 bg-buddy-purple/10 text-buddy-purpleLight text-xs font-semibold uppercase tracking-wider mb-4">
+        <span>Desktop Feature Reel</span>
+      </div>
+      <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+        See Robo Buddy in <span class="text-gradient">Action</span>
+      </h2>
+      <p class="mt-3 text-sm sm:text-base text-buddy-muted">
+        Watch how physics, audio analysis, webcam tracking, and contextual AI come together on the Windows desktop.
+      </p>
+    </div>
+
+    <!-- Feature Reel Container -->
+    <div class="bg-buddy-card border border-buddy-border rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl">
+      <!-- Tabs Navigation -->
+      <div class="flex items-center gap-2 overflow-x-auto pb-4 border-b border-buddy-border scrollbar-thin">
+        {features.map((feat, idx) => (
+          <button
+            type="button"
+            class={`reel-tab px-4 py-2 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-all flex items-center gap-2 ${idx === 0 ? 'bg-gradient-to-r from-buddy-cyan to-buddy-purple text-white shadow-md' : 'bg-buddy-bg border border-buddy-border text-buddy-muted hover:text-white hover:border-buddy-borderLight'}`}
+            data-target={feat.id}
+          >
+            <span>{feat.tab}</span>
+          </button>
+        ))}
+      </div>
+
+      <!-- Feature Content Panels -->
+      <div class="mt-8">
+        {features.map((feat, idx) => (
+          <div
+            id={`panel-${feat.id}`}
+            class={`reel-panel grid grid-cols-1 lg:grid-cols-12 gap-8 items-center ${idx === 0 ? 'block' : 'hidden'}`}
+          >
+            <!-- Left Info Column -->
+            <div class="lg:col-span-5 space-y-5">
+              <div class="flex items-center gap-2">
+                <span class={`text-[11px] font-mono px-2.5 py-0.5 rounded-full border font-semibold ${feat.badgeColor}`}>
+                  {feat.badge}
+                </span>
+              </div>
+              <h3 class="text-2xl sm:text-3xl font-bold text-white tracking-tight leading-snug">
+                {feat.title}
+              </h3>
+              <p class="text-sm text-buddy-muted leading-relaxed">
+                {feat.description}
+              </p>
+              <ul class="space-y-2.5 pt-2">
+                {feat.bullets.map((bullet) => (
+                  <li class="flex items-start gap-2.5 text-xs sm:text-sm text-buddy-text">
+                    <span class="text-buddy-cyan text-base leading-none">✓</span>
+                    <span>{bullet}</span>
+                  </li>
+                ))}
+              </ul>
+              <div class="pt-4">
+                <a href={`/guide#${feat.id}`} class="inline-flex items-center gap-2 text-xs font-semibold text-buddy-cyan hover:text-buddy-cyanLight transition-colors">
+                  <span>Read chapter in guide</span>
+                  <span>→</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- Right Video Player Mockup Column -->
+            <div class="lg:col-span-7">
+              <div class="rounded-xl border border-buddy-border bg-black/60 shadow-xl overflow-hidden relative group">
+                <!-- Mockup OS Window Header -->
+                <div class="h-8 bg-buddy-bg border-b border-buddy-border/80 flex items-center justify-between px-3">
+                  <div class="flex items-center gap-1.5">
+                    <div class="w-2.5 h-2.5 rounded-full bg-red-500/70"></div>
+                    <div class="w-2.5 h-2.5 rounded-full bg-yellow-500/70"></div>
+                    <div class="w-2.5 h-2.5 rounded-full bg-emerald-500/70"></div>
+                  </div>
+                  <span class="text-[11px] font-mono text-buddy-darkMuted">demo_{feat.id}_capture.mp4</span>
+                  <div class="text-[10px] font-mono text-buddy-cyan px-1.5 py-0.5 rounded bg-buddy-cyan/10">1080p 60fps</div>
+                </div>
+
+                <!-- Video Viewport / Ready-to-drop placeholder -->
+                <div class="aspect-video relative bg-gradient-to-br from-buddy-bg via-[#0c1220] to-[#121b2d] flex flex-col items-center justify-center p-6 text-center overflow-hidden">
+                  <!-- Subtle Scanline effect -->
+                  <div class="absolute inset-0 pointer-events-none bg-[radial-gradient(#22d3ee_1px,transparent_1px)] [background-size:16px_16px] opacity-10"></div>
+                  
+                  <!-- Video element (loads user video if present, otherwise shows placeholder) -->
+                  <video
+                    class="absolute inset-0 w-full h-full object-cover hidden"
+                    controls
+                    preload="metadata"
+                    src={feat.videoFile}
+                  ></video>
+
+                  <!-- Placeholder Overlay -->
+                  <div class="relative z-10 flex flex-col items-center max-w-md space-y-3">
+                    <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-buddy-cyan to-buddy-purple p-0.5 shadow-xl group-hover:scale-110 transition-transform">
+                      <div class="w-full h-full bg-buddy-bg/90 rounded-full flex items-center justify-center text-buddy-cyan text-xl pl-1">
+                        ▶
+                      </div>
+                    </div>
+                    <div>
+                      <h4 class="text-sm font-semibold text-white">{feat.videoPoster}</h4>
+                      <p class="text-xs text-buddy-darkMuted mt-1">
+                        Video placeholder ready for desktop screen recording
+                      </p>
+                      <code class="mt-2 inline-block text-[10px] font-mono px-2 py-1 rounded bg-white/5 border border-white/10 text-buddy-cyan">
+                        Drop into: public{feat.videoFile}
+                      </code>
+                    </div>
+                  </div>
+
+                  <!-- Fake Video Player Controls Bar at bottom -->
+                  <div class="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-black/90 to-transparent px-4 flex items-center justify-between z-10">
+                    <div class="flex items-center gap-3 text-xs text-buddy-muted font-mono">
+                      <span class="text-white hover:text-buddy-cyan cursor-pointer">▶</span>
+                      <span>0:00 / 0:45</span>
+                    </div>
+                    <div class="flex-1 mx-4 h-1 bg-white/10 rounded-full overflow-hidden">
+                      <div class="w-1/3 h-full bg-gradient-to-r from-buddy-cyan to-buddy-purple rounded-full"></div>
+                    </div>
+                    <div class="flex items-center gap-3 text-xs text-buddy-muted">
+                      <span>🔊</span>
+                      <span>HD</span>
+                      <span>⛶</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  function initFeatureReel() {
+    const tabs = document.querySelectorAll<HTMLButtonElement>('.reel-tab');
+    const panels = document.querySelectorAll<HTMLElement>('.reel-panel');
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.target;
+        if (!target) return;
+
+        // Update tabs styling
+        tabs.forEach((t) => {
+          t.classList.remove('bg-gradient-to-r', 'from-buddy-cyan', 'to-buddy-purple', 'text-white', 'shadow-md');
+          t.classList.add('bg-buddy-bg', 'border', 'border-buddy-border', 'text-buddy-muted');
+        });
+        tab.classList.add('bg-gradient-to-r', 'from-buddy-cyan', 'to-buddy-purple', 'text-white', 'shadow-md');
+        tab.classList.remove('bg-buddy-bg', 'border', 'border-buddy-border', 'text-buddy-muted');
+
+        // Toggle panels
+        panels.forEach((p) => {
+          if (p.id === `panel-${target}`) {
+            p.classList.remove('hidden');
+            p.classList.add('block');
+          } else {
+            p.classList.add('hidden');
+            p.classList.remove('block');
+          }
+        });
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initFeatureReel);
+  } else {
+    initFeatureReel();
+  }
+</script>

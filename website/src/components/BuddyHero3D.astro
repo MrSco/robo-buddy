@@ -1,0 +1,275 @@
+---
+---
+
+<div class="relative w-full max-w-md mx-auto aspect-[4/5] sm:aspect-[1/1] rounded-2xl border border-buddy-border bg-buddy-card/80 backdrop-blur-xl shadow-2xl overflow-hidden group">
+  <!-- Top retro titlebar -->
+  <div class="absolute top-0 inset-x-0 h-9 bg-buddy-bg/90 border-b border-buddy-border flex items-center justify-between px-3 z-20 select-none">
+    <div class="flex items-center gap-1.5">
+      <div class="w-2.5 h-2.5 rounded-full bg-red-500/80"></div>
+      <div class="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></div>
+      <div class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></div>
+    </div>
+    <div class="flex items-center gap-1.5 text-[11px] font-mono text-buddy-muted">
+      <span class="w-1.5 h-1.5 rounded-full bg-buddy-cyan animate-ping"></span>
+      <span>rocco_interactive.glb</span>
+    </div>
+    <div class="text-[10px] font-mono text-buddy-darkMuted px-1.5 py-0.5 rounded bg-white/5">
+      Three.js
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div id="hero-loading" class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-buddy-card">
+    <div class="w-8 h-8 rounded-full border-2 border-buddy-cyan/30 border-t-buddy-cyan animate-spin"></div>
+    <p class="text-xs font-mono text-buddy-muted animate-pulse">Summoning Rocco (3D scan)...</p>
+  </div>
+
+  <!-- Three.js Canvas -->
+  <canvas id="hero-canvas" class="w-full h-full block touch-none cursor-grab active:cursor-grabbing"></canvas>
+
+  <!-- Interactive Controls Bar -->
+  <div class="absolute bottom-3 inset-x-3 z-20 flex items-center justify-center gap-2 p-1.5 rounded-xl bg-buddy-bg/90 border border-buddy-border/80 backdrop-blur-md shadow-lg">
+    <button id="btn-hero-poke" type="button" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-[11px] text-white font-medium transition-all hover:scale-105 active:scale-95 flex items-center gap-1">
+      <span>👋</span>
+      <span>Poke</span>
+    </button>
+    <button id="btn-hero-groove" type="button" class="px-2.5 py-1 rounded-lg bg-buddy-cyan/20 hover:bg-buddy-cyan/30 text-buddy-cyanLight text-[11px] font-medium border border-buddy-cyan/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1">
+      <span>🕺</span>
+      <span>Dance</span>
+    </button>
+    <button id="btn-hero-wave" type="button" class="px-2.5 py-1 rounded-lg bg-buddy-purple/20 hover:bg-buddy-purple/30 text-buddy-purpleLight text-[11px] font-medium border border-buddy-purple/30 transition-all hover:scale-105 active:scale-95 flex items-center gap-1">
+      <span>✨</span>
+      <span>Wave</span>
+    </button>
+  </div>
+
+  <!-- Floating hint tooltip -->
+  <div class="absolute top-12 left-3 z-20 pointer-events-none opacity-80 group-hover:opacity-100 transition-opacity">
+    <span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-black/60 border border-white/10 text-[10px] font-mono text-buddy-muted backdrop-blur-sm">
+      <svg class="w-3 h-3 text-buddy-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
+      <span>Move cursor to guide head</span>
+    </span>
+  </div>
+</div>
+
+<script>
+  import * as THREE from 'three';
+  import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+  function initHeroViewer() {
+    const canvas = document.getElementById('hero-canvas') as HTMLCanvasElement | null;
+    const loading = document.getElementById('hero-loading');
+    if (!canvas) return;
+
+    const width = canvas.clientWidth || 400;
+    const height = canvas.clientHeight || 450;
+
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setSize(width, height, false);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.shadowMap.enabled = true;
+
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(38, width / height, 0.1, 100);
+    camera.position.set(0, 1.25, 2.3);
+    camera.lookAt(0, 0.95, 0);
+
+    // Studio Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.3);
+    scene.add(ambientLight);
+
+    const keyLight = new THREE.DirectionalLight(0x22d3ee, 2.2); // Cyan key
+    keyLight.position.set(2, 3, 2);
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0xa855f7, 1.8); // Purple fill
+    fillLight.position.set(-2, 1.5, 1.5);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffffff, 2.0); // Top rim
+    rimLight.position.set(0, 3.5, -2);
+    scene.add(rimLight);
+
+    let model: THREE.Group | null = null;
+    let headBone: THREE.Bone | null = null;
+    let neckBone: THREE.Bone | null = null;
+    let rightArmBone: THREE.Bone | null = null;
+    let leftArmBone: THREE.Bone | null = null;
+
+    let targetLookX = 0;
+    let targetLookY = 0;
+    let currentLookX = 0;
+    let currentLookY = 0;
+
+    let currentAction = 'idle';
+    let actionTimer = 0;
+
+    // Load Rocco GLB
+    const loader = new GLTFLoader();
+    loader.load(
+      '/models/rocco.glb',
+      (gltf) => {
+        model = gltf.scene;
+        model.scale.set(1, 1, 1);
+        model.position.set(0, 0.05, 0);
+
+        // Find bones
+        model.traverse((child) => {
+          if ((child as THREE.Bone).isBone) {
+            const name = child.name.toLowerCase();
+            if (!headBone && (name.includes('head') || name === 'mixamorighead')) {
+              headBone = child as THREE.Bone;
+            } else if (!neckBone && (name.includes('neck') || name === 'mixamorigneck')) {
+              neckBone = child as THREE.Bone;
+            } else if (!rightArmBone && (name.includes('rightarm') || name.includes('rightshoulder'))) {
+              rightArmBone = child as THREE.Bone;
+            } else if (!leftArmBone && (name.includes('leftarm') || name.includes('leftshoulder'))) {
+              leftArmBone = child as THREE.Bone;
+            }
+          }
+          if ((child as THREE.Mesh).isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+
+        scene.add(model);
+        if (loading) loading.style.display = 'none';
+      },
+      undefined,
+      (err) => {
+        console.warn('Hero GLB model failed to load, creating geometric fallback:', err);
+        // Stylized friendly 3D robot fallback
+        const group = new THREE.Group();
+        const headGeo = new THREE.BoxGeometry(0.5, 0.45, 0.4);
+        const headMat = new THREE.MeshStandardMaterial({ color: 0x06b6d4, roughness: 0.3, metalness: 0.8 });
+        const headMesh = new THREE.Mesh(headGeo, headMat);
+        headMesh.position.set(0, 1.2, 0);
+        group.add(headMesh);
+
+        const eyeGeo = new THREE.SphereGeometry(0.08, 16, 16);
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0x22d3ee });
+        const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+        eyeL.position.set(-0.13, 1.22, 0.21);
+        const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+        eyeR.position.set(0.13, 1.22, 0.21);
+        group.add(eyeL, eyeR);
+
+        const bodyGeo = new THREE.CylinderGeometry(0.3, 0.35, 0.7, 16);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x8b5cf6, roughness: 0.4 });
+        const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+        bodyMesh.position.set(0, 0.65, 0);
+        group.add(bodyMesh);
+
+        model = group;
+        scene.add(model);
+        if (loading) loading.style.display = 'none';
+      }
+    );
+
+    // Pointer Tracking
+    window.addEventListener('pointermove', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.clientX - rect.left;
+      const clientY = e.clientY - rect.top;
+
+      const normX = (clientX / rect.width) * 2 - 1;
+      const normY = -(clientY / rect.height) * 2 + 1;
+
+      targetLookX = Math.max(-1.2, Math.min(1.2, normX));
+      targetLookY = Math.max(-0.8, Math.min(0.8, normY));
+    });
+
+    // Buttons
+    document.getElementById('btn-hero-poke')?.addEventListener('click', () => {
+      currentAction = 'poke';
+      actionTimer = 1.0;
+    });
+
+    document.getElementById('btn-hero-groove')?.addEventListener('click', () => {
+      currentAction = 'dance';
+      actionTimer = 4.0;
+    });
+
+    document.getElementById('btn-hero-wave')?.addEventListener('click', () => {
+      currentAction = 'wave';
+      actionTimer = 2.5;
+    });
+
+    // Resize Handler
+    const handleResize = () => {
+      if (!canvas) return;
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h, false);
+    };
+    window.addEventListener('resize', handleResize);
+
+    // Animation Loop
+    let clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+      const elapsed = clock.getElapsedTime();
+
+      // Smooth look lerp
+      currentLookX += (targetLookX - currentLookX) * 0.08;
+      currentLookY += (targetLookY - currentLookY) * 0.08;
+
+      if (headBone) {
+        headBone.rotation.y = currentLookX * 0.65;
+        headBone.rotation.x = -currentLookY * 0.45;
+      }
+      if (neckBone) {
+        neckBone.rotation.y = currentLookX * 0.25;
+        neckBone.rotation.x = -currentLookY * 0.15;
+      }
+
+      // Action updates
+      if (actionTimer > 0) {
+        actionTimer -= delta;
+        if (currentAction === 'poke' && model) {
+          model.position.z = Math.sin(actionTimer * 20) * 0.04;
+          model.rotation.z = Math.sin(actionTimer * 15) * 0.08;
+        } else if (currentAction === 'dance' && model) {
+          const beat = elapsed * 7.5;
+          model.position.y = 0.05 + Math.abs(Math.sin(beat)) * 0.07;
+          model.rotation.y = Math.sin(beat * 0.5) * 0.25;
+          model.rotation.z = Math.cos(beat * 0.5) * 0.08;
+        } else if (currentAction === 'wave' && rightArmBone) {
+          rightArmBone.rotation.z = -1.6 + Math.sin(elapsed * 12) * 0.4;
+        }
+      } else {
+        currentAction = 'idle';
+        // Idle breathing
+        if (model) {
+          model.position.y = 0.05 + Math.sin(elapsed * 1.8) * 0.015;
+          model.rotation.y = Math.sin(elapsed * 0.5) * 0.05;
+          model.rotation.z = 0;
+          model.position.z = 0;
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  }
+
+  // Initialize once DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initHeroViewer);
+  } else {
+    initHeroViewer();
+  }
+</script>

@@ -1,0 +1,59 @@
+---
+import GuideLayout from '../../layouts/GuideLayout.astro';
+---
+
+<GuideLayout title="Webcam Motion Capture (Copy Me)" currentSlug="/guide/webcam-mocap">
+  <div class="space-y-8 text-buddy-text">
+    <div>
+      <span class="text-xs font-mono uppercase tracking-wider text-buddy-cyan font-semibold">Customization</span>
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white mt-1">Webcam Motion Capture</h1>
+      <p class="text-base text-buddy-muted mt-2 leading-relaxed">
+        Turn your ordinary webcam into an on-device motion capture studio. Make Buddy mirror your movements live and record your own dances.
+      </p>
+    </div>
+
+    <!-- How Mocap Works -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">How It Works</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        Right-click Buddy and choose <b>"Copy me (webcam)..."</b> or navigate to <b>Settings &rarr; Capture</b>:
+      </p>
+      <ul class="list-disc pl-5 space-y-2 text-xs text-buddy-muted">
+        <li><b>MediaPipe Pose & Hands:</b> Google MediaPipe runs locally on your machine, tracking 33 skeletal body landmarks and 21 articulation points per hand in real-time.</li>
+        <li><b>Mirror on the Buddy:</b> When enabled, Buddy on your desktop copies your posture, head tilts, and hand gestures with near-zero latency.</li>
+        <li><b>Camera Privacy:</b> The camera stream is processed strictly in local memory and is never recorded or streamed anywhere. The webcam device turns off completely as soon as you leave the Capture tab or close Settings.</li>
+      </ul>
+    </div>
+
+    <!-- Recording Custom Animations -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Recording Custom Animation Clips</h2>
+      <ol class="list-decimal pl-5 space-y-3 text-xs text-buddy-muted">
+        <li>
+          <b class="text-white">Position your camera:</b> Stand back until your upper body (and ideally full torso/arms) is clearly visible in the camera preview frame.
+        </li>
+        <li>
+          <b class="text-white">Hit Record:</b> Click the <b>Record</b> button. Move, dance, wave, or act out a custom fidget.
+        </li>
+        <li>
+          <b class="text-white">Stop & Name:</b> Click <b>Stop</b>. Enter a name for the clip (e.g. <code>my-cool-dance</code>).
+        </li>
+        <li>
+          <b class="text-white">Set Role & Loop:</b> Choose how Buddy will use the clip (dance, idle loop, fidget, or poke). Tick <i>"Make it loop"</i> to automatically smooth and blend the last half-second into the start.
+        </li>
+        <li>
+          <b class="text-white">Save:</b> Click <b>Save to my animations</b>. The clip is stored as a retargetable GLB in your library and works immediately on all 3D characters!
+        </li>
+      </ol>
+    </div>
+
+    <!-- Navigation -->
+    <div class="pt-6 border-t border-buddy-border flex justify-between">
+      <a href="/guide/custom-characters" class="text-xs text-buddy-darkMuted hover:text-buddy-cyan transition-colors">&larr; Back: Custom Characters</a>
+      <a href="/guide/troubleshooting" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-buddy-cyan/15 hover:bg-buddy-cyan/25 border border-buddy-cyan/30 text-buddy-cyan text-xs font-semibold transition-colors">
+        <span>Next: Troubleshooting & Logs</span>
+        <span>&rarr;</span>
+      </a>
+    </div>
+  </div>
+</GuideLayout>

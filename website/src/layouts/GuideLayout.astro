@@ -1,0 +1,126 @@
+---
+import BaseLayout from './BaseLayout.astro';
+
+interface Props {
+  title: string;
+  description?: string;
+  currentSlug?: string;
+}
+
+const { title, description = 'Official documentation and user guide for Robo Buddy.', currentSlug = '' } = Astro.props;
+
+const chapters = [
+  {
+    category: 'Getting Started',
+    links: [
+      { name: 'Introduction & Install', href: '/guide' },
+      { name: 'Desktop Controls & Furniture', href: '/guide/basics' }
+    ]
+  },
+  {
+    category: 'Companion Systems',
+    links: [
+      { name: 'Clippy Mode (Context AI)', href: '/guide/clippy-mode', isNew: true },
+      { name: 'Window Physics & Climbing', href: '/guide/window-physics' },
+      { name: 'Music Beat Dancing', href: '/guide/music-dancing' },
+      { name: 'Screensaver Havoc', href: '/guide/screensaver-havoc' }
+    ]
+  },
+  {
+    category: 'AI & Speech',
+    links: [
+      { name: 'Talk Setup & Providers', href: '/guide/talk-ai-voices' },
+      { name: 'Piper Neural Voices', href: '/guide/talk-ai-voices#piper' }
+    ]
+  },
+  {
+    category: 'Customization',
+    links: [
+      { name: 'Custom 3D Rigs & Mixamo', href: '/guide/custom-characters' },
+      { name: 'Webcam Mocap (Copy Me)', href: '/guide/webcam-mocap' }
+    ]
+  },
+  {
+    category: 'Support',
+    links: [
+      { name: 'Troubleshooting & Logs', href: '/guide/troubleshooting' }
+    ]
+  }
+];
+---
+
+<BaseLayout title={`${title} — Robo Buddy Guide`} description={description} currentPath="/guide">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <!-- Breadcrumb & Top Bar -->
+    <div class="flex items-center gap-2 text-xs text-buddy-darkMuted mb-8 font-mono">
+      <a href="/" class="hover:text-buddy-cyan transition-colors">Home</a>
+      <span>/</span>
+      <a href="/guide" class="hover:text-buddy-cyan transition-colors">User Guide</a>
+      <span>/</span>
+      <span class="text-buddy-text">{title}</span>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+      <!-- Left Sidebar Nav -->
+      <aside class="lg:col-span-3">
+        <div class="sticky top-24 rounded-2xl border border-buddy-border bg-buddy-card/80 p-5 backdrop-blur-md space-y-6">
+          <div class="flex items-center justify-between pb-3 border-b border-buddy-border">
+            <span class="text-xs font-bold text-white uppercase tracking-wider">Guide Navigation</span>
+            <span class="text-[10px] font-mono text-buddy-cyan bg-buddy-cyan/10 px-1.5 py-0.5 rounded">v0.6.0</span>
+          </div>
+
+          <nav class="space-y-5">
+            {chapters.map((group) => (
+              <div>
+                <h4 class="text-[11px] font-semibold text-buddy-darkMuted uppercase tracking-wider mb-2 font-mono">
+                  {group.category}
+                </h4>
+                <ul class="space-y-1 text-xs">
+                  {group.links.map((link) => {
+                    const isActive = currentSlug === link.href || (link.href === '/guide' && currentSlug === '');
+                    return (
+                      <li>
+                        <a
+                          href={link.href}
+                          class={`flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-colors ${
+                            isActive
+                              ? 'bg-buddy-cyan/15 text-buddy-cyan font-semibold border border-buddy-cyan/30'
+                              : 'text-buddy-muted hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <span>{link.name}</span>
+                          {link.isNew && (
+                            <span class="text-[9px] font-mono px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-300">NEW</span>
+                          )}
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </nav>
+
+          <div class="pt-3 border-t border-buddy-border">
+            <a
+              href="https://github.com/MrSco/robo-buddy-releases/issues"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="flex items-center gap-2 text-xs text-buddy-darkMuted hover:text-buddy-cyan transition-colors"
+            >
+              <span>💬 Suggest edit or ask question</span>
+              <span>&rarr;</span>
+            </a>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Docs Content Area -->
+      <main class="lg:col-span-9 prose prose-invert max-w-none">
+        <div class="rounded-2xl border border-buddy-border bg-buddy-card/70 p-6 sm:p-10 backdrop-blur-md">
+          <slot />
+        </div>
+      </main>
+    </div>
+  </div>
+</BaseLayout>

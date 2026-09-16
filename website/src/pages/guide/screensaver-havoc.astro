@@ -1,0 +1,66 @@
+---
+import GuideLayout from '../../layouts/GuideLayout.astro';
+---
+
+<GuideLayout title="Screensaver Havoc & Destruction" currentSlug="/guide/screensaver-havoc">
+  <div class="space-y-8 text-buddy-text">
+    <div>
+      <span class="text-xs font-mono uppercase tracking-wider text-buddy-cyan font-semibold">Companion Systems</span>
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white mt-1">Screensaver Havoc</h1>
+      <p class="text-base text-buddy-muted mt-2 leading-relaxed">
+        Turn idle desktop time into controlled destruction with falling tiles, cracked glass cutouts, and CRT power-off effects.
+      </p>
+    </div>
+
+    <!-- How Screensaver Works -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">How Desktop Havoc Works</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        When your system goes idle (or when you choose <b>"Screensaver now"</b> from the context menu), Buddy takes a clean screenshot of your desktop monitors. A fullscreen borderless overlay appears with that snapshot:
+      </p>
+      <div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-buddy-text space-y-1">
+        <b class="text-amber-400">Zero Risk to Your Work</b>
+        <p class="text-buddy-muted leading-relaxed">
+          Buddy only plays with the freeze-frame image. Your real application windows, unsaved documents, and desktop icons are 100% untouched. Pressing any key or wiggling your mouse dismisses the screensaver immediately.
+        </p>
+      </div>
+    </div>
+
+    <!-- Destruction Modes -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Destruction & Erosion Styles</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        Under <b>Settings &rarr; Window &rarr; Screensaver</b>, you can customize the havoc simulation:
+      </p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+        <div class="p-4 rounded-xl bg-buddy-bg border border-buddy-border space-y-2">
+          <b class="text-white text-sm">Falling Grid Tiles</b>
+          <p class="text-buddy-muted">Your desktop is sliced into rectangular tiles. When Buddy punches or lands on the screen, shockwaves propagate, tumbling tiles into the void below.</p>
+        </div>
+        <div class="p-4 rounded-xl bg-buddy-bg border border-buddy-border space-y-2">
+          <b class="text-white text-sm">Cracked Glass Cutouts</b>
+          <p class="text-buddy-muted">Impacts generate jagged voronoi glass fractures. Ambient erosion crumbles shards away around Buddy's footsteps.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CRT Void & Windows Saver -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">CRT Power-Down & Windows Saver Integration</h2>
+      <ul class="list-disc pl-5 space-y-2 text-xs text-buddy-muted">
+        <li><b>CRT Void:</b> After your desktop is broken, Buddy triggers a vintage cathode-ray tube collapse animation down to a single fading phosphor beam into darkness.</li>
+        <li><b>Windows Screensaver Handoff:</b> You can configure Buddy to smoothly launch your standard Windows screensaver (<code>.scr</code>) or another custom screensaver once the destruction sequence completes.</li>
+      </ul>
+    </div>
+
+    <!-- Navigation -->
+    <div class="pt-6 border-t border-buddy-border flex justify-between">
+      <a href="/guide/music-dancing" class="text-xs text-buddy-darkMuted hover:text-buddy-cyan transition-colors">&larr; Back: Music Dancing</a>
+      <a href="/guide/talk-ai-voices" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-buddy-cyan/15 hover:bg-buddy-cyan/25 border border-buddy-cyan/30 text-buddy-cyan text-xs font-semibold transition-colors">
+        <span>Next: Talk & AI Voices</span>
+        <span>&rarr;</span>
+      </a>
+    </div>
+  </div>
+</GuideLayout>

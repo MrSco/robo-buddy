@@ -1,0 +1,107 @@
+---
+import GuideLayout from '../../layouts/GuideLayout.astro';
+---
+
+<GuideLayout title="Desktop Controls & Furniture" currentSlug="/guide/basics">
+  <div class="space-y-8 text-buddy-text">
+    <div>
+      <span class="text-xs font-mono uppercase tracking-wider text-buddy-cyan font-semibold">Getting Started</span>
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white mt-1">Desktop Controls & Furniture</h1>
+      <p class="text-base text-buddy-muted mt-2 leading-relaxed">
+        Interacting with Robo Buddy is tactile and physical. Your open windows are not just apps—they are physical surfaces.
+      </p>
+    </div>
+
+    <!-- Mouse Controls Table -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Mouse & Gesture Interactions</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs border border-buddy-border rounded-lg overflow-hidden">
+          <thead class="bg-buddy-bg font-semibold text-white">
+            <tr>
+              <th class="p-3 border-b border-buddy-border">Action</th>
+              <th class="p-3 border-b border-buddy-border">What Happens</th>
+              <th class="p-3 border-b border-buddy-border">Notes</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-buddy-border text-buddy-muted">
+            <tr>
+              <td class="p-3 font-semibold text-white">Left Click</td>
+              <td class="p-3">Pokes Buddy, making him flinch, laugh, or react.</td>
+              <td class="p-3">Plays reaction sound if character has them.</td>
+            </tr>
+            <tr>
+              <td class="p-3 font-semibold text-white">Click & Drag</td>
+              <td class="p-3">Pick up and carry him anywhere on your screens. Grab an arm or leg and he dangles.</td>
+              <td class="p-3">Feet lift off the ground into airborne ragdoll.</td>
+            </tr>
+            <tr>
+              <td class="p-3 font-semibold text-white">Fling (Throw)</td>
+              <td class="p-3">Release mouse while moving quickly to throw him across the desktop.</td>
+              <td class="p-3">Tumbles with physics and lands on the floor or window.</td>
+            </tr>
+            <tr>
+              <td class="p-3 font-semibold text-white">Double Click</td>
+              <td class="p-3">Opens the speech/talk box over his head to chat.</td>
+              <td class="p-3">Requires "Let him talk" enabled in Settings.</td>
+            </tr>
+            <tr>
+              <td class="p-3 font-semibold text-white">Right Click</td>
+              <td class="p-3">Opens the quick context menu right under your cursor.</td>
+              <td class="p-3">Same menu as right-clicking the system tray icon.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Windows as Furniture -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Windows Are Furniture</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        With <b>"Stand on and climb other windows"</b> enabled in Settings &rarr; Reactions:
+      </p>
+      <ul class="list-disc pl-5 space-y-2 text-xs text-buddy-muted">
+        <li><b>Ledge Lands:</b> Drop him directly onto an application window title bar, and he lands firmly on top of it.</li>
+        <li><b>Edge Grabs:</b> Drop him slightly short of a window edge, and he catches the rim with his hands and pulls himself up onto the window!</li>
+        <li><b>Riding Along:</b> When you drag or move that window, Buddy rides along on top of it.</li>
+        <li><b>Autonomous Climbing:</b> When idle, Buddy will climb onto adjacent windows, walk across them, and hop down when bored.</li>
+      </ul>
+    </div>
+
+    <!-- Tray Menu -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">System Tray Menu</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        Buddy lives in the Windows notification area (system tray). Right-click his tray icon for essential controls:
+      </p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+        <div class="p-3 rounded-lg bg-buddy-bg border border-buddy-border">
+          <b class="text-white">Settings...</b>
+          <p class="text-buddy-muted mt-1">Opens the full tabbed settings window.</p>
+        </div>
+        <div class="p-3 rounded-lg bg-buddy-bg border border-buddy-border">
+          <b class="text-white">Bring buddy here</b>
+          <p class="text-buddy-muted mt-1">Teleports Buddy onto the monitor where your cursor is.</p>
+        </div>
+        <div class="p-3 rounded-lg bg-buddy-bg border border-buddy-border">
+          <b class="text-white">Screensaver now</b>
+          <p class="text-buddy-muted mt-1">Immediately triggers the desktop havoc screensaver.</p>
+        </div>
+        <div class="p-3 rounded-lg bg-buddy-bg border border-buddy-border">
+          <b class="text-white">Pause reactions</b>
+          <p class="text-buddy-muted mt-1">Freezes all idle roaming, dancing, and context triggers.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Next Chapter Button -->
+    <div class="pt-6 border-t border-buddy-border flex justify-between">
+      <a href="/guide" class="text-xs text-buddy-darkMuted hover:text-buddy-cyan transition-colors">&larr; Back to Introduction</a>
+      <a href="/guide/clippy-mode" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-buddy-cyan/15 hover:bg-buddy-cyan/25 border border-buddy-cyan/30 text-buddy-cyan text-xs font-semibold transition-colors">
+        <span>Next: Clippy Mode (Context AI)</span>
+        <span>&rarr;</span>
+      </a>
+    </div>
+  </div>
+</GuideLayout>

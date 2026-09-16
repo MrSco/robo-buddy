@@ -1,0 +1,90 @@
+---
+import GuideLayout from '../../layouts/GuideLayout.astro';
+---
+
+<GuideLayout title="Window Physics & Climbing" currentSlug="/guide/window-physics">
+  <div class="space-y-8 text-buddy-text">
+    <div>
+      <span class="text-xs font-mono uppercase tracking-wider text-buddy-cyan font-semibold">Companion Systems</span>
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white mt-1">Window Physics & Climbing</h1>
+      <p class="text-base text-buddy-muted mt-2 leading-relaxed">
+        How gravity, ragdoll mechanics, window edges, and mouse transparency work in Robo Buddy.
+      </p>
+    </div>
+
+    <!-- Physics Controls -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Fine-Tuning Physics</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        Under <b>Settings &rarr; Reactions</b>, you can customize the desktop physics engine:
+      </p>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+        <div class="p-4 rounded-xl bg-buddy-bg border border-buddy-border space-y-1.5">
+          <b class="text-white text-sm">Gravity Strength</b>
+          <p class="text-buddy-muted">Controls how rapidly Buddy accelerates downward when released or falling off a ledge. Higher values give a heavy, grounded feel.</p>
+        </div>
+        <div class="p-4 rounded-xl bg-buddy-bg border border-buddy-border space-y-1.5">
+          <b class="text-white text-sm">Bounciness</b>
+          <p class="text-buddy-muted">Determines how much kinetic energy is retained on impacts. Turn this up for cartoonish boings across your desktop.</p>
+        </div>
+        <div class="p-4 rounded-xl bg-buddy-bg border border-buddy-border space-y-1.5">
+          <b class="text-white text-sm">Throw Strength</b>
+          <p class="text-buddy-muted">Multiplies the cursor velocity when throwing Buddy. Turn up to send him flying across multiple monitors.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Click-Through Transparency Modes -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Click-Through Precision Modes</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        Because Buddy lives in a transparent desktop overlay window, how clicks pass through to your apps is important. Configure this under <b>Settings &rarr; Window</b>:
+      </p>
+      <div class="space-y-3 text-xs">
+        <div class="p-3 rounded-lg bg-buddy-bg border border-buddy-border flex items-start gap-3">
+          <span class="text-buddy-cyan text-base font-bold">1</span>
+          <div>
+            <b class="text-white">Precise (Default):</b>
+            <p class="text-buddy-muted mt-0.5">Clicks pass through all transparent space around Buddy to whatever window is behind him. Only clicking directly on his drawn 3D/2D body catches the mouse.</p>
+          </div>
+        </div>
+        <div class="p-3 rounded-lg bg-buddy-bg border border-buddy-border flex items-start gap-3">
+          <span class="text-buddy-purple text-base font-bold">2</span>
+          <div>
+            <b class="text-white">Whole Window:</b>
+            <p class="text-buddy-muted mt-0.5">The full bounding rectangle of Buddy catches clicks. Recommended if you prefer an easier target to grab.</p>
+          </div>
+        </div>
+        <div class="p-3 rounded-lg bg-buddy-bg border border-buddy-border flex items-start gap-3">
+          <span class="text-buddy-darkMuted text-base font-bold">3</span>
+          <div>
+            <b class="text-white">Locked:</b>
+            <p class="text-buddy-muted mt-0.5">Makes Buddy 100% click-through and non-interactive with the mouse. Great when you want him purely as a background aesthetic without ever misclicking.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Window Stacking & Head Bumps -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Ledge Climbing & Screen Boundaries</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        Robo Buddy uses native Win32 window geometry to navigate real apps on your desktop:
+      </p>
+      <ul class="list-disc pl-5 space-y-2 text-xs text-buddy-muted">
+        <li><b>Edge Catch:</b> When dropped near a title bar, Buddy reaches out, grips the ledge, and pulls himself up with a dynamic climbing animation.</li>
+        <li><b>Duck & Fit:</b> If a window is moved too close to the top of the monitor, Buddy ducks down to fit underneath the screen border.</li>
+        <li><b>Head Bumps:</b> If pushed past the top of the screen by a rising window, he bumps his head and tumbles back down.</li>
+      </ul>
+    </div>
+
+    <!-- Navigation -->
+    <div class="pt-6 border-t border-buddy-border flex justify-between">
+      <a href="/guide/clippy-mode" class="text-xs text-buddy-darkMuted hover:text-buddy-cyan transition-colors">&larr; Back: Clippy Mode</a>
+      <a href="/guide/music-dancing" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-buddy-cyan/15 hover:bg-buddy-cyan/25 border border-buddy-cyan/30 text-buddy-cyan text-xs font-semibold transition-colors">
+        <span>Next: Music Beat Dancing</span>
+        <span>&rarr;</span>
+      </a>
+    </div>
+  </div>
+</GuideLayout>

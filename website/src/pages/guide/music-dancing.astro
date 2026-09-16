@@ -1,0 +1,73 @@
+---
+import GuideLayout from '../../layouts/GuideLayout.astro';
+---
+
+<GuideLayout title="Music Beat Dancing" currentSlug="/guide/music-dancing">
+  <div class="space-y-8 text-buddy-text">
+    <div>
+      <span class="text-xs font-mono uppercase tracking-wider text-buddy-cyan font-semibold">Companion Systems</span>
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white mt-1">Music Detection & Beat Dancing</h1>
+      <p class="text-base text-buddy-muted mt-2 leading-relaxed">
+        Robo Buddy grooves along with whatever song is playing through your Windows audio output.
+      </p>
+    </div>
+
+    <!-- How it Works -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">How Beat Detection Works</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        Buddy uses low-latency native <b>WASAPI Audio Loopback</b> in Rust. The stream is fed into real-time Fast Fourier Transforms (FFT) to extract spectral flux and rhythmic periodicities.
+      </p>
+      
+      <div class="p-4 rounded-xl bg-pink-500/10 border border-pink-500/30 text-xs text-buddy-text space-y-2">
+        <b class="text-pink-400 flex items-center gap-1.5">
+          <span>🔒</span> Privacy Note
+        </b>
+        <p class="text-buddy-muted leading-relaxed">
+          Audio is never saved, cached, or transmitted over any network. It is evaluated solely as mathematical frequency magnitudes in memory and discarded in milliseconds.
+        </p>
+      </div>
+    </div>
+
+    <!-- Tuning Beat Lock -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Tuning Beat Lock Sensitivity</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        Different audio environments require different sensitivity. Open <b>Settings &rarr; Reactions</b> to view the live BPM meter and adjust the <i>Beat lock</i> slider:
+      </p>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+        <div class="p-4 rounded-xl bg-buddy-bg border border-buddy-border space-y-2">
+          <b class="text-white text-sm">Higher Beat Lock (0.75 - 1.0)</b>
+          <p class="text-buddy-muted">Buddy commits to tempos immediately. Great for EDM, dance pop, and quick rhythm switches. He starts grooving almost as soon as a kick drum starts.</p>
+        </div>
+        <div class="p-4 rounded-xl bg-buddy-bg border border-buddy-border space-y-2">
+          <b class="text-white text-sm">Lower Beat Lock (0.25 - 0.50)</b>
+          <p class="text-buddy-muted">Requires a rhythm to hold steady for several seconds before dancing. Recommended when listening to podcasts, YouTube commentary, or playing video games to prevent sporadic twitching.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dances & Custom Clips -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Selecting Dances</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        Under the Dance selector in Settings:
+      </p>
+      <ul class="list-disc pl-5 space-y-2 text-xs text-buddy-muted">
+        <li><b>Procedural Groove:</b> An algorithmic rhythm bob that synchronizes its speed dynamically to the detected BPM on every humanoid character.</li>
+        <li><b>Random Dance:</b> Picks a random dance clip from your animation library every time a new music session begins.</li>
+        <li><b>Custom Mixamo Dances:</b> Any dance clip from Mixamo or your motion capture sessions can be assigned the "dance" role on the Animations tab.</li>
+      </ul>
+    </div>
+
+    <!-- Navigation -->
+    <div class="pt-6 border-t border-buddy-border flex justify-between">
+      <a href="/guide/window-physics" class="text-xs text-buddy-darkMuted hover:text-buddy-cyan transition-colors">&larr; Back: Window Physics</a>
+      <a href="/guide/screensaver-havoc" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-buddy-cyan/15 hover:bg-buddy-cyan/25 border border-buddy-cyan/30 text-buddy-cyan text-xs font-semibold transition-colors">
+        <span>Next: Screensaver Havoc</span>
+        <span>&rarr;</span>
+      </a>
+    </div>
+  </div>
+</GuideLayout>

@@ -1,0 +1,21 @@
+{
+  "name": "robo-buddy-website",
+  "type": "module",
+  "version": "0.6.0",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/tailwind": "^5.1.4",
+    "astro": "^5.4.2",
+    "tailwindcss": "^3.4.17",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.180.0"
+  }
+}

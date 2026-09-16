@@ -1,0 +1,80 @@
+---
+import GuideLayout from '../../layouts/GuideLayout.astro';
+---
+
+<GuideLayout title="Custom Characters & 3D Rig Import" currentSlug="/guide/custom-characters">
+  <div class="space-y-8 text-buddy-text">
+    <div>
+      <span class="text-xs font-mono uppercase tracking-wider text-buddy-cyan font-semibold">Customization</span>
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-white mt-1">Custom Characters & 3D Rigs</h1>
+      <p class="text-base text-buddy-muted mt-2 leading-relaxed">
+        Import any 3D humanoid character or 2D animated sprite. Universal retargeting ensures every clip in your library works seamlessly on every model.
+      </p>
+    </div>
+
+    <!-- Supported File Formats -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Supported File Formats</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+        <div class="p-4 rounded-xl bg-buddy-bg border border-buddy-border space-y-2">
+          <b class="text-white text-sm">3D Humanoid Models</b>
+          <p class="text-buddy-muted"><code>.glb</code>, <code>.gltf</code>, <code>.vrm</code>, or <code>.fbx</code></p>
+          <p class="text-buddy-darkMuted leading-relaxed">
+            Must contain a humanoid skeleton. Mixamo, Unreal Engine Manny/Quinn, and VRoid standard bone names are recognized automatically.
+          </p>
+        </div>
+        <div class="p-4 rounded-xl bg-buddy-bg border border-buddy-border space-y-2">
+          <b class="text-white text-sm">2D Animated Characters</b>
+          <p class="text-buddy-muted"><code>.webp</code>, <code>.gif</code>, <code>.png</code>, or <code>.apng</code></p>
+          <p class="text-buddy-darkMuted leading-relaxed">
+            Turns any animated sprite sheet into a flat desktop pet that wanders, idles, and reacts to clicks.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Make One of Yourself Guide -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Tutorial: Make a 3D Buddy of Yourself</h2>
+      <p class="text-sm text-buddy-muted leading-relaxed">
+        The default buddy, <b>Rocco</b>, was created using this exact workflow:
+      </p>
+
+      <ol class="list-decimal pl-5 space-y-3 text-xs text-buddy-muted">
+        <li>
+          <b class="text-white">Scan your body:</b> Use a phone 3D scanning app (like in3D on iOS/Android). Stand in a neutral pose with arms slightly outward. Export the result as a <code>.glb</code> or <code>.obj</code> file.
+        </li>
+        <li>
+          <b class="text-white">Auto-rig on Mixamo:</b> Go to <a href="https://www.mixamo.com" target="_blank" rel="noopener noreferrer" class="text-buddy-cyan underline">mixamo.com</a> (free with an Adobe account). Click "Upload Character" and upload your 3D scan.
+        </li>
+        <li>
+          <b class="text-white">Place markers:</b> Place the chin, wrists, elbows, knees, and groin markers according to the on-screen guide. Mixamo generates a fully rigged skeleton in seconds.
+        </li>
+        <li>
+          <b class="text-white">Download:</b> Click "Download" and select <b>FBX</b> or convert to <b>GLB</b>.
+        </li>
+        <li>
+          <b class="text-white">Drop onto Buddy:</b> Drag and drop the downloaded file directly onto Buddy or click <b>Import model...</b> in Settings &rarr; Character. He appears instantly on your screen!
+        </li>
+      </ol>
+    </div>
+
+    <!-- Per-Character Lighting & Profiles -->
+    <div class="space-y-4">
+      <h2 class="text-xl font-bold text-white border-b border-buddy-border pb-2">Lighting & Personality</h2>
+      <ul class="list-disc pl-5 space-y-2 text-xs text-buddy-muted">
+        <li><b>Per-Model Lighting:</b> Different 3D models have different shader materials. In the Character tab, you can dial in lighting brightness and reflections independently for each imported model.</li>
+        <li><b>Unique Personalities:</b> Each imported character gets its own <code>manifest.json</code> under <code>%APPDATA%\com.rocco.robobuddy\characters\</code>. You can configure unique system prompts, speech bubble lines, and tone of voice that stick with that character.</li>
+      </ul>
+    </div>
+
+    <!-- Navigation -->
+    <div class="pt-6 border-t border-buddy-border flex justify-between">
+      <a href="/guide/talk-ai-voices" class="text-xs text-buddy-darkMuted hover:text-buddy-cyan transition-colors">&larr; Back: Talk & Voices</a>
+      <a href="/guide/webcam-mocap" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-buddy-cyan/15 hover:bg-buddy-cyan/25 border border-buddy-cyan/30 text-buddy-cyan text-xs font-semibold transition-colors">
+        <span>Next: Webcam Motion Capture</span>
+        <span>&rarr;</span>
+      </a>
+    </div>
+  </div>
+</GuideLayout>

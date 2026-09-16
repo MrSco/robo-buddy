@@ -1,0 +1,84 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import BuddyHero3D from '../components/BuddyHero3D.astro';
+import FeatureReel from '../components/FeatureReel.astro';
+import ClippyShowcase from '../components/ClippyShowcase.astro';
+import BentoGrid from '../components/BentoGrid.astro';
+import DownloadCTA from '../components/DownloadCTA.astro';
+---
+
+<BaseLayout currentPath="/">
+  <!-- ==================== HERO SECTION ==================== -->
+  <section class="relative pt-12 pb-20 sm:pt-20 sm:pb-28 overflow-hidden">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        <!-- Left Hero Copy -->
+        <div class="lg:col-span-7 space-y-6 text-center lg:text-left">
+          <!-- Release Badge -->
+          <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-buddy-border bg-buddy-card/80 text-xs text-buddy-muted shadow-sm backdrop-blur-md">
+            <span class="w-2 h-2 rounded-full bg-buddy-cyan animate-pulse"></span>
+            <span class="text-white font-medium">Robo Buddy 0.6.0 is here</span>
+            <span class="text-buddy-darkMuted">•</span>
+            <span class="text-buddy-cyan hover:underline cursor-pointer">What's new &rarr;</span>
+          </div>
+
+          <!-- Main Title -->
+          <h1 class="text-4xl sm:text-6xl font-extrabold tracking-tight text-white leading-[1.1]">
+            The Desktop Pet, <br />
+            <span class="text-gradient">Reimagined</span> for the AI Era.
+          </h1>
+
+          <!-- Subtitle -->
+          <p class="text-base sm:text-lg text-buddy-muted max-w-xl mx-auto lg:mx-0 leading-relaxed">
+            He lives on your taskbar, watches your cursor, and dances to whatever plays through your speakers. Throw him across your screen, watch him climb your windows, or chat with offline neural voices.
+          </p>
+
+          <!-- CTAs -->
+          <div class="pt-2 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+            <a
+              href="#download"
+              class="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-gradient-to-r from-buddy-cyan to-buddy-purple hover:brightness-110 text-white font-bold text-sm shadow-xl shadow-buddy-cyan/20 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2.5"
+            >
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.951-1.77"/></svg>
+              <span>Download for Windows</span>
+            </a>
+
+            <a
+              href="/guide"
+              class="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-buddy-card/80 border border-buddy-border hover:border-buddy-cyan/50 text-buddy-text hover:text-white font-medium text-sm transition-all hover:bg-white/5 flex items-center justify-center gap-2"
+            >
+              <span>Explore User Guide</span>
+              <span>&rarr;</span>
+            </a>
+          </div>
+
+          <!-- Trust Badges -->
+          <div class="pt-4 flex flex-wrap items-center justify-center lg:justify-start gap-y-2 gap-x-6 text-xs text-buddy-darkMuted font-mono">
+            <span>Windows 10/11</span>
+            <span>•</span>
+            <span>100% Free & Open Source</span>
+            <span>•</span>
+            <span>No Telemetry / Offline First</span>
+          </div>
+        </div>
+
+        <!-- Right Hero Interactive 3D Viewer -->
+        <div class="lg:col-span-5 flex justify-center">
+          <BuddyHero3D />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== FEATURE REEL (VIDEO DEMOS) ==================== -->
+  <FeatureReel />
+
+  <!-- ==================== CLIPPY MODE (NEW PROACTIVE AI) ==================== -->
+  <ClippyShowcase />
+
+  <!-- ==================== BENTO GRID CAPABILITIES ==================== -->
+  <BentoGrid />
+
+  <!-- ==================== DOWNLOAD CTA ==================== -->
+  <DownloadCTA />
+</BaseLayout>
