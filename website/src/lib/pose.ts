@@ -57,6 +57,19 @@ export function applyLookAt(c: Character, yaw: number, pitch: number, roll = 0) 
   rotateWorld(head, WORLD_Z, roll);
 }
 
+/** Arms up and flailing, used while airborne or thrown. */
+export function applyFlail(c: Character, t: number) {
+  c.root.updateMatrixWorld(true);
+  for (const n of ["leftUpperArm", "rightUpperArm", "leftLowerArm", "rightLowerArm"] as const) {
+    resetBone(c, c.bone(n));
+  }
+  const wave = Math.sin(t * 14) * 0.35;
+  rotateWorld(c.bone("leftUpperArm"), WORLD_Z, 0.9 + wave);
+  rotateWorld(c.bone("rightUpperArm"), WORLD_Z, -0.9 - wave);
+  rotateWorld(c.bone("leftLowerArm"), WORLD_Z, 0.5);
+  rotateWorld(c.bone("rightLowerArm"), WORLD_Z, -0.5);
+}
+
 /** A bounded procedural action overlay for kicks, punches, and throws. */
 export function applyAttack(c: Character, kind: "punch" | "kick" | "throw", progress: number) {
   const p = Math.max(0, Math.min(1, progress));
@@ -191,43 +204,5 @@ export function applyDangle(c: Character, t: number, amount: number) {
   aimBone(c.bone("rightLowerLeg"), c.bone("rightFoot"), tmpDir, amount);
 }
 
-const crouchAxis = new THREE.Vector3();
-const crouchA = new THREE.Vector3();
-const crouchB = new THREE.Vector3();
-
-/**
- * Procedural duck/crouch with inverse kinematics knee bend: knees forward, hips down,
- * feet flat on the ground. Matches desktop crouch mechanics.
- */
-export function applyCrouch(c: Character, drop: number) {
-  if (drop <= 1e-5) return;
-  const hip = c.bone("leftUpperLeg") ?? c.bone("rightUpperLeg");
-  const foot = c.bone("leftFoot") ?? c.bone("rightFoot");
-  if (!hip || !foot) return;
-  for (const n of [
-    "leftUpperLeg",
-    "leftLowerLeg",
-    "leftFoot",
-    "rightUpperLeg",
-    "rightLowerLeg",
-    "rightFoot",
-  ] as const) {
-    const b = c.bone(n);
-    if (b && !c.animatedBones.has(b)) resetBone(c, b);
-  }
-  c.root.updateMatrixWorld(true);
-  hip.getWorldPosition(crouchA);
-  foot.getWorldPosition(crouchB);
-  const len = Math.max(1e-3, crouchA.y - crouchB.y);
-  const a = Math.acos(THREE.MathUtils.clamp(1 - Math.min(drop, len * 0.45) / len, -1, 1));
-  crouchAxis.set(1, 0, 0).applyQuaternion(c.root.quaternion).normalize();
-  for (const side of ["left", "right"] as const) {
-    rotateWorld(c.bone(`${side}UpperLeg`), crouchAxis, -a);
-    rotateWorld(c.bone(`${side}LowerLeg`), crouchAxis, 2 * a);
-    rotateWorld(c.bone(`${side}Foot`), crouchAxis, -a);
-  }
-  rotateWorld(c.bone("chest") ?? c.bone("spine"), crouchAxis, a * 0.3);
-  c.root.position.y -= len * (1 - Math.cos(a));
-}
 
 

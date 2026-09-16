@@ -157,11 +157,12 @@ import { CHARACTERS } from '../lib/character-loader';
   import {
     applyLookAt,
     applyAttack,
-    applyCrouch,
     applyHeldByArm,
     applyHeldByLeg,
     applyDangle,
+    applyFlail,
   } from '../lib/pose';
+  import { LimbSprings } from '../lib/secondary';
 
   function initHeroStage() {
     const container = document.getElementById('buddy-stage-container');
@@ -323,6 +324,15 @@ import { CHARACTERS } from '../lib/character-loader';
     let heldAmount = 0;
     let flipAmount = 0;
 
+    // Desktop Ragdoll Limb Springs (Matching desktop secondary motion)
+    const springs = new LimbSprings();
+    let springAmount = 0;
+    let accelX = 0;
+    let accelY = 0;
+    let lastPointerVelX = 0;
+    let lastPointerVelY = 0;
+    let isCrouching = false;
+
     // Behavior states
     let isHeld = false;
     let isFalling = false;
@@ -348,7 +358,14 @@ import { CHARACTERS } from '../lib/character-loader';
         isAttacking = false;
         nextAutoAction = 1.5; // resume autonomous showcase
         if (!isFalling && !isHeld && activeCharacter) {
-          playClip('idle', { loop: true, fade: 0.3 });
+          const maxPosY = CEILING_Y - footOffset - 0.92;
+          if (maxPosY - posY < 0.16) {
+            isCrouching = true;
+            playClip('crouch', { loop: true, fade: 0.25 });
+          } else {
+            isCrouching = false;
+            playClip('idle', { loop: true, fade: 0.3 });
+          }
         }
       }, durationMs);
     }
@@ -468,29 +485,33 @@ import { CHARACTERS } from '../lib/character-loader';
       }, durationMs);
     }
 
-    // Position speech bubble dynamically pinned snug above Buddy's 3D head bone
+    // Position speech bubble dynamically pinned snug above Buddy's 3D skull crown
     function updateSpeechBubblePos() {
       if (!bubble || bubble.style.opacity === '0' || !canvas) return;
       const cRect = canvas.getBoundingClientRect();
-      const headPos = new THREE.Vector3();
+      const crownPos = new THREE.Vector3();
       if (headBone) {
-        headBone.getWorldPosition(headPos);
+        headBone.getWorldPosition(crownPos);
+        // The skull crown sits ~0.13m above the head bone (base of skull)
+        crownPos.y += 0.13;
       } else if (activeCharacter) {
-        headPos.copy(activeCharacter.root.position);
-        headPos.y += 0.82;
+        crownPos.copy(activeCharacter.root.position);
+        crownPos.y += 0.94;
       } else {
-        headPos.set(posX, posY + 0.82, posZ);
+        crownPos.set(posX, posY + 0.94, posZ);
       }
 
-      headPos.project(camera);
-      const screenX = ((headPos.x + 1) / 2) * cRect.width + cRect.left;
-      const screenY = ((-headPos.y + 1) / 2) * cRect.height + cRect.top;
+      crownPos.project(camera);
+      const screenX = ((crownPos.x + 1) / 2) * cRect.width + cRect.left;
+      const screenY = ((-crownPos.y + 1) / 2) * cRect.height + cRect.top;
 
-      // Position bubble so down-pointing tail meets skull snugly (screenY - 4px)
+      // With CSS -translate-y-full, (screenY - 14px) positions the bottom of the card
+      // 14px above the crown of the head. The 14px tail meets the top of the skull
+      // perfectly with zero head covering and no awkward air gap!
       const bubbleW = bubble.offsetWidth || 220;
       const bubbleH = bubble.offsetHeight || 80;
       const clampedX = Math.max(bubbleW / 2 + 12, Math.min(window.innerWidth - bubbleW / 2 - 12, screenX));
-      const clampedY = Math.max(cRect.top + bubbleH + 10, screenY - 4);
+      const clampedY = Math.max(cRect.top + bubbleH + 12, screenY - 14);
 
       bubble.style.left = `${clampedX}px`;
       bubble.style.top = `${clampedY}px`;
@@ -826,6 +847,12 @@ import { CHARACTERS } from '../lib/character-loader';
       lastPointerY = e.clientY;
       lastPointerTime = now;
 
+      // Dragging acceleration drives desktop ragdoll limb springs
+      accelX = THREE.MathUtils.clamp((pointerVelX - lastPointerVelX) * 0.003, -2.5, 2.5);
+      accelY = THREE.MathUtils.clamp((pointerVelY - lastPointerVelY) * 0.003, -2.5, 2.5);
+      lastPointerVelX = pointerVelX;
+      lastPointerVelY = pointerVelY;
+
       // Dragging held Buddy (pinned to the specific gripped limb)
       if (isHeld && activeCharacter && canvas) {
         const rect = canvas.getBoundingClientRect();
@@ -845,7 +872,7 @@ import { CHARACTERS } from '../lib/character-loader';
           holdOffsetY = 0.82;
         }
 
-        const maxPosY = CEILING_Y - footOffset - 0.92;
+        const maxPosY = CEILING_Y - 0.92;
         posX = Math.max(-3.5, Math.min(3.5, pos.x));
         posY = Math.max(FLOOR_Y, Math.min(maxPosY, pos.y - holdOffsetY));
       }
@@ -915,7 +942,14 @@ import { CHARACTERS } from '../lib/character-loader';
       window.setTimeout(() => {
         isPoked = false;
         if (!isHeld && !isFalling && activeCharacter) {
-          playClip('idle', { loop: true, fade: 0.25 });
+          const maxPosY = CEILING_Y - footOffset - 0.92;
+          if (maxPosY - posY < 0.16) {
+            isCrouching = true;
+            playClip('crouch', { loop: true, fade: 0.25 });
+          } else {
+            isCrouching = false;
+            playClip('idle', { loop: true, fade: 0.25 });
+          }
         }
       }, 1200);
     }
@@ -1145,7 +1179,13 @@ import { CHARACTERS } from '../lib/character-loader';
         if (progress >= 1) {
           isAttacking = false;
           if (!isFalling && !isHeld) {
-            playClip('idle', { loop: true, fade: 0.25 });
+            if (maxPosY - posY < 0.16) {
+              isCrouching = true;
+              playClip('crouch', { loop: true, fade: 0.2 });
+            } else {
+              isCrouching = false;
+              playClip('idle', { loop: true, fade: 0.25 });
+            }
           }
         }
       }
@@ -1169,14 +1209,18 @@ import { CHARACTERS } from '../lib/character-loader';
         }
       }
 
-      // Procedural crouch / duck when approaching or under ceiling header
+      // Authored clip crouch / duck when approaching or under ceiling header
       if (!isFalling && !isHeld && activeCharacter) {
         const headroom = maxPosY - posY;
-        if (headroom < 0.22) {
-          const drop = Math.min(0.25, Math.max(0.04, 0.22 - headroom));
-          applyCrouch(activeCharacter, drop);
-          if (!isWalking && !isDancing && !isAttacking && drop > 0.08) {
+        if (headroom < 0.16) {
+          if (!isCrouching && !isWalking && !isDancing && !isAttacking) {
+            isCrouching = true;
             playClip('crouch', { loop: true, fade: 0.2 });
+          }
+        } else if (isCrouching) {
+          isCrouching = false;
+          if (!isWalking && !isDancing && !isAttacking) {
+            playClip('idle', { loop: true, fade: 0.25 });
           }
         }
       }
@@ -1260,7 +1304,13 @@ import { CHARACTERS } from '../lib/character-loader';
           } else {
             isWalking = false;
             targetRotY = 0;
-            playClip('idle', { loop: true, fade: 0.3 });
+            if (maxPosY - posY < 0.16) {
+              isCrouching = true;
+              playClip('crouch', { loop: true, fade: 0.25 });
+            } else {
+              isCrouching = false;
+              playClip('idle', { loop: true, fade: 0.3 });
+            }
           }
         }
       }
@@ -1328,7 +1378,13 @@ import { CHARACTERS } from '../lib/character-loader';
 
             window.setTimeout(() => {
               if (!isFalling && !isHeld && activeCharacter) {
-                playClip('idle', { loop: true, fade: 0.25 });
+                if (maxPosY - posY < 0.16) {
+                  isCrouching = true;
+                  playClip('crouch', { loop: true, fade: 0.25 });
+                } else {
+                  isCrouching = false;
+                  playClip('idle', { loop: true, fade: 0.25 });
+                }
               }
             }, 700);
             break;
@@ -1350,7 +1406,13 @@ import { CHARACTERS } from '../lib/character-loader';
             playClip('land', { loop: false, fade: 0.1 });
             window.setTimeout(() => {
               if (!isFalling && !isHeld && !isDancing && activeCharacter) {
-                playClip('idle', { loop: true, fade: 0.25 });
+                if (maxPosY - posY < 0.16) {
+                  isCrouching = true;
+                  playClip('crouch', { loop: true, fade: 0.25 });
+                } else {
+                  isCrouching = false;
+                  playClip('idle', { loop: true, fade: 0.25 });
+                }
               }
             }, 750);
           }
@@ -1396,6 +1458,26 @@ import { CHARACTERS } from '../lib/character-loader';
         // Dampen head look-at when character is walking or turned sideways
         const lookScale = 1 - Math.min(1, Math.abs(rotY) / 1.2);
         applyLookAt(activeCharacter, currentYaw * lookScale, currentPitch * lookScale, 0);
+      }
+
+      // 4b. DESKTOP-STYLE RAGDOLL LIMB SPRINGS & SECONDARY MOTION
+      if (isFalling) {
+        accelX = THREE.MathUtils.clamp(velX * 0.45, -2.5, 2.5);
+        accelY = THREE.MathUtils.clamp(-velY * 0.35, -2.5, 2.5);
+      } else if (!isHeld) {
+        accelX += (0 - accelX) * Math.min(1, dt * 8);
+        accelY += (0 - accelY) * Math.min(1, dt * 8);
+      }
+
+      const wantSprings = isHeld || isFalling;
+      springAmount += ((wantSprings ? 1 : 0) - springAmount) * Math.min(1, dt * (wantSprings ? 9 : 3));
+      const rigid = isHeld && currentGrabPart !== 'torso' ? currentGrabPart : null;
+
+      if (activeCharacter) {
+        if (isFalling && Math.hypot(velX, velY) > 2.0) {
+          applyFlail(activeCharacter, clock.getElapsedTime());
+        }
+        springs.update(activeCharacter, dt, clock.getElapsedTime(), accelX, accelY, springAmount, rigid);
       }
 
       // 5. UPDATE CHARACTER TRANSFORMS IN SCENE
