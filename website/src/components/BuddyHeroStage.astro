@@ -59,8 +59,8 @@ import { CHARACTERS } from '../lib/character-loader';
   </div>
 </div>
 
-<!-- Viewport-Wide Fixed 3D Stage Container (Follows user throughout whole page) -->
-<div id="buddy-stage-container" class="fixed inset-0 w-screen h-screen select-none pointer-events-none z-25 overflow-hidden">
+<!-- Viewport-Wide Fixed 3D Stage Container (Follows user throughout whole page, in front of all page elements) -->
+<div id="buddy-stage-container" class="fixed inset-0 w-screen h-screen select-none pointer-events-none overflow-hidden" style="z-index: 40;">
   <!-- Speech Bubble Overlay (dynamically pinned to Buddy's 3D skull crown) -->
   <div
     id="buddy-speech-bubble"
@@ -183,6 +183,11 @@ import { CHARACTERS } from '../lib/character-loader';
     const pixelPalImg = document.getElementById('pixel-pal-img') as HTMLImageElement | null;
 
     if (!canvas || !container) return;
+
+    // Portal the fixed 3D stage directly to <body> so Buddy renders in front of all page elements, cards, and buttons
+    if (container.parentElement && container.parentElement !== document.body) {
+      document.body.appendChild(container);
+    }
 
     // Dimensions: full viewport
     let width = window.innerWidth;
