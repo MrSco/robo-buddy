@@ -37,8 +37,12 @@ struct PendingImports(std::sync::Mutex<Vec<String>>);
 /// Hand a dropped file to the settings window, opening it if need be. The buddy's own window is
 /// no place to import from: it is small, it would have to load the whole model to find out what
 /// it had, and Settings already has the code path for every kind of file.
+// Async, and open_settings too: a plain command runs on the main thread, and building a window
+// from there dispatches to the main thread and waits for it -- on Windows that is a deadlock. The
+// settings window came up white and everything hung behind it. Off the main thread, build() hands
+// the work over and waits like anything else.
 #[tauri::command]
-fn import_via_settings(app: tauri::AppHandle, path: String) {
+async fn import_via_settings(app: tauri::AppHandle, path: String) {
     if let Ok(mut q) = app.state::<PendingImports>().0.lock() {
         q.push(path.clone());
     }
@@ -102,7 +106,7 @@ fn show_settings_on(app: &tauri::AppHandle, tab: Option<&str>) {
 }
 
 #[tauri::command]
-fn open_settings(app: tauri::AppHandle) {
+async fn open_settings(app: tauri::AppHandle) {
     show_settings(&app);
 }
 

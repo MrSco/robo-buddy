@@ -276,7 +276,6 @@ export class SettingsApp implements SettingsContext {
         for (const path of await invoke<string[]>("take_pending_imports")) await this.importFile(path);
       };
       void listen("import-file", () => void drainImports());
-      void drainImports();
     } catch {
       // not in Tauri
     }
@@ -289,6 +288,17 @@ export class SettingsApp implements SettingsContext {
       this.settings = s;
       this.render();
     });
+
+    // 9. With everything above in place, import whatever a drop on the buddy queued -- quite
+    //    possibly the drop that opened this window. Not awaited: an import can sit in Skeleton
+    //    Studio for as long as the user likes, and start-up must not wait on that.
+    void (async () => {
+      try {
+        for (const path of await invoke<string[]>("take_pending_imports")) await this.importFile(path);
+      } catch {
+        // not in Tauri
+      }
+    })();
   }
 }
 
