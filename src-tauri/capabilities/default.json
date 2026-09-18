@@ -20,6 +20,7 @@
     "core:window:allow-scale-factor",
     "dialog:allow-open",
     "dialog:allow-message",
+    "dialog:allow-ask",
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",

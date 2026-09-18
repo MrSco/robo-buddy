@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { effectiveManifest, listLibrary, invalidateLibrary, ROLES, type LibraryClip } from "../library";
 import type { PackRef, Manifest } from "../packs";
 import { $, type SettingsContext, type TabModule } from "./types";
@@ -91,7 +92,13 @@ export class LibraryTab implements TabModule {
         del.textContent = "🗑";
         del.title = "Delete this clip from your library";
         del.addEventListener("click", async () => {
-          if (!confirm(`Delete the clip "${c.name}"? This removes the file.`)) return;
+          const sure = await ask(`Delete the clip "${c.name}"? This removes the file.`, {
+            title: "Delete clip",
+            kind: "warning",
+            okLabel: "Delete",
+            cancelLabel: "Keep",
+          });
+          if (!sure) return;
           try {
             if (this.ctx.getLive().previewing === c.name) this.ctx.getLive().stopPreview();
             await invoke("delete_user_clip", { file: c.file });

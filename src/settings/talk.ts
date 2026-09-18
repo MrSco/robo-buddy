@@ -376,7 +376,13 @@ export class TalkTab implements TabModule {
       const path = this.els.piperVoice.value;
       const name = this.els.piperVoice.selectedOptions[0]?.textContent ?? path;
       if (!path) return;
-      if (!confirm(`Delete the voice "${name}"?`)) return;
+      const sure = await ask(`Delete the voice "${name}"?`, {
+        title: "Delete voice",
+        kind: "warning",
+        okLabel: "Delete",
+        cancelLabel: "Keep",
+      });
+      if (!sure) return;
       try {
         await invoke("piper_delete_voice", { path });
         if (this.ctx.getSettings().piperVoice === path) await this.ctx.commit({ piperVoice: "" });

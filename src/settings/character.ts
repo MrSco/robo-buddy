@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
+import { ask, open } from "@tauri-apps/plugin-dialog";
 import { invalidateThumbnail, thumbnailFor } from "../preview";
 import { $, type SettingsContext, type TabModule } from "./types";
 import type { Settings } from "../settings-store";
@@ -81,7 +81,13 @@ export class CharacterTab implements TabModule {
     this.els.removePack.addEventListener("click", async () => {
       const pack = ctx.getPacks().find((p) => p.id === ctx.getPreviewing());
       if (!pack || pack.bundled) return;
-      if (!confirm(`Remove "${pack.name}"? Its files are deleted from your characters folder.`)) return;
+      const sure = await ask(`Remove "${pack.name}"? Its files are deleted from your characters folder.`, {
+        title: "Remove character",
+        kind: "warning",
+        okLabel: "Remove",
+        cancelLabel: "Keep",
+      });
+      if (!sure) return;
       try {
         await invoke("delete_user_pack", { id: pack.id });
         const fallback = ctx.getSettings().character === pack.id ? "rocco" : ctx.getSettings().character;
