@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { listen } from "@tauri-apps/api/event";
 import { isEnabled } from "@tauri-apps/plugin-autostart";
 import { LivePreview } from "../preview";
 import { listPacks, type Manifest, type PackRef } from "../packs";
@@ -65,10 +66,14 @@ export class SettingsApp implements SettingsContext {
     return this.packs;
   }
 
-  async getManifest(pack: PackRef): Promise<Manifest> {
+  async getManifest(pack: PackRef, forceReload = false): Promise<Manifest> {
+    if (forceReload) {
+      this.manifests.delete(pack.id);
+    }
     let m = this.manifests.get(pack.id);
     if (!m) {
-      m = (await (await fetch(pack.base + "manifest.json")).json()) as Manifest;
+      const url = pack.base + "manifest.json" + (forceReload ? `?t=${Date.now()}` : "");
+      m = (await (await fetch(url)).json()) as Manifest;
       this.manifests.set(pack.id, m);
     }
     return m;
@@ -115,11 +120,14 @@ export class SettingsApp implements SettingsContext {
     const removePack = $<HTMLButtonElement>("remove-pack");
     removePack.hidden = pack.bundled;
     removePack.textContent = `Remove "${pack.name}"`;
+    const rigStudio = $<HTMLButtonElement>("rig-studio");
+    if (rigStudio) rigStudio.hidden = pack.bundled;
     const ticket = this.getLive().beginLoading();
     let failure: unknown;
     try {
       const m = await this.getManifest(pack);
       if (selection !== this.previewSelection) return;
+      if (rigStudio) rigStudio.hidden = pack.bundled || m.renderer !== "3d";
       await this.getLive().show(pack, m);
       if (selection === this.previewSelection && m.renderer === "3d") this.status(`Rig: ${this.getLive().rigReport}`);
     } catch (err) {
@@ -127,10 +135,12 @@ export class SettingsApp implements SettingsContext {
       if (selection === this.previewSelection) this.status(`Preview failed: ${err}`);
     } finally {
       this.getLive().finishLoading(ticket, failure);
+      this.characterTab.updateSelectBuddyButton();
     }
   }
 
   async refreshPacks(): Promise<void> {
+    this.manifests.clear();
     this.packs = await listPacks();
     this.characterTab.refreshPackSelect();
   }
@@ -154,6 +164,7 @@ export class SettingsApp implements SettingsContext {
       this.status(`Importing ${path.split(/[\\/]/).pop()}…`);
       const staged = await invoke<string>("stage_dropped", { source: path });
       let kind: "model" | "clip" = "model";
+      let importedRigParams: any = null;
       if (["glb", "gltf", "fbx"].includes(ext)) {
         const { loadModel } = await import("../character");
         const { convertFileSrc } = await import("@tauri-apps/api/core");
@@ -163,6 +174,23 @@ export class SettingsApp implements SettingsContext {
           if ((o as { isMesh?: boolean }).isMesh) hasMesh = true;
         });
         kind = hasMesh ? "model" : probe.animations.length ? "clip" : "model";
+        if (kind === "model") {
+          const { isModelRigged, hasMeshGeometry, autoRig } = await import("../autorig");
+          if (hasMeshGeometry(probe.root) && !isModelRigged(probe.root)) {
+            const { showRigDialog } = await import("./rig-dialog");
+            const fileName = path.split(/[/\\]/).pop() ?? "model";
+            const res = await showRigDialog({ modelName: fileName, root: probe.root });
+            if (res.action === "cancel") return;
+            if (res.action === "rig") {
+              this.status("Auto-rigging skeleton...");
+              importedRigParams = res.params;
+              const riggedGlb = await autoRig(probe.root, res.params);
+              await invoke("save_staged_glb", new Uint8Array(riggedGlb), {
+                headers: { "x-staged-path": staged },
+              });
+            }
+          }
+        }
       } else if (!["webp", "gif", "png", "apng", "vrm"].includes(ext)) {
         this.status(`Unsupported file type .${ext}`);
         return;
@@ -172,10 +200,14 @@ export class SettingsApp implements SettingsContext {
         kind,
         name: null,
       });
+      if (result.kind === "model" && result.id && importedRigParams) {
+        await invoke("set_pack_rig_params", { id: result.id, params: importedRigParams });
+      }
       invalidateLibrary();
       if (result.kind === "model" && result.id) {
         await this.refreshPacks();
         await this.commit({ character: result.id });
+        await this.previewPack(result.id);
         this.status(`Imported "${result.name}".`);
       } else {
         await this.renderLibrary();
@@ -236,6 +268,9 @@ export class SettingsApp implements SettingsContext {
         this.dropzoneEl.classList.toggle("over", e.payload.type === "enter" || e.payload.type === "over");
         if (e.payload.type !== "drop") return;
         for (const path of e.payload.paths) await this.importFile(path);
+      });
+      void listen<string>("import-file", (e) => {
+        if (e.payload) void this.importFile(e.payload);
       });
     } catch {
       // not in Tauri

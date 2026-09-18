@@ -9,7 +9,7 @@ export interface SettingsContext {
   commit(patch: Partial<Settings>): Promise<void>;
   getLive(): LivePreview;
   getPacks(): PackRef[];
-  getManifest(pack: PackRef): Promise<Manifest>;
+  getManifest(pack: PackRef, forceReload?: boolean): Promise<Manifest>;
   getRunningManifest(pack: PackRef): Promise<Manifest>;
   getCurrentManifest(): Manifest | null;
   getPreviewing(): string | null;

@@ -6,6 +6,8 @@ export type ClickThroughMode = "pixel" | "window" | "locked";
 
 export interface Settings {
   character: string;
+  /** Incremented when a character's model or rig is updated so running windows reload it immediately. */
+  characterRevision?: number;
   size: number;
   /** Light and reflection strength on 3D characters, 1 = as designed. The global fallback. */
   lighting: number;
@@ -105,6 +107,7 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   character: "rocco",
+  characterRevision: 0,
   size: 1,
   lighting: 1,
   lightingByCharacter: {},

@@ -80,6 +80,7 @@ export class Renderer3D implements Renderer {
   private gripObject: THREE.Object3D | null = null;
   private gripAnchor: { x: number; y: number } | null = null;
   private holding = false;
+  private wasHeld = false;
   private heldAmount = 0;
   private flipAmount = 0;
   private springs = new LimbSprings();
@@ -161,6 +162,10 @@ export class Renderer3D implements Renderer {
     this.character?.dispose();
     this.character = null;
     this.state = null;
+    this.wasHeld = false;
+    this.crouchU = 0;
+    this.holding = false;
+    this.gripAnchor = null;
     this.renderer.clear();
   }
 
@@ -194,11 +199,43 @@ export class Renderer3D implements Renderer {
   private fitCamera(dt: number, snap = 0) {
     const c = this.character;
     if (!c) return;
-    // Held by the head or the body: the frame stays where it was. This re-centres on his
-    // outline every frame, so a body swinging inside the window drags the frame after it and
-    // the very point the cursor has hold of slides away, however still the body is being held.
-    // A limb hold does not need it, because the held limb is re-aimed at the cursor regardless.
-    if (!snap && this.holding) return;
+    // Held by the head or the body: holdGrip pins the grabbed bone to gripAnchor, so we don't
+    // want to shift fitX or fitY around. But if the dangling or swinging character extends beyond
+    // the current camera frustum, we must expand fitDist so he doesn't get clipped at the edges!
+    if (!snap && this.holding) {
+      c.root.updateMatrixWorld(true);
+      const h = this.baseSize.y;
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let lowest = Infinity;
+      let maxY = -Infinity;
+      let front = -Infinity;
+      for (const [name, pad] of Renderer3D.FIT_BONES) {
+        const b = c.bone(name);
+        if (!b) continue;
+        b.getWorldPosition(this.tmp);
+        const p = h * pad;
+        if (this.tmp.x - p < minX) minX = this.tmp.x - p;
+        if (this.tmp.x + p > maxX) maxX = this.tmp.x + p;
+        if (this.tmp.y - p < lowest) lowest = this.tmp.y - p;
+        if (this.tmp.y + p > maxY) maxY = this.tmp.y + p;
+        if (this.tmp.z + p > front) front = this.tmp.z + p;
+      }
+      if (Number.isFinite(minX)) {
+        const halfV = (maxY - lowest) / 2 + h * 0.05;
+        const halfH = (maxX - minX) / 2 + h * 0.05;
+        const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+        const tanH = tanV * (this.cssW / this.cssH);
+        const depth = Math.max(0, front - (this.baseCenter.z + this.baseSize.z / 2));
+        const neededDist = Math.max(halfV / tanV, halfH / tanH) + depth;
+        if (neededDist > this.fitDist) {
+          const k = 1 - Math.exp(-dt * 20);
+          this.fitDist += (neededDist - this.fitDist) * k;
+          this.camera.position.set(this.fitX, this.fitY, this.baseCenter.z + this.fitDist);
+        }
+      }
+      return;
+    }
     const h = this.baseSize.y;
     const floor = this.baseCenter.y - h / 2;
     c.root.updateMatrixWorld(true);
@@ -320,14 +357,21 @@ export class Renderer3D implements Renderer {
     if (!c) return;
     const grab = input.state === "dragged" ? input.grab : null;
     if (grab) this.lastGrab = grab.part;
+    const isGrabbed = !!grab;
+    const justGrabbed = isGrabbed && !this.wasHeld;
+    this.wasHeld = isGrabbed;
+
+    // Grabbed while crouched: clear crouch immediately so Buddy is not deformed while held
+    if (isGrabbed) {
+      this.crouchU = 0;
+      this.crouchPx = 0;
+    }
+
     const limbHold = !!grab && grab.part !== "head" && grab.part !== "torso";
     const gripTarget = grab && !limbHold ? this.baseSize.y * (grab.part === "head" ? 0.92 : 0.6) : 0;
     this.gripPivot += (gripTarget - this.gripPivot) * Math.min(1, input.dt * 10);
     this.gripStill += ((grab && !limbHold ? 1 : 0) - this.gripStill) * Math.min(1, input.dt * 10);
-    // Caught on the frame the grip starts, before the hold pose has moved anything, so the
-    // anchor is where the click actually landed rather than where he ends up hanging.
     const holding = !!grab && !limbHold && !!this.gripObject;
-    if (holding && !this.holding) this.gripAnchor = this.screenPos(this.gripObject ?? undefined);
     if (!holding) this.gripAnchor = null;
     this.holding = holding;
     const down = input.state === "down";
@@ -354,11 +398,16 @@ export class Renderer3D implements Renderer {
 
     // Held: the body hangs from whatever part the cursor has. A pack that names its own held
     // clip keeps it for head and torso holds; otherwise everything dangles procedurally.
-    const packHeldClip = !!grab && !limbHold && input.clip !== null && input.clip.name !== this.idleClipName();
-    const wantHold = !!grab && !packHeldClip;
-    this.heldAmount += ((wantHold ? 1 : 0) - this.heldAmount) * Math.min(1, input.dt * 10);
     const upsideDown = grab?.part === "leftLeg" || grab?.part === "rightLeg";
-    this.flipAmount += ((upsideDown ? 1 : 0) - this.flipAmount) * Math.min(1, input.dt * 6);
+    if (justGrabbed) {
+      this.heldAmount = 1;
+      if (upsideDown) this.flipAmount = 1;
+    } else {
+      const packHeldClip = !!grab && !limbHold && input.clip !== null && input.clip.name !== this.idleClipName();
+      const wantHold = !!grab && !packHeldClip;
+      this.heldAmount += ((wantHold ? 1 : 0) - this.heldAmount) * Math.min(1, input.dt * 10);
+      this.flipAmount += ((upsideDown ? 1 : 0) - this.flipAmount) * Math.min(1, input.dt * 6);
+    }
     if (this.heldAmount > 0.001 && this.lastGrab) {
       if (this.lastGrab === "leftArm" || this.lastGrab === "rightArm") {
         applyHeldByArm(c, this.lastGrab === "leftArm" ? "left" : "right", input.t, this.heldAmount);
@@ -483,10 +532,15 @@ export class Renderer3D implements Renderer {
     this.springs.update(c, input.dt, input.t, input.accelX, input.accelY, this.springAmount, rigid);
     applyLimp(c, this.downAmount);
     // Ducking under the top of the screen, eased so it reads as him bending, not snapping.
-    const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
-    const crouchTarget = (this.crouchPx * 2 * Math.max(this.fitDist, 0.05) * tanV) / this.cssH;
-    this.crouchU += (crouchTarget - this.crouchU) * Math.min(1, input.dt * 6);
-    if (this.crouchU > 1e-4) applyCrouch(c, this.crouchU);
+    // Ignored while grabbed so holding him never crouches or compresses the ragdoll.
+    if (isGrabbed) {
+      this.crouchU = 0;
+    } else {
+      const tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+      const crouchTarget = (this.crouchPx * 2 * Math.max(this.fitDist, 0.05) * tanV) / this.cssH;
+      this.crouchU += (crouchTarget - this.crouchU) * Math.min(1, input.dt * 6);
+      if (this.crouchU > 1e-4) applyCrouch(c, this.crouchU);
+    }
     // A pack with a sleep clip of its own poses him; a clip flagged as a base is only there to
     // keep the mixer weighted, so the slump still goes over it.
     const posedAsleep = input.state === "sleep" && clipDriven && !input.clip?.base;
@@ -494,7 +548,13 @@ export class Renderer3D implements Renderer {
     if (input.attack?.procedural) applyAttack(c, input.attack.kind, input.attack.progress);
     c.update(input.dt);
     this.detectTpose(c, input);
-    this.fitCamera(input.dt);
+    if (justGrabbed) {
+      this.fitCamera(0, 1);
+      if (holding) this.gripAnchor = this.screenPos(this.gripObject ?? undefined);
+    } else {
+      if (holding && !this.gripAnchor) this.gripAnchor = this.screenPos(this.gripObject ?? undefined);
+      this.fitCamera(input.dt);
+    }
     this.holdGrip(c);
     this.renderer.render(this.scene, this.camera);
     this.renders++;

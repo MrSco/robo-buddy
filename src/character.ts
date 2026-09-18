@@ -168,7 +168,7 @@ function degenerateInverse(m: THREE.Matrix4): boolean {
   return identity || Math.abs(m.determinant()) < 1e-12;
 }
 
-function restoreBindPose(root: THREE.Object3D) {
+export function restoreBindPose(root: THREE.Object3D) {
   root.updateMatrixWorld(true);
   const done = new Set<THREE.Object3D>();
   const inv = new THREE.Matrix4();
@@ -437,7 +437,8 @@ function reweightSpanningRods(root: THREE.Object3D): number {
 }
 
 export async function loadCharacter(pack: PackRef, manifest: Manifest): Promise<Character> {
-  const model = await loadModel(pack.base + manifest.model);
+  const modelUrl = pack.bundled ? pack.base + manifest.model : `${pack.base}${manifest.model}?t=${Date.now()}`;
+  const model = await loadModel(modelUrl);
   const { root, vrm } = model;
   if (!vrm) {
     restoreBindPose(root);

@@ -258,8 +258,15 @@ async function boot() {
   if (IN_TAURI) {
     // Drop a model or animation file onto the buddy to import it.
     await getCurrentWebview().onDragDropEvent(async (e) => {
-      if (e.payload.type !== "drop") return;
-      for (const path of e.payload.paths) await importDropped(path);
+      if (e.payload.type === "enter" || e.payload.type === "over") {
+        draggingOverWindow = true;
+        getCurrentWindow().setIgnoreCursorEvents(false).catch(() => {});
+      } else if (e.payload.type === "leave") {
+        draggingOverWindow = false;
+      } else if (e.payload.type === "drop") {
+        draggingOverWindow = false;
+        for (const path of e.payload.paths) await importDropped(path);
+      }
     });
     // Other always-on-top windows opened later sit above him in the topmost band; take the
     // top of it back every couple of seconds (no focus change, so nothing is interrupted).
@@ -359,7 +366,7 @@ async function boot() {
     settingsEvents++;
     const prev = settings;
     settings = s;
-    if (s.character !== prev.character || JSON.stringify(s.animRoles) !== JSON.stringify(prev.animRoles)) {
+    if (s.character !== prev.character || s.characterRevision !== prev.characterRevision || JSON.stringify(s.animRoles) !== JSON.stringify(prev.animRoles)) {
       invalidateLibrary();
       await loadPack(s.character);
     }
@@ -396,7 +403,7 @@ async function loadPack(id: string) {
   loading = true;
   try {
     const ref = await resolvePack(id);
-    const raw = await (await fetch(ref.base + "manifest.json")).json();
+    const raw = await (await fetch(ref.base + "manifest.json" + (ref.bundled ? "" : `?t=${Date.now()}`))).json();
     const base = validateManifest(raw);
     // Every library clip is available to every 3D pack (an imported model borrows the bundled
     // character's animation sections wholesale); user roles decide where each clip is used.
@@ -502,6 +509,18 @@ async function importDropped(path: string) {
         if ((o as THREE.Mesh).isMesh) hasMesh = true;
       });
       kind = hasMesh ? "model" : probe.animations.length ? "clip" : "model";
+      if (kind === "model") {
+        const { isModelRigged, hasMeshGeometry } = await import("./autorig");
+        if (hasMeshGeometry(probe.root) && !isModelRigged(probe.root)) {
+          // Open settings window so the user gets the full 1120x860 Skeleton Studio
+          await invoke("open_settings");
+          bubble.say(["Opening Skeleton Studio in Settings..."], 4, clock.elapsedTime);
+          setTimeout(() => {
+            void emit("import-file", path);
+          }, 350);
+          return;
+        }
+      }
     }
     const result = await invoke<{ kind: string; id?: string; name: string }>("finalize_import", { staged, kind, name: null });
     invalidateLibrary();
@@ -994,6 +1013,8 @@ function updateLook(dt: number) {
   pitch += (targetPitch - pitch) * k;
 }
 
+let draggingOverWindow = false;
+
 function updateClickThrough() {
   if (!IN_TAURI || !physics || !renderer) return;
   let shouldIgnore: boolean;
@@ -1001,6 +1022,8 @@ function updateClickThrough() {
   else if (talk.open) shouldIgnore = false;
   else if (physics.mode === "held") shouldIgnore = false;
   else if (settings.clickThrough === "window") shouldIgnore = false;
+  else if (draggingOverWindow) shouldIgnore = false;
+  else if (document.querySelector(".rig-dialog-overlay")) shouldIgnore = false;
   else {
     const p = cursorInCanvas();
     shouldIgnore = !p || (renderer.alphaAt(p.x, p.y) < 16 && !bubble.hitTest(p.x, p.y));

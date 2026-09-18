@@ -288,3 +288,9 @@ export function thumbnailFor(pack: PackRef, manifest: Manifest, preview: LivePre
   }
   return p;
 }
+
+/** Clear cached gallery thumbnail(s) so updated models or rigs re-render their thumbnail. */
+export function invalidateThumbnail(id?: string): void {
+  if (id) thumbCache.delete(id);
+  else thumbCache.clear();
+}

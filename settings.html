@@ -32,7 +32,9 @@
                 <select id="character" hidden></select>
                 <p class="hint">Click one to preview it here, click it again to make it the buddy.</p>
                 <div class="row wrap">
+                  <button id="select-buddy" type="button" class="btn-select-buddy" hidden title="Choose this character as your active desktop buddy.">Set as Active Buddy</button>
                   <button id="import" type="button" title="Add a model of your own. 3D: GLB, glTF, VRM or FBX with a humanoid skeleton. 2D: an animated WebP, GIF or PNG.">Import model…</button>
+                  <button id="rig-studio" type="button" hidden title="Adjust skeleton alignment and preview animations for this 3D character.">🦴 Skeleton Studio</button>
                   <button id="remove-pack" type="button" hidden title="Delete the imported character shown in the preview. Built-in characters cannot be removed.">Remove this character</button>
                   <button id="open-characters" type="button" title="Open the folder where imported characters live.">Folder…</button>
                   <button id="bring" type="button" title="Teleports the buddy onto the monitor this window is on. Handy when he wandered off to another screen.">Bring buddy to this screen</button>
@@ -560,6 +562,9 @@
 
         <p class="status" id="status"></p>
       </main>
+    <div id="window-loading" class="window-loading-overlay" hidden>
+      <div class="window-spinner"></div>
+      <div class="window-loading-msg" id="window-loading-msg">Loading character…</div>
     </div>
     <script type="module" src="/src/settings.ts"></script>
   </body>

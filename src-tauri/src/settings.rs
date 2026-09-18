@@ -111,6 +111,8 @@ pub struct Settings {
     pub context_llm_titles: bool,
     /// Process names excluded from context reactions.
     pub context_blacklist: Vec<String>,
+    /// Incremented when a character's model or rig is updated so running windows reload it immediately.
+    pub character_revision: u64,
 }
 
 impl Default for Settings {
@@ -180,6 +182,7 @@ impl Default for Settings {
                 "KeePass.exe".into(),
                 "KeePassXC.exe".into(),
             ],
+            character_revision: 0,
         }
     }
 }

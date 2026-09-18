@@ -53,8 +53,8 @@ fn show_settings_on(app: &tauri::AppHandle, tab: Option<&str>) {
     }
     match tauri::WebviewWindowBuilder::new(app, "settings", tauri::WebviewUrl::App("settings.html".into()))
         .title("Robo Buddy Settings")
-        .inner_size(940.0, 780.0)
-        .min_inner_size(440.0, 520.0)
+        .inner_size(1120.0, 860.0)
+        .min_inner_size(600.0, 560.0)
         .resizable(true)
         .center()
         .build()
@@ -237,6 +237,9 @@ pub fn run() {
             packs::open_user_folder,
             piper::piper_delete_voice,
             packs::save_user_clip,
+            packs::save_staged_glb,
+            packs::save_pack_glb,
+            packs::set_pack_rig_params,
             open_settings,
             open_url,
             screen::capture_desktop,

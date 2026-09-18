@@ -33,6 +33,9 @@ export function poseLocal(c: Character, b: THREE.Object3D | undefined, x: number
   b.quaternion.copy(base).multiply(tmpQ);
 }
 
+const tmpArmDir = new THREE.Vector3();
+const tmpArmOrigin = new THREE.Vector3();
+
 /** Procedural standing idle: arms down from T-pose, breathing, gentle sway. */
 export function applyIdle(c: Character, t: number, intensity = 1) {
   const breathe = Math.sin(t * 1.6) * 0.02 * intensity;
@@ -50,11 +53,30 @@ export function applyIdle(c: Character, t: number, intensity = 1) {
     const b = c.bone(n);
     return b && !c.animatedBones.has(b) ? b : undefined;
   };
-  const drop = 1.25 + breathe; // ~72 degrees: arms hang slightly out from the body
+
+  let drop = 1.25 + breathe; // ~72 degrees: arms hang slightly out from the body
+  let elbowBend = -0.2;
+
+  // Check if character's rest pose is already in A-pose (arms already angled downward)
+  const la = c.bone("leftUpperArm");
+  const lf = c.bone("leftLowerArm");
+  if (la && lf) {
+    const dir = lf.getWorldPosition(tmpArmDir).sub(la.getWorldPosition(tmpArmOrigin)).normalize();
+    // In T-pose, dir.y is ~0. In A-pose, dir.y is <= -0.4 (angled down >= 25 deg).
+    if (dir.y < -0.45) {
+      drop = breathe; // Already in A-pose: only apply gentle breathing sway
+      elbowBend = 0;
+    } else if (dir.y < -0.2) {
+      drop = Math.max(0, 1.25 + dir.y * 1.5) + breathe;
+    }
+  }
+
   rotateWorld(free("leftUpperArm"), WORLD_Z, -drop);
   rotateWorld(free("rightUpperArm"), WORLD_Z, drop);
-  rotateWorld(free("leftLowerArm"), WORLD_X, -0.2);
-  rotateWorld(free("rightLowerArm"), WORLD_X, -0.2);
+  if (elbowBend !== 0) {
+    rotateWorld(free("leftLowerArm"), WORLD_X, elbowBend);
+    rotateWorld(free("rightLowerArm"), WORLD_X, elbowBend);
+  }
 }
 
 /** Arms up and flailing, used while airborne. */

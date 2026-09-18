@@ -1,5 +1,6 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { IN_TAURI } from "./input";
+import type { RigParams } from "./autorig";
 
 export interface PackRef {
   /** "rocco" for bundled packs, "user:<folder>" for packs in the app data dir. */
@@ -8,6 +9,8 @@ export interface PackRef {
   /** Base URL, always ending in "/". */
   base: string;
   bundled: boolean;
+  /** Absolute directory on disk for user packs. */
+  dir?: string;
 }
 
 export interface Manifest {
@@ -16,6 +19,8 @@ export interface Manifest {
   version: number;
   renderer: "3d" | "2d";
   model: string;
+  /** Alignment parameters used when auto-rigging this model. */
+  rigParams?: RigParams;
   /** Optional named external clip files (GLB/GLTF with animations), relative to the pack. */
   clips?: Record<string, string>;
   states: Record<
@@ -108,7 +113,7 @@ export async function listPacks(): Promise<PackRef[]> {
   }
   if (!IN_TAURI) return bundled;
   const users = await invoke<UserPack[]>("list_user_packs");
-  return [...bundled, ...users.map((u) => ({ id: u.id, name: u.name, base: userBase(u.dir), bundled: false }))];
+  return [...bundled, ...users.map((u) => ({ id: u.id, name: u.name, base: userBase(u.dir), bundled: false, dir: u.dir }))];
 }
 
 /**

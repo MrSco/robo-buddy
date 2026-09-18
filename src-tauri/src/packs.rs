@@ -92,7 +92,18 @@ pub fn import_pack(app: AppHandle, source: String, name: Option<String>) -> Resu
     let manifest = if renderer == "3d" {
         serde_json::json!({
             "name": display, "author": "", "version": 1, "renderer": "3d", "model": model_name,
-            "states": { "idle": { "clip": "idle", "loop": true } },
+            "states": {
+                "idle": { "clip": "idle", "loop": true },
+                "walk": { "clip": "walk", "loop": true, "speed": 110 },
+                "dance": { "clip": "dance", "loop": true, "beatsPerLoop": 2 },
+                "poked": { "clip": "hit", "loop": false }
+            },
+            "clips": {
+                "idle": "/clips/ual/Idle_Loop.glb",
+                "walk": "/clips/ual/Walk_Loop.glb",
+                "dance": "/clips/ual/Dance_Loop.glb",
+                "hit": "/clips/ual/Hit_Chest.glb"
+            },
             "reactions": {
                 "music": { "enabled": true, "threshold": 0.15 },
                 "mouse": { "enabled": true, "lookAtCursor": true },
@@ -263,6 +274,56 @@ pub fn save_user_clip(app: AppHandle, request: tauri::ipc::Request<'_>) -> Resul
     Ok(path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or(safe))
 }
 
+/// Overwrite a staged file with modified bytes (e.g. newly auto-rigged GLB bytes).
+#[tauri::command]
+pub fn save_staged_glb(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let path_str = request
+        .headers()
+        .get("x-staged-path")
+        .and_then(|v| v.to_str().ok())
+        .ok_or("missing x-staged-path header")?;
+    let path = PathBuf::from(path_str);
+    let inbox = inbox_dir(&app).ok_or("no data dir")?;
+    if !path.starts_with(&inbox) {
+        return Err("path must be inside inbox".into());
+    }
+    let bytes = match request.body() {
+        tauri::ipc::InvokeBody::Raw(b) => b.clone(),
+        _ => return Err("expected a binary body".into()),
+    };
+    fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+/// Overwrite an imported character pack's GLB with newly auto-rigged GLB bytes.
+#[tauri::command]
+pub fn save_pack_glb(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let path_str = request
+        .headers()
+        .get("x-pack-model-path")
+        .and_then(|v| v.to_str().ok())
+        .ok_or("missing x-pack-model-path header")?;
+    let path = PathBuf::from(path_str);
+    let characters = characters_dir(&app).ok_or("no data dir")?;
+    if !path.starts_with(&characters) {
+        return Err("path must be inside characters directory".into());
+    }
+    let bytes = match request.body() {
+        tauri::ipc::InvokeBody::Raw(b) => b.clone(),
+        _ => return Err("expected a binary body".into()),
+    };
+    // The model as the user imported it is kept beside the re-rigged one, once, the first time
+    // it is overwritten. Without it a bad rigging pass takes the only copy they had.
+    if path.is_file() {
+        let keep = path.with_extension("glb.orig");
+        if !keep.exists() {
+            fs::copy(&path, &keep).map_err(|e| e.to_string())?;
+        }
+    }
+    fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
 /// Remove an imported character (its whole folder under the user's characters dir). Bundled packs have no folder there.
 #[tauri::command]
 pub fn delete_user_pack(app: AppHandle, id: String) -> Result<(), String> {
@@ -334,5 +395,26 @@ pub fn set_pack_persona(
             }
         }
     }
+    fs::write(&path, serde_json::to_string_pretty(&manifest).unwrap()).map_err(|e| e.to_string())
+}
+
+/// Store a character's rig parameters in its manifest so Skeleton Studio can reload them.
+#[tauri::command]
+pub fn set_pack_rig_params(
+    app: AppHandle,
+    id: String,
+    params: serde_json::Value,
+) -> Result<(), String> {
+    let folder = id.strip_prefix("user:").ok_or("only imported characters can be edited")?;
+    let root = characters_dir(&app).ok_or("no data dir")?;
+    let dir = root.join(Path::new(folder).file_name().ok_or("bad id")?);
+    if !dir.starts_with(&root) || !dir.is_dir() {
+        return Err("character folder not found".into());
+    }
+    let path = dir.join("manifest.json");
+    let text = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mut manifest: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    let obj = manifest.as_object_mut().ok_or("manifest is not an object")?;
+    obj.insert("rigParams".to_string(), params);
     fs::write(&path, serde_json::to_string_pretty(&manifest).unwrap()).map_err(|e| e.to_string())
 }
