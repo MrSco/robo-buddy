@@ -354,6 +354,7 @@ export function showRigDialog(opts: RigDialogOptions): Promise<RigDialogResult> 
             <div style="display: flex; gap: 6px; align-items: center; pointer-events: auto;">
               <span class="rig-viewport-hint">🖱️ Left: Orbit • Right: Pan • Wheel: Zoom</span>
               <button type="button" class="rig-mini-btn active" id="btn-xray" title="Toggle mesh translucency">X-Ray: ON</button>
+              <button type="button" class="rig-mini-btn" id="btn-skin" hidden title="Animate the model on the skin weights it already has, or on the ones Auto-Rig will give it">Skin: Current</button>
             </div>
             <div class="rig-viewport-controls" id="anim-preview-controls">
               <span style="font-size: 10px; color: var(--muted, #9a9daa); margin-right: 2px;">Preview:</span>
@@ -615,7 +616,7 @@ export function showRigDialog(opts: RigDialogOptions): Promise<RigDialogResult> 
 
     // Clone model for preview
     let previewModel: THREE.Object3D | null = null;
-    let previewSkinnedGroup: THREE.Group | null = null;
+    let previewSkinnedGroup: THREE.Object3D | null = null;
     let previewMixer: THREE.AnimationMixer | null = null;
     let boundsBox = new THREE.Box3();
     let boundsSize = new THREE.Vector3(1, 2, 1);
@@ -703,6 +704,12 @@ export function showRigDialog(opts: RigDialogOptions): Promise<RigDialogResult> 
     // X-Ray Mode
     let xrayEnabled = true;
     const btnXray = card.querySelector<HTMLButtonElement>("#btn-xray");
+    // Which skin the clip preview animates. A model that arrived with a skeleton is shown on its
+    // own weights by default -- what the desktop and the Animations tab show -- and can be flipped
+    // to the ones Auto-Rig & Import would give it. A model with no skin has only the new ones.
+    let skinMode: "current" | "new" = opts.root && hasOwnSkeleton(opts.root) ? "current" : "new";
+    const btnSkin = card.querySelector<HTMLButtonElement>("#btn-skin");
+    if (btnSkin && skinMode === "current") btnSkin.hidden = false;
     function updateXrayButton() {
       if (!btnXray) return;
       btnXray.textContent = xrayEnabled ? "X-Ray: ON" : "X-Ray: OFF";
@@ -1200,6 +1207,15 @@ export function showRigDialog(opts: RigDialogOptions): Promise<RigDialogResult> 
       xrayEnabled = !xrayEnabled;
       applyXray();
     });
+    btnSkin?.addEventListener("click", () => {
+      skinMode = skinMode === "current" ? "new" : "current";
+      btnSkin.textContent = skinMode === "current" ? "Skin: Current" : "Skin: New";
+      btnSkin.classList.toggle("active", skinMode === "new");
+      // The animated copy is built for one skin or the other; throw it away and, if a quick clip
+      // is playing, bring it straight back on the other one.
+      invalidateAnim();
+      if (currentAnim !== "pose") void setPreviewAnimation(currentAnim);
+    });
 
     // Animation Preview Controls & Playback
     const btnAnimPose = card.querySelector<HTMLButtonElement>("#btn-anim-pose");
@@ -1360,8 +1376,13 @@ export function showRigDialog(opts: RigDialogOptions): Promise<RigDialogResult> 
             }
           });
 
-          const { group } = createRiggedGroup(modelForRig, params);
-          previewSkinnedGroup = group;
+          if (skinMode === "current") {
+            // Its own skeleton and weights, exactly as the desktop plays it.
+            previewSkinnedGroup = modelForRig;
+          } else {
+            const { group } = createRiggedGroup(modelForRig, params);
+            previewSkinnedGroup = group;
+          }
           scene.add(previewSkinnedGroup);
           previewMixer = new THREE.AnimationMixer(previewSkinnedGroup);
           animDirty = false;

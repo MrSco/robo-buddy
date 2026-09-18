@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import {
+  boneTransferMap,
   buildHumanoidBoneDefs,
   checkSkeletonContainment,
   createRiggedGroup,
+  transferSkinWeights,
   createSkeleton,
   distToSegmentSq,
   inferRigParamsFromSkeleton,
@@ -765,5 +767,124 @@ describe("autorig", () => {
     // Still 3 m tall and unmoved: a containment check must not rescale the model it inspects.
     expect(group.scale.y).toBe(1);
     expect(mesh.position.y).toBe(1.5);
+  });
+
+  /** A humanoid skeleton the way a numbered Sketchfab export spells it, with a twist bone and a stray root. */
+  function sketchfabSkeleton(): { bones: THREE.Bone[]; byName: Map<string, THREE.Bone> } {
+    const byName = new Map<string, THREE.Bone>();
+    const make = (name: string, parent?: string) => {
+      const b = new THREE.Bone();
+      b.name = name;
+      byName.set(name, b);
+      if (parent) byName.get(parent)!.add(b);
+      return b;
+    };
+    make("_rootJoint");
+    make("mixamorigHips_01", "_rootJoint");
+    make("mixamorigSpine_02", "mixamorigHips_01");
+    make("mixamorigHead_05", "mixamorigSpine_02");
+    make("mixamorigLeftArm_010", "mixamorigSpine_02");
+    make("LeftArmTwist_011", "mixamorigLeftArm_010");
+    make("mixamorigLeftForeArm_012", "mixamorigLeftArm_010");
+    make("mixamorigLeftHand_013", "mixamorigLeftForeArm_012");
+    make("mixamorigLeftHandIndex1_014", "mixamorigLeftHand_013");
+    make("mixamorigRightArm_030", "mixamorigSpine_02");
+    make("mixamorigRightForeArm_031", "mixamorigRightArm_030");
+    make("mixamorigLeftUpLeg_055", "mixamorigHips_01");
+    make("mixamorigLeftLeg_056", "mixamorigLeftUpLeg_055");
+    make("mixamorigRightUpLeg_060", "mixamorigHips_01");
+    make("mixamorigRightLeg_061", "mixamorigRightUpLeg_060");
+    return { bones: [...byName.values()], byName };
+  }
+
+  it("maps an old humanoid skeleton onto the new one by role, and walks up for the rest", () => {
+    const { bones } = sketchfabSkeleton();
+    const box = new THREE.Box3(new THREE.Vector3(-0.4, 0, -0.2), new THREE.Vector3(0.4, 1.8, 0.2));
+    const defs = buildHumanoidBoneDefs(box, new THREE.Vector3(0.8, 1.8, 0.4), new THREE.Vector3(0, 0.9, 0), { includeFingers: false });
+    const at = (name: string) => defs.findIndex((d) => d.name === name);
+    const map = boneTransferMap(new THREE.Skeleton(bones), defs)!;
+    expect(map).not.toBeNull();
+    const src = (name: string) => bones.findIndex((b) => b.name === name);
+    expect(map[src("mixamorigHips_01")]).toBe(at("mixamorig:Hips"));
+    expect(map[src("mixamorigLeftHand_013")]).toBe(at("mixamorig:LeftHand"));
+    expect(map[src("mixamorigRightLeg_061")]).toBe(at("mixamorig:RightLeg"));
+    // No fingers on the new skeleton: the finger follows the hand. A twist bone follows its arm.
+    expect(map[src("mixamorigLeftHandIndex1_014")]).toBe(at("mixamorig:LeftHand"));
+    expect(map[src("LeftArmTwist_011")]).toBe(at("mixamorig:LeftArm"));
+    // Above the hips there is nothing to follow but the hips.
+    expect(map[src("_rootJoint")]).toBe(at("mixamorig:Hips"));
+
+    // Not a humanoid: nothing to carry over.
+    const odd = ["a", "b", "c"].map((n) => { const b = new THREE.Bone(); b.name = n; return b; });
+    expect(boneTransferMap(new THREE.Skeleton(odd), defs)).toBeNull();
+  });
+
+  it("pools weights that land on one bone and keeps the four heaviest, renormalised", () => {
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.Float32BufferAttribute(new Float32Array(3 * 3), 3));
+    // v0: three old bones, two of which now share a new one. v1: nothing weighted. v2: five-way split needs trimming.
+    geom.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(new Uint16Array([0, 1, 2, 3, 0, 0, 0, 0, 0, 1, 2, 3]), 4));
+    geom.setAttribute("skinWeight", new THREE.Float32BufferAttribute(new Float32Array([0.5, 0.3, 0.2, 0, 0, 0, 0, 0, 0.1, 0.15, 0.3, 0.45]), 4));
+    const map = new Int32Array([5, 5, 7, 9]);
+    const outI = new Uint16Array(3 * 4);
+    const outW = new Float32Array(3 * 4);
+    transferSkinWeights(geom, map, outI, outW);
+    expect(Array.from(outI.slice(0, 4))).toEqual([5, 7, 0, 0]);
+    expect(outW[0]).toBeCloseTo(0.8, 5);
+    expect(outW[1]).toBeCloseTo(0.2, 5);
+    expect(outW[2]).toBe(0);
+    expect(Array.from(outI.slice(4, 8))).toEqual([0, 0, 0, 0]);
+    expect(Array.from(outW.slice(4, 8))).toEqual([1, 0, 0, 0]);
+    // 0.1 and 0.15 both go to bone 5 (0.25), 0.3 to 7, 0.45 to 9: heaviest first.
+    expect(Array.from(outI.slice(8, 12))).toEqual([9, 7, 5, 0]);
+    expect(outW[8]).toBeCloseTo(0.45, 5);
+    expect(outW[9]).toBeCloseTo(0.3, 5);
+    expect(outW[10]).toBeCloseTo(0.25, 5);
+  });
+
+  it("re-rigs an already skinned humanoid with its own weights rather than fresh ones", () => {
+    const { bones, byName } = sketchfabSkeleton();
+    // Stand the bones up so the skeleton reads as Y-up and the mesh has somewhere to be.
+    byName.get("mixamorigHips_01")!.position.set(0, 0.9, 0);
+    byName.get("mixamorigHead_05")!.position.set(0, 0.7, 0);
+    byName.get("mixamorigLeftUpLeg_055")!.position.set(0.1, -0.05, 0);
+    byName.get("mixamorigRightUpLeg_060")!.position.set(-0.1, -0.05, 0);
+    byName.get("mixamorigLeftArm_010")!.position.set(0.3, 0.55, 0);
+    byName.get("mixamorigRightArm_030")!.position.set(-0.3, 0.55, 0);
+    // A thin 1.8 m body; every vertex above shoulder height weighted to the LEFT HAND on purpose,
+    // which distance-based weighting would never do and a transfer must preserve.
+    const geom = new THREE.CylinderGeometry(0.1, 0.1, 1.8, 8, 6);
+    geom.translate(0, 0.9, 0);
+    const n = geom.getAttribute("position").count;
+    const hand = bones.findIndex((b) => b.name === "mixamorigLeftHand_013");
+    const hips = bones.findIndex((b) => b.name === "mixamorigHips_01");
+    const si = new Uint16Array(n * 4);
+    const sw = new Float32Array(n * 4);
+    const pos = geom.getAttribute("position");
+    let tagged = 0;
+    for (let i = 0; i < n; i++) {
+      const high = pos.getY(i) > 1.4;
+      si[i * 4] = high ? hand : hips;
+      sw[i * 4] = 1;
+      if (high) tagged++;
+    }
+    geom.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(si, 4));
+    geom.setAttribute("skinWeight", new THREE.Float32BufferAttribute(sw, 4));
+    const root = new THREE.Group();
+    const skinned = new THREE.SkinnedMesh(geom, new THREE.MeshBasicMaterial());
+    root.add(byName.get("_rootJoint")!);
+    root.add(skinned);
+    root.updateMatrixWorld(true);
+    skinned.bind(new THREE.Skeleton(bones, bones.map(() => new THREE.Matrix4())), new THREE.Matrix4());
+    expect(isModelRigged(root)).toBe(true);
+
+    const { group, defs } = createRiggedGroup(root, { includeFingers: false });
+    const out = group.children.find((o) => (o as THREE.SkinnedMesh).isSkinnedMesh) as THREE.SkinnedMesh;
+    const outIdx = out.geometry.getAttribute("skinIndex");
+    const leftHand = defs.findIndex((d) => d.name === "mixamorig:LeftHand");
+    let stillHand = 0;
+    for (let i = 0; i < outIdx.count; i++) if (outIdx.getX(i) === leftHand) stillHand++;
+    expect(tagged).toBeGreaterThan(0);
+    expect(stillHand).toBe(tagged);
   });
 });

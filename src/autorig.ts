@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
-import { findHumanoidBones } from "./humanoid";
+import { findHumanoidBones, humanoidMatch, REQUIRED_BONES, type BoneName } from "./humanoid";
 import { refreshSkins } from "./character";
 
 if (typeof FileReader === "undefined") {
@@ -848,6 +848,87 @@ export function inferRigParamsFromSkeleton(root: THREE.Object3D): RigParams | nu
 /**
  * Creates the Three.js Bone hierarchy and Skeleton from bone definitions.
  */
+/**
+ * Which new bone each of an old skeleton's bones hands its vertices to, by humanoid role: the old
+ * LeftHand, however it was spelt, feeds the new mixamorig:LeftHand. A bone with no role of its own
+ * -- a twist bone, a finger when fingers are off, a prop -- follows its nearest ancestor that has
+ * one, and anything above the hips follows the hips. Null when the old skeleton is not a humanoid
+ * we can read, in which case the vertices are weighted from scratch.
+ */
+export function boneTransferMap(skeleton: THREE.Skeleton, defs: BoneDef[]): Int32Array | null {
+  const targetByRole = new Map<BoneName, number>();
+  defs.forEach((d, i) => {
+    const role = humanoidMatch(d.name)?.bone;
+    if (role !== undefined && !targetByRole.has(role)) targetByRole.set(role, i);
+  });
+  const roleOf = new Map<THREE.Object3D, BoneName>();
+  for (const b of skeleton.bones) {
+    const role = humanoidMatch(b.name)?.bone;
+    if (role !== undefined) roleOf.set(b, role);
+  }
+  const found = new Set(roleOf.values());
+  if (REQUIRED_BONES.some((r) => !found.has(r))) return null;
+  const hips = targetByRole.get("hips") ?? 0;
+  const map = new Int32Array(skeleton.bones.length);
+  skeleton.bones.forEach((b, j) => {
+    let idx: number | undefined;
+    for (let o: THREE.Object3D | null = b; o && idx === undefined; o = o.parent) {
+      const role = roleOf.get(o);
+      if (role !== undefined) idx = targetByRole.get(role);
+    }
+    map[j] = idx ?? hips;
+  });
+  return map;
+}
+
+/**
+ * Carry a mesh's skin weights over to a new skeleton through a bone map. Old bones that land on the
+ * same new bone pool their weight; the four heaviest survive, renormalised. A vertex nothing was
+ * weighted to goes wholly to bone 0, the hips, as a freshly weighted one would.
+ */
+export function transferSkinWeights(source: THREE.BufferGeometry, map: Int32Array, outIndex: Uint16Array, outWeight: Float32Array): void {
+  const si = source.getAttribute("skinIndex");
+  const sw = source.getAttribute("skinWeight");
+  const idx = [0, 0, 0, 0];
+  const wt = [0, 0, 0, 0];
+  for (let i = 0; i < si.count; i++) {
+    let n = 0;
+    for (let k = 0; k < 4; k++) {
+      const w = sw.getComponent(i, k);
+      const j = si.getComponent(i, k);
+      if (w <= 0 || j < 0 || j >= map.length) continue;
+      const t = map[j];
+      let slot = -1;
+      for (let m = 0; m < n; m++) if (idx[m] === t) { slot = m; break; }
+      if (slot >= 0) {
+        wt[slot] += w;
+      } else {
+        idx[n] = t;
+        wt[n] = w;
+        n++;
+      }
+    }
+    // Heaviest first, then share out what is there.
+    for (let a = 1; a < n; a++) {
+      for (let b = a; b > 0 && wt[b] > wt[b - 1]; b--) {
+        [wt[b], wt[b - 1]] = [wt[b - 1], wt[b]];
+        [idx[b], idx[b - 1]] = [idx[b - 1], idx[b]];
+      }
+    }
+    let total = 0;
+    for (let m = 0; m < n; m++) total += wt[m];
+    for (let k = 0; k < 4; k++) {
+      if (k < n && total > 0) {
+        outIndex[i * 4 + k] = idx[k];
+        outWeight[i * 4 + k] = wt[k] / total;
+      } else {
+        outIndex[i * 4 + k] = 0;
+        outWeight[i * 4 + k] = k === 0 && total <= 0 ? 1 : 0;
+      }
+    }
+  }
+}
+
 export function createSkeleton(defs: BoneDef[]): {
   rootBone: THREE.Bone;
   bones: THREE.Bone[];
@@ -1038,7 +1119,13 @@ export function createRiggedGroup(root: THREE.Object3D, paramsOrPose: PoseChoice
       }
     }
 
-    for (let i = 0; i < count; i++) {
+    // A mesh that already had a humanoid skeleton keeps the weights its artist gave it, moved bone
+    // for bone onto the new one: fingers, claws and knees deform as they always did, and only the
+    // joints move. Weights are only worked out from distance when there is nothing to carry over.
+    const transfer = skinnedSrc ? boneTransferMap(skinnedSrc.skeleton, defs) : null;
+    if (transfer) {
+      transferSkinWeights(mesh.geometry, transfer, skinIndices, skinWeights);
+    } else for (let i = 0; i < count; i++) {
       if (isRigidAttachment && dominantBoneIdx >= 0) {
         skinIndices[i * 4] = dominantBoneIdx;
         skinWeights[i * 4] = 1.0;
