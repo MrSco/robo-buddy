@@ -1,9 +1,5 @@
 ---
-import pkg from "../../../package.json";
-
-const version = pkg.version;
-const exeUrl = `https://github.com/MrSco/robo-buddy/releases/download/v${version}/RoboBuddy-Setup-${version}.exe`;
-const msiUrl = `https://github.com/MrSco/robo-buddy/releases/download/v${version}/RoboBuddy-${version}.msi`;
+import { setupExeUrl, msiUrl, allReleasesUrl } from "../lib/downloads";
 ---
 
 <section id="download" class="py-24 relative overflow-hidden">
@@ -28,7 +24,7 @@ const msiUrl = `https://github.com/MrSco/robo-buddy/releases/download/v${version
         <!-- Main Download Action Buttons -->
         <div class="pt-4 flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
-            href={exeUrl}
+            href={setupExeUrl}
             class="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-buddy-cyan to-buddy-purple hover:brightness-110 text-white font-bold text-base shadow-xl shadow-buddy-cyan/25 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3"
           >
             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.951-1.77"/></svg>
@@ -60,7 +56,7 @@ const msiUrl = `https://github.com/MrSco/robo-buddy/releases/download/v${version
         </div>
 
         <div class="pt-2 text-xs text-buddy-darkMuted font-mono">
-          Looking for past builds or source releases? <a href="https://github.com/MrSco/robo-buddy" target="_blank" rel="noopener noreferrer" class="text-buddy-cyan hover:underline">View GitHub Releases &rarr;</a>
+          Looking for past builds or source releases? <a href={allReleasesUrl} target="_blank" rel="noopener noreferrer" class="text-buddy-cyan hover:underline">View GitHub Releases &rarr;</a>
         </div>
       </div>
     </div>
