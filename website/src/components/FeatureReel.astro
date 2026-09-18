@@ -188,6 +188,19 @@ const features = [
                     src={feat.videoFile}
                   ></video>
 
+                  <!-- Fullscreen: the reel is small on purpose, but the detail is in the recording -->
+                  <button
+                    type="button"
+                    class="feature-fullscreen absolute bottom-3 right-3 z-20 flex items-center gap-1.5 rounded-md bg-buddy-bg/70 px-2.5 py-1.5 text-[11px] font-medium text-white/90 backdrop-blur-sm ring-1 ring-white/15 transition hover:bg-buddy-bg/90 hover:text-white hover:ring-buddy-cyan/60"
+                    aria-label={`Watch ${feat.title} full screen`}
+                    title="Full screen"
+                  >
+                    <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" />
+                    </svg>
+                    Full screen
+                  </button>
+
                   <!-- Fallback Placeholder (displayed only if video fails to load) -->
                   <div class="feature-placeholder hidden relative z-10 flex flex-col items-center max-w-md space-y-3 p-6 text-center">
                     <div class="w-16 h-16 rounded-full bg-gradient-to-tr from-buddy-cyan to-buddy-purple p-0.5 shadow-xl">
@@ -244,6 +257,25 @@ const features = [
         } else {
           vid.pause();
         }
+      });
+
+      // Full screen on the video itself. object-cover crops to fill the card, which is right at
+      // card size and wrong at screen size, so it gives way to object-contain while fullscreen.
+      const fsButton = parent?.querySelector<HTMLButtonElement>('.feature-fullscreen');
+      fsButton?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const v = vid as HTMLVideoElement & { webkitEnterFullscreen?: () => void };
+        if (v.requestFullscreen) {
+          v.requestFullscreen().catch(() => {});
+        } else if (v.webkitEnterFullscreen) {
+          v.webkitEnterFullscreen(); // iOS Safari
+        }
+        vid.play().catch(() => {});
+      });
+      vid.addEventListener('fullscreenchange', () => {
+        const full = document.fullscreenElement === vid;
+        vid.classList.toggle('object-cover', !full);
+        vid.classList.toggle('object-contain', full);
       });
 
       if (vid.readyState >= 2) {
