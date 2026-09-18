@@ -19,3 +19,4 @@ __pycache__/
 
 # A cargo check run from the repo root once left its cache here; only src-tauri/target is real
 /target
+src-tauri/core/target

@@ -1,0 +1,14 @@
+[package]
+name = "robo-buddy-core"
+# Not released on its own; the version that ships is the one in the package above.
+version = "0.0.0"
+edition = "2021"
+description = "Robo Buddy logic with no Tauri in it, so that it can be tested without one"
+
+# Its own workspace root. `src-tauri` is a plain package rather than a workspace, and cargo
+# refuses to build a crate nested inside one unless it is either a member or, as here, declares
+# that it is not looking for a parent.
+[workspace]
+
+[dependencies]
+log = "0.4"

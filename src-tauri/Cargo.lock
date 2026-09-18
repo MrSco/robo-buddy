@@ -3265,6 +3265,7 @@ dependencies = [
  "log",
  "png 0.17.16",
  "reqwest",
+ "robo-buddy-core",
  "rustfft",
  "serde",
  "serde_json",
@@ -3279,6 +3280,13 @@ dependencies = [
  "windows 0.61.3",
  "winreg 0.55.0",
  "zip",
+]
+
+[[package]]
+name = "robo-buddy-core"
+version = "0.0.0"
+dependencies = [
+ "log",
 ]
 
 [[package]]

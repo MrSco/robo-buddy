@@ -28,7 +28,9 @@ jobs:
       # Without this a cold build is over ten minutes; warm it is a fraction of that.
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri -> target
+          workspaces: |
+            src-tauri -> target
+            src-tauri/core -> target
 
       # tauri-build reads dist/, so the frontend has to exist first.
       - uses: pnpm/action-setup@v6
@@ -46,6 +48,14 @@ jobs:
       - name: cargo check
         working-directory: src-tauri
         run: cargo check --locked
+
+      # The app crate's own test harness cannot start on Windows: only its binary gets a manifest,
+      # so the harness binds comctl32 to the v5.82 stub and dies on a missing TaskDialogIndirect
+      # before the first test runs. Logic worth testing lives in core, which links no Tauri and
+      # finishes in about a second.
+      - name: cargo test (core)
+        working-directory: src-tauri/core
+        run: cargo test --locked
 
       # Reports lints without failing the build. There is no rustup on the development machine,
       # so the warning list has never been seen; tighten to `-- -D warnings` once it is clean.

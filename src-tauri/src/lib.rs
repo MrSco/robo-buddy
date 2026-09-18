@@ -13,10 +13,12 @@ mod piper;
 mod packs;
 mod screen;
 mod idle_saver;
-mod idle_episode;
-mod logging;
 mod settings;
 mod context;
+
+// Logic that carries its own tests lives in a crate with no Tauri in it. Re-exported under the
+// same names so `crate::logging::` and `crate::idle_episode::` still read the way they did.
+pub use robo_buddy_core::{idle_episode, logging};
 
 /// The tab the settings window should open on, left here until the page asks for it.
 #[derive(Default)]
