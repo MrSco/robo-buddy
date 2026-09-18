@@ -22,8 +22,8 @@
 
 | Package | Type | Description | Link |
 | :--- | :--- | :--- | :--- |
-| **RoboBuddy-Setup-0.7.2.exe** | **EXE Setup (Recommended)** | Standard per-user installer. Creates desktop & Start Menu shortcuts, auto-checks WebView2. | [📥 Download .exe](https://github.com/MrSco/robo-buddy/releases/latest/download/RoboBuddy-Setup-0.7.2.exe) |
-| **RoboBuddy-0.7.2.msi** | **MSI Installer** | Windows Installer package for system administrators and enterprise deployment. | [📥 Download .msi](https://github.com/MrSco/robo-buddy/releases/latest/download/RoboBuddy-0.7.2.msi) |
+| **RoboBuddy-Setup-0.7.3.exe** | **EXE Setup (Recommended)** | Standard per-user installer. Creates desktop & Start Menu shortcuts, auto-checks WebView2. | [📥 Download .exe](https://github.com/MrSco/robo-buddy/releases/latest/download/RoboBuddy-Setup-0.7.3.exe) |
+| **RoboBuddy-0.7.3.msi** | **MSI Installer** | Windows Installer package for system administrators and enterprise deployment. | [📥 Download .msi](https://github.com/MrSco/robo-buddy/releases/latest/download/RoboBuddy-0.7.3.msi) |
 
 > [!TIP]
 > All releases, release notes, and file checksums are published on the [GitHub Releases](https://github.com/MrSco/robo-buddy/releases) page.
@@ -55,7 +55,7 @@
 
 ## 🚀 Quick Start Guide
 
-1. **Install**: Run `RoboBuddy-Setup-0.7.2.exe` and follow the quick setup wizard.
+1. **Install**: Run `RoboBuddy-Setup-0.7.3.exe` and follow the quick setup wizard.
 2. **System Tray**: Look for the Robo Buddy icon in your Windows taskbar notification area (system tray). Right-click it (or right-click Buddy himself) to access:
    - **Settings**: Audio sensitivity, character management, AI brains, and screensaver options.
    - **Bring Buddy Here**: Instantly teleports Buddy to your current cursor position.
