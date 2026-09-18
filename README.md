@@ -80,7 +80,7 @@ Encountered an issue or have a suggestion? We'd love to hear from you!
 ---
 
 <div align="center">
-  <sub>Built with Tauri v2, Rust, Three.js, and Web Technologies.</sub>
+  <sub>Built with Tauri v2, Rust, Three.js, and Web Technologies. Code under the <a href="LICENSE">MIT License</a>; bundled assets under their own terms, see <a href="CREDITS.md">CREDITS.md</a>.</sub>
 </div>
 
 ---
