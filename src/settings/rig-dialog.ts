@@ -618,6 +618,10 @@ export function showRigDialog(opts: RigDialogOptions): Promise<RigDialogResult> 
     let previewModel: THREE.Object3D | null = null;
     let previewSkinnedGroup: THREE.Object3D | null = null;
     let previewMixer: THREE.AnimationMixer | null = null;
+    // The animated copy's rig, read once while it still stands in rest. Reading it when a clip is
+    // first asked for meant reading whatever pose the last clip had left the bones in -- a clip
+    // first played mid-dance was retargeted against a dancing "rest", cached, and wrong for good.
+    let previewRig: Rig | null = null;
     let boundsBox = new THREE.Box3();
     let boundsSize = new THREE.Vector3(1, 2, 1);
     let boundsCenter = new THREE.Vector3(0, 1, 0);
@@ -1324,6 +1328,7 @@ export function showRigDialog(opts: RigDialogOptions): Promise<RigDialogResult> 
             }
           });
           previewSkinnedGroup = null;
+          previewRig = null;
         }
         if (previewModel) previewModel.visible = true;
         skeletonVisualizer.visible = true;
@@ -1353,6 +1358,7 @@ export function showRigDialog(opts: RigDialogOptions): Promise<RigDialogResult> 
               }
             });
             previewSkinnedGroup = null;
+            previewRig = null;
           }
 
           // Clone previewModel and restore original materials on clone for preview
@@ -1385,6 +1391,7 @@ export function showRigDialog(opts: RigDialogOptions): Promise<RigDialogResult> 
           }
           scene.add(previewSkinnedGroup);
           previewMixer = new THREE.AnimationMixer(previewSkinnedGroup);
+          previewRig = buildRig(previewSkinnedGroup);
           animDirty = false;
           applyXray();
         }
@@ -1403,14 +1410,23 @@ export function showRigDialog(opts: RigDialogOptions): Promise<RigDialogResult> 
             cachedCanon = await canonicalRig();
           }
           const sourceRig = hasOwnSkeleton(extra.root) ? buildRig(extra.root) : cachedCanon;
-          const targetRig = buildRig(previewSkinnedGroup);
-          clip = retargetClip(raw, sourceRig, targetRig);
+          if (!previewRig) previewRig = buildRig(previewSkinnedGroup);
+          clip = retargetClip(raw, sourceRig, previewRig);
           clip.name = clipName;
           cachedClips.set(clipName, clip);
         }
 
         if (previewMixer) {
           previewMixer.stopAllAction();
+          // Back to rest before the next clip starts, so nothing the last one left in the bones
+          // bleeds into a clip that does not touch them, and it starts from where it was made.
+          if (previewRig) {
+            for (const [o, t] of previewRig.rest) {
+              o.position.copy(t.p);
+              o.quaternion.copy(t.q);
+              o.scale.copy(t.s);
+            }
+          }
           const action = previewMixer.clipAction(clip);
           action.reset();
           action.setLoop(THREE.LoopRepeat, Infinity);
@@ -1499,6 +1515,7 @@ export function showRigDialog(opts: RigDialogOptions): Promise<RigDialogResult> 
           }
         });
         previewSkinnedGroup = null;
+        previewRig = null;
       }
       if (renderer3d) renderer3d.dispose();
       jointGeo.dispose();
