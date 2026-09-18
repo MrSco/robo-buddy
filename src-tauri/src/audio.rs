@@ -14,6 +14,8 @@ const FFT_SIZE: usize = 2048;
 const HOP: usize = 512;
 const HOPS_PER_SEC: f32 = RATE as f32 / HOP as f32; // ~86
 const EMIT_INTERVAL: Duration = Duration::from_millis(33);
+/// How often to check whether Windows has moved the default output device elsewhere.
+const DEVICE_CHECK_INTERVAL: Duration = Duration::from_secs(1);
 
 #[derive(Serialize, Clone, Copy, Default, Debug)]
 pub struct AudioFeatures {
@@ -266,6 +268,8 @@ fn capture_loop(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let enumerator = DeviceEnumerator::new()?;
     // Loopback: open the default *render* device and initialise it for capture.
     let device = enumerator.get_default_device(&Direction::Render)?;
+    // Remembered so the loop can notice Windows moving the default out from under it.
+    let device_id = device.get_id().unwrap_or_default();
     let mut client = device.get_iaudioclient()?;
     let format = WaveFormat::new(32, 32, &SampleType::Float, RATE, 2, None);
     let blockalign = format.get_blockalign() as usize;
@@ -284,6 +288,7 @@ fn capture_loop(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let mut bytes: VecDeque<u8> = VecDeque::with_capacity(RATE * blockalign);
     let mut mono: Vec<f32> = Vec::with_capacity(RATE / 10);
     let mut last_emit = Instant::now();
+    let mut last_device_check = Instant::now();
 
     loop {
         match event.wait_for_event(100) {
@@ -317,6 +322,24 @@ fn capture_loop(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
             analyzer.beat_pending = false;
             let _ = app.emit("audio", f);
         }
+        // A capture stream stays open, and keeps handing over digital silence, long after its
+        // endpoint has stopped being the default one -- no packet ever fails, so the error path
+        // above never runs and he would listen to the wrong device until he was restarted. A
+        // wireless headset going to sleep, or a headset coming back, is enough to do it. Ask once
+        // a second who the default is now, and reopen on the answer changing.
+        if last_device_check.elapsed() >= DEVICE_CHECK_INTERVAL {
+            last_device_check = Instant::now();
+            let now_default = enumerator
+                .get_default_device(&Direction::Render)
+                .ok()
+                .and_then(|d| d.get_id().ok());
+            if let Some(id) = now_default {
+                if id != device_id {
+                    log::info!("default output device changed; reopening the loopback capture");
+                    return Ok(());
+                }
+            }
+        }
     }
 }
 
@@ -332,11 +355,17 @@ pub fn start_audio_thread(app: AppHandle) {
             #[cfg(windows)]
             let _ = wasapi::initialize_mta();
             loop {
-                if let Err(e) = capture_loop(&app) {
-                    log::warn!("audio capture stopped: {e}; retrying in 2 s");
-                    let _ = app.emit("audio", AudioFeatures { silent: true, ..Default::default() });
+                match capture_loop(&app) {
+                    // The default device moved. Reopen straight away rather than leaving him deaf
+                    // for another two seconds.
+                    Ok(()) => thread::sleep(Duration::from_millis(100)),
+                    Err(e) => {
+                        log::warn!("audio capture stopped: {e}; retrying in 2 s");
+                        let _ =
+                            app.emit("audio", AudioFeatures { silent: true, ..Default::default() });
+                        thread::sleep(Duration::from_secs(2));
+                    }
                 }
-                thread::sleep(Duration::from_secs(2));
             }
         })
         .expect("spawn audio thread");
