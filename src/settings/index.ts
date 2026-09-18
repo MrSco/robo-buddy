@@ -269,9 +269,14 @@ export class SettingsApp implements SettingsContext {
         if (e.payload.type !== "drop") return;
         for (const path of e.payload.paths) await this.importFile(path);
       });
-      void listen<string>("import-file", (e) => {
-        if (e.payload) void this.importFile(e.payload);
-      });
+      // Files dropped on the buddy wait in a queue on the Rust side; "import-file" is only a nudge
+      // to drain it. Drained once here too, for the drop that opened this window while it was
+      // still loading and would otherwise have been lost.
+      const drainImports = async () => {
+        for (const path of await invoke<string[]>("take_pending_imports")) await this.importFile(path);
+      };
+      void listen("import-file", () => void drainImports());
+      void drainImports();
     } catch {
       // not in Tauri
     }

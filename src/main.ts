@@ -259,8 +259,10 @@ async function boot() {
     // Drop a model or animation file onto the buddy to import it.
     await getCurrentWebview().onDragDropEvent(async (e) => {
       if (e.payload.type === "enter" || e.payload.type === "over") {
+        // updateClickThrough sees this flag and keeps him solid for the rest of the drag. It was
+        // also re-applied here on every "over" -- dozens of style changes a second on a window
+        // mid-OLE-drag, which is the kind of thing that leaves a drag wedged.
         draggingOverWindow = true;
-        getCurrentWindow().setIgnoreCursorEvents(false).catch(() => {});
       } else if (e.payload.type === "leave") {
         draggingOverWindow = false;
       } else if (e.payload.type === "drop") {
@@ -496,41 +498,14 @@ async function importDropped(path: string) {
     speak("poked");
     return;
   }
+  // Settings does the importing: it has the room for Skeleton Studio and the one code path that
+  // handles every kind of file. Doing it here meant loading a whole model into this little window
+  // just to learn what it was, then handing it over through an event fired 350 ms after opening
+  // Settings -- before a freshly made window was listening -- so the drop went nowhere.
+  void invoke("append_log", { line: `drop: ${path} -> settings` }).catch(() => {});
   try {
-    const staged = await invoke<string>("stage_dropped", { source: path });
-    let kind: "model" | "clip" = "model";
-    if (["glb", "gltf", "fbx"].includes(ext)) {
-      // An animation file has no mesh; a model does.
-      const { loadModel } = await import("./character");
-      const { convertFileSrc } = await import("@tauri-apps/api/core");
-      const probe = await loadModel(convertFileSrc(staged));
-      let hasMesh = false;
-      probe.root.traverse((o) => {
-        if ((o as THREE.Mesh).isMesh) hasMesh = true;
-      });
-      kind = hasMesh ? "model" : probe.animations.length ? "clip" : "model";
-      if (kind === "model") {
-        const { isModelRigged, hasMeshGeometry } = await import("./autorig");
-        if (hasMeshGeometry(probe.root) && !isModelRigged(probe.root)) {
-          // Open settings window so the user gets the full 1120x860 Skeleton Studio
-          await invoke("open_settings");
-          bubble.say(["Opening Skeleton Studio in Settings..."], 4, clock.elapsedTime);
-          setTimeout(() => {
-            void emit("import-file", path);
-          }, 350);
-          return;
-        }
-      }
-    }
-    const result = await invoke<{ kind: string; id?: string; name: string }>("finalize_import", { staged, kind, name: null });
-    invalidateLibrary();
-    if (result.kind === "model" && result.id) {
-      const { setSettings } = await import("./settings-store");
-      await setSettings({ ...settings, character: result.id });
-    } else {
-      await loadPack(settings.character);
-      bubble.say([`Got "${result.name}". Tag it in Settings.`], 3.5, clock.elapsedTime);
-    }
+    await invoke("import_via_settings", { path });
+    bubble.say(["Opening that in Settings..."], 3.5, clock.elapsedTime);
   } catch (err) {
     reportError("import", err);
     bubble.say([`Couldn't import that: ${String(err).slice(0, 60)}`], 4, clock.elapsedTime);

@@ -28,6 +28,39 @@ fn take_settings_tab(state: tauri::State<PendingTab>) -> Option<String> {
     state.0.lock().ok().and_then(|mut t| t.take())
 }
 
+/// Files dropped on the buddy, waiting for the settings window to import them. Queued here rather
+/// than sent in an event, because the window that is going to do the importing may be the one
+/// this drop is opening, and an event fired at a page still loading is simply lost.
+#[derive(Default)]
+struct PendingImports(std::sync::Mutex<Vec<String>>);
+
+/// Hand a dropped file to the settings window, opening it if need be. The buddy's own window is
+/// no place to import from: it is small, it would have to load the whole model to find out what
+/// it had, and Settings already has the code path for every kind of file.
+#[tauri::command]
+fn import_via_settings(app: tauri::AppHandle, path: String) {
+    if let Ok(mut q) = app.state::<PendingImports>().0.lock() {
+        q.push(path.clone());
+    }
+    chat::append_log(app.clone(), format!("import: queued {path} for settings"));
+    if let Some(win) = app.get_webview_window("settings") {
+        let _ = win.show();
+        let _ = win.unminimize();
+        let _ = win.set_focus();
+        // A nudge, not the path: the window drains the queue itself.
+        let _ = win.emit("import-file", ());
+    } else {
+        show_settings_on(&app, Some("character"));
+    }
+}
+
+/// Everything waiting to be imported, and the queue emptied. The settings page asks on start-up
+/// and again whenever it is nudged.
+#[tauri::command]
+fn take_pending_imports(state: tauri::State<PendingImports>) -> Vec<String> {
+    state.0.lock().map(|mut q| std::mem::take(&mut *q)).unwrap_or_default()
+}
+
 fn show_settings(app: &tauri::AppHandle) {
     show_settings_on(app, None);
 }
@@ -132,6 +165,7 @@ pub fn run() {
             None,
         ))
         .manage(PendingTab::default())
+        .manage(PendingImports::default())
         .manage(idle_saver::State::default())
         .manage(screen::Shot::default())
         .manage(screen::PageReadiness::default())
@@ -254,6 +288,8 @@ pub fn run() {
             idle_saver::set_idle_screensaver,
             idle_saver::idle_saver_status,
             take_settings_tab,
+            import_via_settings,
+            take_pending_imports,
             context_menu,
             chat::set_chat_key,
             chat::has_chat_key,

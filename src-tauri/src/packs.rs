@@ -177,15 +177,25 @@ pub fn list_user_clips(app: AppHandle) -> Vec<UserClip> {
 
 /// Copy a dropped file into the inbox (inside the asset-protocol scope) so the frontend can
 /// open it and decide whether it is a model or an animation.
+/// Copy a dropped file into the inbox. Off the main thread: a plain command runs on it, and for
+/// as long as the copy took, every window and the tray froze with it.
 #[tauri::command]
-pub fn stage_dropped(app: AppHandle, source: String) -> Result<String, String> {
-    let src = Path::new(&source);
+pub async fn stage_dropped(app: AppHandle, source: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || stage_dropped_blocking(&app, &source))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn stage_dropped_blocking(app: &AppHandle, source: &str) -> Result<String, String> {
+    let src = Path::new(source);
     let name = src.file_name().ok_or("no file name")?.to_string_lossy().into_owned();
-    let dir = inbox_dir(&app).ok_or("no data dir")?;
+    let dir = inbox_dir(app).ok_or("no data dir")?;
     let dst = dir.join(&name);
     fs::copy(src, &dst).map_err(|e| e.to_string())?;
-    // FBX textures usually sit next to the file; bring image siblings along.
-    if let Some(parent) = src.parent() {
+    // FBX textures usually sit next to the file; bring image siblings along. Only for FBX: a GLB
+    // carries its own, and a model dragged out of Downloads used to bring every picture in there.
+    let fbx = src.extension().and_then(|x| x.to_str()).map(|x| x.eq_ignore_ascii_case("fbx")).unwrap_or(false);
+    if let Some(parent) = src.parent().filter(|_| fbx) {
         if let Ok(entries) = fs::read_dir(parent) {
             for e in entries.flatten() {
                 let p = e.path();
