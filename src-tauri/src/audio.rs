@@ -135,7 +135,12 @@ impl Analyzer {
 
         let band = |lo: f32, hi: f32| -> f32 {
             let (a, b) = (bin_for(lo).max(1), bin_for(hi).min(mags.len() - 1));
-            mags[a..b].iter().sum::<f32>() / (b - a).max(1) as f32
+            // An inverted range would slice out of bounds and underflow the divisor. It cannot
+            // happen at the rate and size fixed above, but neither is worth a crash if they move.
+            if b <= a {
+                return 0.0;
+            }
+            mags[a..b].iter().sum::<f32>() / (b - a) as f32
         };
         let bass = band(20.0, 160.0);
         let mid = band(160.0, 2000.0);
@@ -251,12 +256,17 @@ impl Analyzer {
             return;
         }
         let bpm = 60.0 * HOPS_PER_SEC / best.0 as f32;
+        // A driver handing over a NaN sample carries it all the way through to here, and a NaN
+        // tempo would both reach the meter and, sorted below, take the whole thread down.
+        if !bpm.is_finite() {
+            return;
+        }
         self.bpm_estimates.push_back(bpm);
         if self.bpm_estimates.len() > 5 {
             self.bpm_estimates.pop_front();
         }
         let mut sorted: Vec<f32> = self.bpm_estimates.iter().copied().collect();
-        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted.sort_by(f32::total_cmp);
         self.features.bpm = sorted[sorted.len() / 2];
     }
 }
@@ -279,6 +289,12 @@ fn capture_loop(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         buffer_duration_hns: min_period,
     };
     client.initialize_client(&format, &Direction::Capture, &mode)?;
+    // The frame reader below takes two 32-bit samples per frame. Were the negotiated format ever
+    // narrower it would pop past the end of a packet and panic, which with `panic = "abort"` takes
+    // the whole app down; turn it into an ordinary error the retry loop can handle instead.
+    if blockalign < 8 {
+        return Err(format!("loopback gave an unexpected {blockalign}-byte frame").into());
+    }
     let event = client.set_get_eventhandle()?;
     let capture = client.get_audiocaptureclient()?;
     client.start_stream()?;

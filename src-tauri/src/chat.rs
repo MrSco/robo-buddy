@@ -324,15 +324,7 @@ pub fn save_phrases(app: AppHandle, pack: String, json: String) -> Result<(), St
 pub fn append_log(app: AppHandle, line: String) {
     let Some(dir) = app.path().app_data_dir().ok() else { return };
     let _ = fs::create_dir_all(&dir);
-    let path = dir.join("buddy.log");
-    if fs::metadata(&path).map(|m| m.len() > 200_000).unwrap_or(false) {
-        let _ = fs::remove_file(&path);
-    }
-    use std::io::Write;
-    if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(&path) {
-        let secs = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
-        let _ = writeln!(f, "{secs} {line}");
-    }
+    crate::logging::append(&dir.join("buddy.log"), &line);
 }
 
 // ---------- user personality profiles ----------

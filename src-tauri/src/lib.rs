@@ -14,6 +14,7 @@ mod packs;
 mod screen;
 mod idle_saver;
 mod idle_episode;
+mod logging;
 mod settings;
 mod context;
 
@@ -178,6 +179,11 @@ pub fn run() {
         .manage(screen::Backdrop::default())
         .manage(screen::Punch::default())
         .setup(move |app| {
+            // Before anything else, so that whatever follows can be seen to have failed.
+            if let Ok(dir) = app.path().app_data_dir() {
+                logging::init(&dir);
+            }
+            log::info!("robo buddy {} starting", env!("CARGO_PKG_VERSION"));
             let bring_item = MenuItem::with_id(app, "bring", "Bring buddy here", true, None::<&str>)?;
             let saver_item = MenuItem::with_id(app, "screensaver", "Screensaver now", true, None::<&str>)?;
             let settings_item = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>)?;
